@@ -3,7 +3,8 @@ import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
 import type { Cell } from "../../shared/pathfind";
 import { TILE } from "../../shared/constants";
-import { MAP_W, MAP_H, TILES, ROCK, TREE, isWalkable } from "../../shared/map";
+import { MAP_W, MAP_H, PROPS, BLOCKING_PROPS, TERRAIN_NAMES, isWalkable } from "../../shared/map";
+import { renderGround, TILE_URLS } from "./mapRender";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
 import { MOBS } from "../../shared/game";
@@ -92,7 +93,10 @@ export class GameScene extends Phaser.Scene {
       for (const d of IDLE_DIRS)
         for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
     // พื้นหญ้า 64×64 ปูซ้ำทั้งแมพ (ขนาดเดิม ไม่ย่อ/ขยาย)
-    this.load.image("tile_grass", "sprites/tiles/grass.png");
+    TILE_URLS.forEach((url, i) => this.load.image(`tile_${TERRAIN_NAMES[i]}`, url));
+    // ของประดับในแมพ: props.json (ขนาด, จุดยึด, ความกว้างเงา) + รูปแต่ละชิ้น
+    this.load.json("props_set1", "sprites/props/set1/props.json");
+    for (const kind of new Set(PROPS.map((p) => p.kind))) this.load.image(`prop_${kind}`, `sprites/props/set1/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
     // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น (ชุดหลัก + ชุดท่าเพิ่มแต่ละโฟลเดอร์)
@@ -602,21 +606,22 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawMap() {
-    this.add.tileSprite(0, 0, MAP_W * TILE, MAP_H * TILE, "tile_grass").setOrigin(0, 0).setDepth(-2);
-    const g = this.add.graphics().setDepth(-1);
-    for (let y = 0; y < MAP_H; y++) {
-      for (let x = 0; x < MAP_W; x++) {
-        const t = TILES[y * MAP_W + x];
-        const px = x * TILE, py = y * TILE;
-        if (t === ROCK) {
-          g.fillStyle(0x7d8590).fillRoundedRect(px + 3, py + 6, TILE - 6, TILE - 9, 6);
-          g.fillStyle(0x9aa3ad).fillRoundedRect(px + 7, py + 8, 10, 6, 3);
-        } else if (t === TREE) {
-          g.fillStyle(0x5b3a1f).fillRect(px + 13, py + 18, 6, 12);
-          g.fillStyle(0x2f5d2a).fillCircle(px + 16, py + 13, 12);
-          g.fillStyle(0x3d7535).fillCircle(px + 12, py + 10, 6);
-        }
-      }
+    // พื้นทั้งแผ่น (ลายพื้น + ขอบโค้ง + ทรายเปียก + ฟองคลื่น + เส้นขอบหญ้า) วาดครั้งเดียว
+    const tiles = TERRAIN_NAMES.map((n) => this.textures.get(`tile_${n}`).getSourceImage() as HTMLImageElement);
+    this.textures.addCanvas("map_ground", renderGround(tiles));
+    this.add.image(0, 0, "map_ground").setOrigin(0, 0).setDepth(-3);
+
+    // ของประดับ: จุดยึดกึ่งกลางฐานวางใกล้ขอบล่างของช่อง พร้อมเงาวงรี
+    // ชิ้นที่ขวางทางเรียงลำดับตามแกน y กับตัวละคร/มอน ชิ้นเล็กเดินผ่านได้อยู่ระดับพื้น (ใต้ตัวละครเสมอ)
+    const meta = (this.cache.json.get("props_set1") ?? {}) as Record<string, { width: number; height: number; anchor: { x: number; y: number }; shadowWidth: number }>;
+    for (const p of PROPS) {
+      const m = meta[p.kind];
+      if (!m) continue;
+      const x = p.x * TILE + TILE / 2, y = p.y * TILE + TILE - 6;
+      const block = BLOCKING_PROPS.has(p.kind);
+      const depth = block ? y - 8 : -1;
+      this.add.ellipse(x, y, m.shadowWidth, Math.max(3, Math.round(m.shadowWidth * 0.3)), 0x000000, 70 / 255).setDepth(block ? depth - 0.5 : -2);
+      this.add.image(x, y, `prop_${p.kind}`).setOrigin(m.anchor.x / m.width, (m.anchor.y + 1) / m.height).setDepth(depth);
     }
   }
 }

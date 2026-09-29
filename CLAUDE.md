@@ -39,7 +39,7 @@ npm run typecheck       # tsc ทั้ง client และ server
 - `shared/` ใช้ร่วมกันทั้งสองฝั่ง
   - `constants.ts` ค่าตัวเลขเกม (TILE=32, tick 100ms, ความเร็วเดิน, ระยะตี, รัศมี auto) และ `NAME_RE` กติกาชื่อตัวละคร (client ตรวจก่อนส่ง server ตรวจซ้ำ)
   - `data/levels.json`, `data/monsters.json` ตัวเลขสมดุลที่ export จาก Excel (ดูหัวข้อ "ตัวเลขสมดุลเกม")
-  - `map.ts` แมพสร้างจาก seed ตายตัว 48×36 ช่อง (ยังไม่ได้ใช้ Tiled)
+  - `map.ts` แมพ "ทุ่งนาริมคลอง" สร้างจาก seed ตายตัว 48×36 ช่อง (ยังไม่ได้ใช้ Tiled): ชั้นพื้น `TERRAIN` (grass/water/sand/dirt/paddy — น้ำเดินไม่ได้) + ของประดับ `PROPS` (ชิ้นใน `BLOCKING_PROPS` ขวางทาง) คลองคดผ่านกลาง ทรายริมตลิ่ง ทางข้ามทราย 2 จุด นาข้าวเป็นแปลงมีคันนาดิน ถนนดินจากจุดเกิด ขอบแมพเป็นพุ่มไม้
   - `pathfind.ts` A* 8 ทิศ ห้ามตัดมุม
   - `game.ts` ข้อมูลมอน, สูตร EXP/ดาเมจ
   - `protocol.ts` รูปแบบข้อความ client↔server
@@ -53,6 +53,7 @@ npm run typecheck       # tsc ทั้ง client และ server
 - `client/src/creator.ts` หน้าสร้างตัวละคร (ตัวอย่างหมุนได้ 8 ทิศ)
 - `client/src/recolor.ts` เปลี่ยนสีผม/ตาของ sprite base ตอนโหลด
 - `client/src/GameScene.ts` ฉากเกม Phaser
+- `client/src/mapRender.ts` วาดพื้นทั้งแผ่นเป็นภาพเดียวตอนเข้าเกม: ลายพื้น 64×64 ปูซ้ำตามพิกัดโลก, ขอบโค้งด้วย noise (`WARP`), ทรายเปียกริมน้ำ, ฟองคลื่น, เส้นขอบหญ้า 1px
 - `client/public/sprites/base-male/`, `base-female/` ภาพ base 8 ทิศ (ผมดำ)
 - `client/public/ui/` ภาพพื้นหลังหน้าล็อกอินและโลโก้
 
@@ -116,10 +117,10 @@ npm run typecheck       # tsc ทั้ง client และ server
 - ภาพต้นฉบับจาก PixelLab เก็บที่ `art/pixellab/<ชื่อภาษาอังกฤษ>/` (ตั้งชื่อโฟลเดอร์และไฟล์เป็นภาษาอังกฤษเสมอ) แต่ละชุดมี `metadata.json` บอกทิศและเฟรม ถ้า `animations` ว่าง แปลว่ามีแค่ภาพนิ่ง 8 ทิศ
 - ภาพมอนเก็บที่ `art/monsters/<ชื่อภาษาอังกฤษ>/`
 - **ของประดับ/วัตถุในแมพ (ChatGPT):** sheet 4×4 หนึ่งช่องหนึ่งชิ้น ChatGPT มักวาดทุกชิ้นเต็มช่องเท่ากัน จึงตัดด้วย `tools/slice_props.py` ที่กำหนดความกว้างในเกมทีละชิ้น (ตัวละครกว้างราว 22px) ได้ `<ชื่อ>.png`, `props.json` (ขนาด, จุดยึดกึ่งกลางฐาน, ความกว้างเงา) และ `preview.png`
-  - ชุดแรก `art/props/set1/sheet.png`: `python tools/slice_props.py art/props/set1/sheet.png art/props/set1 --cols 4 --rows 4 --names flowers-yellow,flowers-pink,tall-grass,fern,bush,rock,rocks-3,mossy-boulder,seashell,starfish,driftwood,coconut,beach-grass,rice-straw,clay-jar,lotus --widths 14,14,14,18,24,14,18,28,8,9,18,10,14,14,14,18` (ตัดแล้ว **ยังไม่ได้วางในแมพ**)
+  - ชุดแรก `art/props/set1/sheet.png` (ใช้ในแมพแล้ว ไฟล์เกมที่ `client/public/sprites/props/set1/`): `python tools/slice_props.py art/props/set1/sheet.png art/props/set1 --cols 4 --rows 4 --names flowers-yellow,flowers-pink,tall-grass,fern,bush,rock,rocks-3,mossy-boulder,seashell,starfish,driftwood,coconut,beach-grass,rice-straw,clay-jar,lotus --widths 14,14,14,18,24,14,18,28,8,9,18,10,14,14,14,18`
   - วาดเงาด้วยโค้ด: วงรีสีดำโปร่งแสง (alpha ~70/255) ใต้จุดยึดของวัตถุ ตัวละคร และมอนทุกตัว เรียงลำดับการวาดตามแกน y
 - ลายพื้นเก็บที่ `art/tiles/` (grass, sand, water, dirt, paddy ขนาด 64×64 ต่อกันไร้รอยต่อ ผู้ใช้เลือกสีสดตามต้นฉบับ ภาพต้นฉบับจาก ChatGPT ที่ `art/tiles/source/`) ขอบระหว่างพื้นทำให้โค้งด้วย noise, ทรายริมน้ำเข้มขึ้น, ฟองคลื่นสีขาวที่ขอบน้ำ, เส้นหญ้าเข้ม 1px ที่ขอบหญ้า
-  - **ในเกมตอนนี้:** ใช้แค่ grass ปูซ้ำทั้งแมพ (tileSprite ขนาดเดิม `client/public/sprites/tiles/grass.png`) หิน/ต้นไม้ยังวาดด้วยโค้ด sand/water/dirt/paddy ยังไม่ได้ใส่ (ยังไม่มีผังแมพว่าพื้นแต่ละแบบอยู่ตรงไหน)
+  - ในเกมใช้ครบทั้ง 5 แบบแล้ว (ไฟล์เกม `client/public/sprites/tiles/`) ผังพื้นอยู่ใน `shared/map.ts` วาดด้วย `client/src/mapRender.ts` (หิน/ต้นไม้ที่เคยวาดด้วยโค้ดเลิกใช้ ใช้ของประดับแทน)
 - รูปไอเท็ม/ของดรอปเก็บที่ `art/items/` เป็น pixel art ขนาด 32×32 (มีสำรอง 64×64 ได้) พื้นโปร่งใส
   - มีแล้ว: `crab-claw-16.png`, `crab-claw-32.png`, `crab-claw-64.png` (ก้ามปูนา; 16 ย่อจาก 64 แบบลงตัว 4:1), `red-crab-claw-16/32/64.png` (ก้ามปูแดง, ต้นแบบ `red-crab-claw-source.png`)
   - ของบนพื้นหายเองหลัง 60 นาที (`GROUND_ITEM_MS`, ผู้ใช้กำหนด) ใครกดเก็บก็ได้ ต้องกดที่ของเอง (auto ไม่เก็บให้) ตอนนี้ปูนาดรอปก้ามปูนา 100%
