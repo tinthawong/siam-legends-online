@@ -7,6 +7,7 @@ import { MAP_W, MAP_H, TILES, ROCK, TREE, isWalkable } from "../../shared/map";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
 import { MOBS } from "../../shared/game";
+import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, idleFrameUrl } from "./sprites";
 
 interface View {
   id: string;
@@ -23,13 +24,6 @@ interface View {
   dir: Dir;              // ทิศที่หันอยู่
   pose: string;          // texture/animation ที่แสดงอยู่ (กันตั้งซ้ำทุกเฟรม)
 }
-
-// ท่ายืน (idle) จาก PixelLab: เฟรม 64×64 ตัวละครเลื่อน +8px จากภาพ base 48×48 (เท้าบรรทัด 53)
-// ตอนนี้มีเฉพาะทิศใต้ ได้ทิศอื่นมาให้วางไฟล์ที่ sprites/base-<เพศ>/idle-<ทิศ>/0..8.png แล้วเพิ่มทิศในลิสต์นี้
-const IDLE_DIRS = ["south"] as const;
-const IDLE_FRAMES = 9;
-const IDLE_FPS = 5; // 200ms ต่อเฟรม ตามไฟล์ต้นฉบับ
-const IDLE_OFFSET = 8;
 
 const center = (n: number) => n * TILE + TILE / 2;
 
@@ -63,7 +57,7 @@ export class GameScene extends Phaser.Scene {
       for (const d of DIRS) this.load.image(`base_${g}_${d}`, `sprites/base-${g}/${d}.png`);
     for (const g of Object.keys(GENDERS))
       for (const d of IDLE_DIRS)
-        for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, `sprites/base-${g}/idle-${d}/${i}.png`);
+        for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
     // มอนที่มีภาพ 8 ทิศ (client/public/sprites/<sprite>/<ทิศ>.png)
     for (const def of Object.values(MOBS))
       if (def.sprite) for (const d of DIRS) this.load.image(`mob_${def.sprite}_${d}`, `sprites/${def.sprite}/${d}.png`);

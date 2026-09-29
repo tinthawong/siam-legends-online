@@ -1,6 +1,7 @@
 // หน้าสร้างตัวละคร: ตัวอย่างหมุนได้ + เลือกเพศ / สีผม / สีตา
 import { DEFAULT_LOOK, GENDERS, HAIR_COLORS, EYE_COLORS, lookKey, type Gender, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
+import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, idleFrameUrl } from "./sprites";
 
 // เรียงตามเข็มนาฬิกาเวลามองจากด้านบน ใช้กับปุ่มหมุน
 const ROTATION = ["south", "south-west", "west", "north-west", "north", "north-east", "east", "south-east"];
@@ -11,6 +12,7 @@ export class Creator {
   private images = new Map<string, HTMLImageElement>();
   private cache = new Map<string, HTMLCanvasElement>();
   private ready: Promise<void> | null = null;
+  private frame = 0; // เฟรมท่ายืนที่แสดงอยู่
 
   constructor(private canvas: HTMLCanvasElement) {}
 
@@ -30,6 +32,20 @@ export class Creator {
         this.images.set(`${g}_${d}`, img);
         loads.push(img.decode().catch(() => undefined));
       }
+    // ท่ายืน: ทิศที่มีเฟรมจะเล่นวนเหมือนในเกม
+    for (const g of Object.keys(GENDERS))
+      for (const d of IDLE_DIRS)
+        for (let i = 0; i < IDLE_FRAMES; i++) {
+          const img = new Image();
+          img.src = `/${idleFrameUrl(g, d, i)}`;
+          this.images.set(`${g}_idle_${d}_${i}`, img);
+          loads.push(img.decode().catch(() => undefined));
+        }
+    setInterval(() => {
+      if (!this.canvas.offsetParent || !IDLE_DIRS.includes(ROTATION[this.dir])) return; // ซ่อนอยู่ / ทิศนี้ไม่มีท่ายืน
+      this.frame = (this.frame + 1) % IDLE_FRAMES;
+      this.render();
+    }, 1000 / IDLE_FPS);
     this.ready = Promise.all(loads).then(() => this.render());
     return this.ready;
   }
@@ -62,18 +78,22 @@ export class Creator {
 
   private render() {
     const d = ROTATION[this.dir];
-    const key = `${lookKey(this.look)}_${d}`;
+    const idle = IDLE_DIRS.includes(d) ? `idle_${d}_${this.frame}` : null;
+    const src = idle ?? d;
+    const key = `${lookKey(this.look)}_${src}`;
     let sprite = this.cache.get(key);
     if (!sprite) {
-      const img = this.images.get(`${this.look.gender}_${d}`);
+      const img = this.images.get(`${this.look.gender}_${src}`);
       if (!img || !img.complete || !img.naturalWidth) return;
-      sprite = recolorSprite(img, this.look);
+      sprite = recolorSprite(img, this.look, idle ? IDLE_OFFSET : 0);
       this.cache.set(key, sprite);
     }
     const ctx = this.canvas.getContext("2d")!;
     ctx.imageSmoothingEnabled = false;
     ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-    const s = Math.floor(this.canvas.width / sprite.width);
-    ctx.drawImage(sprite, (this.canvas.width - sprite.width * s) / 2, this.canvas.height - sprite.height * s, sprite.width * s, sprite.height * s);
+    // ขยายเท่ากับภาพ base 48px ทุกกรณี และเลื่อนเฟรม 64px กลับ 8px ให้ตัวละครอยู่ตำแหน่งเดียวกัน
+    const s = Math.floor(this.canvas.width / 48);
+    const off = idle ? IDLE_OFFSET * s : 0;
+    ctx.drawImage(sprite, (this.canvas.width - 48 * s) / 2 - off, this.canvas.height - 48 * s - off, sprite.width * s, sprite.height * s);
   }
 }
