@@ -40,6 +40,10 @@ export interface PlayerStats {
   hp: number;
   maxHp: number;
   money: number; // เบี้ย
+  stats: { str: number; vit: number; agi: number; luk: number };
+  points: number;  // แต้มสถานะคงเหลือ
+  aspdMs: number;  // ตีได้ทุก ๆ กี่ ms
+  crit: number;    // โอกาสคริ 0–1
 }
 
 // client → server
@@ -51,7 +55,8 @@ export type ClientMsg =
   | { t: "revive" }            // สลบอยู่ → กลับเมือง (ฟื้นที่จุดเกิด)
   | { t: "use"; item: string }  // ใช้ไอเท็มในกระเป๋า (ยา)
   | { t: "buy"; item: string; count: number } // ซื้อของด้วยเบี้ย
-  | { t: "bot"; potionAt: number }; // กินยาอัตโนมัติเมื่อเลือดต่ำกว่ากี่ % (0 = ปิด)
+  | { t: "bot"; potionAt: number } // กินยาอัตโนมัติเมื่อเลือดต่ำกว่ากี่ % (0 = ปิด)
+  | { t: "stat"; stat: "str" | "vit" | "agi" | "luk"; n: number }; // ใช้แต้มสถานะ
 
 // server → client
 export type ServerMsg =
@@ -86,6 +91,7 @@ export interface JoinCharacter {
   look: Look;
   inv: InvItem[];
   money: number;
+  stats: { str: number; vit: number; agi: number; luk: number };
 }
 
 /** close code ที่ client ต้องรู้ */

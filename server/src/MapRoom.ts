@@ -8,7 +8,7 @@ import {
 } from "../../shared/constants";
 import { MAP_W, MAP_H, SPAWN, ZONES, isWalkable, inZone, exitAt } from "../../shared/map";
 import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
-import { MOBS, expToNext, playerAtk, playerMaxHp, rollDamage } from "../../shared/game";
+import { MOBS, expToNext, rollDamage, STAT_KEYS, statPointsLeft, statAtk, statMaxHp, statAspdMs, statCrit, type Stats } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import { CLOSE_KICKED } from "../../shared/protocol";
 import type { ClientMsg, ServerMsg, EntityState, PlayerStats, JoinCharacter, GroundItem, InvItem } from "../../shared/protocol";
@@ -44,6 +44,7 @@ interface Player extends Ent {
   pickup: string | null;   // ของบนพื้นที่กำลังเดินไปเก็บ
   dead: boolean;           // เลือดหมด สลบอยู่กับที่ จนกว่าจะกดกลับเมือง
   money: number;           // เบี้ย
+  st: Stats;               // แต้มสถานะที่อัปแล้ว
   potionAt: number;        // กินยาอัตโนมัติเมื่อเลือดต่ำกว่ากี่ % (0 = ปิด)
   nextPotionAt: number;
   inv: Map<string, number>; // กระเป๋า: item → จำนวน
@@ -97,7 +98,7 @@ export class MapRoom extends DurableObject<Env> {
     // บัญชีเดียวกันเข้าซ้ำ → เตะตัวเก่า และใช้ค่าล่าสุดในหน่วยความจำ (ใหม่กว่าใน D1)
     for (const old of this.players.values()) {
       if (old.userId !== ch.userId) continue;
-      ch = { ...ch, level: old.level, exp: old.exp, x: old.x, y: old.y, inv: invList(old.inv), money: old.money };
+      ch = { ...ch, level: old.level, exp: old.exp, x: old.x, y: old.y, inv: invList(old.inv), money: old.money, stats: { ...old.st } };
       this.players.delete(old.id);
       this.broadcast({ t: "despawn", id: old.id });
       this.send(old, { t: "kicked" }); // แจ้งก่อน เพราะ close event อาจมาช้า
@@ -115,12 +116,12 @@ export class MapRoom extends DurableObject<Env> {
     const p: Player = {
       id, kind: "player", name: ch.name, userId: ch.userId, look: ch.look,
       x: pos.x, y: pos.y,
-      hp: playerMaxHp(ch.level), maxHp: playerMaxHp(ch.level),
+      hp: statMaxHp(ch.level, { ...ch.stats }), maxHp: statMaxHp(ch.level, { ...ch.stats }),
       moveMs: PLAYER_MOVE_MS, path: [], nextStepAt: 0,
       ws: server, level: ch.level, exp: ch.exp,
       target: null, auto: false, nextAttackAt: 0, chaseKey: null,
       lastCombatAt: 0, nextRegenAt: 0,
-      pickup: null, dead: false, money: ch.money ?? 0, potionAt: 0, nextPotionAt: 0, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
+      pickup: null, dead: false, money: ch.money ?? 0, st: { ...ch.stats }, potionAt: 0, nextPotionAt: 0, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
     };
     this.players.set(id, p);
 
@@ -195,6 +196,17 @@ export class MapRoom extends DurableObject<Env> {
         this.send(p, { t: "stats", self: this.stats(p) });
         break;
       }
+      case "stat": {
+        // ใช้แต้มสถานะ: server ตรวจแต้มคงเหลือเอง
+        const k = msg.stat, n = Math.floor(Number(msg.n));
+        if (!STAT_KEYS.includes(k) || !(n >= 1) || n > statPointsLeft(p.level, p.st)) return;
+        p.st[k] += n;
+        const maxHp = statMaxHp(p.level, p.st);
+        p.hp += maxHp - p.maxHp; // อัปอึดแล้วเลือดเพิ่มตามทันที
+        p.maxHp = maxHp;
+        this.send(p, { t: "stats", self: this.stats(p) });
+        break;
+      }
       case "bot": {
         const v = Math.round(Number(msg.potionAt));
         p.potionAt = v >= 0 && v <= 95 ? v : 0;
@@ -234,14 +246,14 @@ export class MapRoom extends DurableObject<Env> {
     if (!list.length) return;
     const now = Date.now();
     const stmt = this.env.DB.prepare(
-      "UPDATE characters SET level = ?, exp = ?, x = ?, y = ?, money = ?, updated_at = ? WHERE user_id = ?",
+      "UPDATE characters SET level = ?, exp = ?, x = ?, y = ?, money = ?, str = ?, vit = ?, agi = ?, luk = ?, updated_at = ? WHERE user_id = ?",
     );
     const invStmt = this.env.DB.prepare(
       "INSERT INTO inventory (user_id, item, count) VALUES (?, ?, ?) ON CONFLICT (user_id, item) DO UPDATE SET count = excluded.count",
     );
     try {
       await this.env.DB.batch(list.flatMap((p) => [
-        stmt.bind(p.level, p.exp, p.x, p.y, p.money, now, p.userId),
+        stmt.bind(p.level, p.exp, p.x, p.y, p.money, p.st.str, p.st.vit, p.st.agi, p.st.luk, now, p.userId),
         ...[...p.inv].map(([item, count]) => invStmt.bind(p.userId, item, count)),
       ]));
     } catch (e) {
@@ -355,9 +367,9 @@ export class MapRoom extends DurableObject<Env> {
   }
 
   private attack(p: Player, m: Mob, now: number) {
-    p.nextAttackAt = now + PLAYER_ASPD_MS;
+    p.nextAttackAt = now + statAspdMs(PLAYER_ASPD_MS, p.st);
     p.lastCombatAt = now;
-    const { dmg, crit } = rollDamage(playerAtk(p.level), MOBS[m.type].def);
+    const { dmg, crit } = rollDamage(statAtk(p.level, p.st), MOBS[m.type].def, Math.random, statCrit(p.st));
     m.hp = Math.max(0, m.hp - dmg);
     this.broadcast({ t: "hit", src: p.id, dst: m.id, dmg, crit, hp: m.hp });
     if (m.hp === 0) { this.killMob(m, p, now); return; }
@@ -513,7 +525,7 @@ export class MapRoom extends DurableObject<Env> {
     while (killer.exp >= expToNext(killer.level)) {
       killer.exp -= expToNext(killer.level);
       killer.level++;
-      killer.maxHp = playerMaxHp(killer.level);
+      killer.maxHp = statMaxHp(killer.level, killer.st);
       killer.hp = killer.maxHp;
     }
     this.send(killer, { t: "stats", self: this.stats(killer) });
@@ -610,7 +622,8 @@ export class MapRoom extends DurableObject<Env> {
   private stats(p: Player): PlayerStats {
     return {
       level: p.level, exp: p.exp, expNext: expToNext(p.level),
-      atk: playerAtk(p.level), hp: p.hp, maxHp: p.maxHp, money: p.money,
+      atk: statAtk(p.level, p.st), hp: p.hp, maxHp: p.maxHp, money: p.money,
+      stats: { ...p.st }, points: statPointsLeft(p.level, p.st), aspdMs: statAspdMs(PLAYER_ASPD_MS, p.st), crit: statCrit(p.st),
     };
   }
 

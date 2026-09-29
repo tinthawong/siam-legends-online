@@ -308,6 +308,33 @@ function bindHud(net: Net) {
     $("bot-potions").textContent = String(inv.filter((i) => ITEMS[i.item]?.heal).reduce((a, i) => a + i.count, 0));
   };
 
+  // อัปสถานะ: ปุ่ม +1 และ +5 (server ตรวจแต้มเอง)
+  const STATS: { key: "str" | "vit" | "agi" | "luk"; name: string; desc: string }[] = [
+    { key: "str", name: "พลัง", desc: "+1 พลังโจมตี" },
+    { key: "vit", name: "อึด", desc: "+5 พลังชีวิต" },
+    { key: "agi", name: "ว่องไว", desc: "ตีเร็วขึ้น 1%" },
+    { key: "luk", name: "โชค", desc: "คริ +0.5%" },
+  ];
+  const statVal: Record<string, HTMLElement> = {};
+  const statBtns: HTMLButtonElement[] = [];
+  for (const st of STATS) {
+    const row = document.createElement("div");
+    row.className = "stat-row";
+    row.innerHTML = `<span>${st.name}<small>${st.desc}</small></span><span class="v">0</span>`;
+    statVal[st.key] = row.querySelector(".v")!;
+    for (const n of [1, 5]) {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = `+${n}`;
+      b.title = `${st.name} +${n}`;
+      b.dataset.n = String(n);
+      b.onclick = () => net.send({ t: "stat", stat: st.key, n });
+      row.appendChild(b);
+      statBtns.push(b);
+    }
+    $("stat-rows").appendChild(row);
+  }
+
   return {
     inventory: (items: InvItem[]) => { inv = items; renderBag(); },
     stats: (s: PlayerStats) => {
@@ -319,6 +346,14 @@ function bindHud(net: Net) {
       $("st-atk").textContent = String(s.atk);
       $("st-exp").textContent = `${s.exp} / ${s.expNext}`;
       $("st-money").textContent = money.toLocaleString("th-TH");
+      $("st-aspd").textContent = `${(1000 / s.aspdMs).toFixed(2)} ครั้ง/วิ`;
+      $("st-crit").textContent = `${Math.round(s.crit * 1000) / 10}%`;
+      $("st-points").textContent = String(s.points);
+      for (const k in statVal) statVal[k].textContent = String(s.stats[k as keyof typeof s.stats]);
+      for (const b of statBtns) b.disabled = s.points < Number(b.dataset.n);
+      const badge = $("stat-badge");
+      badge.hidden = s.points <= 0;
+      badge.textContent = `+${s.points}`;
     },
     joined: sendBot, // ส่งค่าบอทให้ server ตอนเข้าแมพ (server ไม่ได้เก็บค่านี้)
   };

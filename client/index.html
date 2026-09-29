@@ -288,12 +288,23 @@
     #menu button span { font-size: 11px; line-height: 1; }
     #menu button[aria-expanded="true"] { background: rgba(242, 193, 78, 0.18); color: var(--exp); box-shadow: inset 0 0 0 1px var(--exp); }
     .panel-pop { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(92px + env(safe-area-inset-bottom));
-      width: min(320px, calc(100vw - 20px)); padding: 10px 12px 12px; }
+      width: min(320px, calc(100vw - 20px)); padding: 10px 12px 12px; max-height: calc(100vh - 110px); overflow-y: auto; }
     .panel-close { background: none; border: 0; color: var(--ink-dim); font-size: 16px; padding: 2px 6px; }
     .panel-hint { margin: 8px 0 0; font-size: 12px; color: var(--ink-dim); }
     .stat-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
     .stat-list dt { color: var(--ink-dim); }
     .stat-list dd { margin: 0; text-align: right; font-weight: 600; }
+    #menu button { position: relative; }
+    .badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
+      background: #e0525a; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; line-height: 20px; box-shadow: 0 0 0 2px var(--window); }
+    .stat-head { display: flex; justify-content: space-between; align-items: baseline; margin: 12px 0 6px; padding-top: 10px;
+      border-top: 1px solid rgba(159, 192, 236, 0.25); font-size: 14px; }
+    .stat-head b#st-points { color: var(--exp); font-size: 16px; }
+    .stat-row { display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 8px; padding: 5px 0; font-size: 14px; }
+    .stat-row small { display: block; font-size: 11px; color: var(--ink-dim); }
+    .stat-row .v { min-width: 28px; text-align: right; font-weight: 700; }
+    .stat-row button { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 6px; background: var(--exp); color: #2b1d00; font-weight: 700; font-size: 13px; }
+    .stat-row button:disabled { opacity: 0.35; cursor: default; }
     .money-big { margin: 0 0 10px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
     .money-big b { font-size: 22px; color: var(--exp); }
     .coin { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff2b0, #f2c14e 45%, #a8741c); box-shadow: inset 0 0 0 1px #6b4410; }
@@ -478,6 +489,7 @@
     <!-- แถบเมนูล่าง: กดปุ่มเปิด/ปิดหน้าต่างของปุ่มนั้น (เปิดได้ทีละหน้า) -->
     <nav id="menu" aria-label="เมนู">
       <button type="button" data-panel="stat-panel" aria-expanded="false" title="สถานะ (C)">
+        <i class="badge" id="stat-badge" hidden></i>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><span>สถานะ</span>
       </button>
       <button type="button" data-panel="bag" aria-expanded="false" title="กระเป๋า (I)">
@@ -499,7 +511,12 @@
         <dt>พลังโจมตี</dt><dd id="st-atk"></dd>
         <dt>EXP</dt><dd id="st-exp"></dd>
         <dt>เบี้ย</dt><dd id="st-money"></dd>
+        <dt>ความเร็วตี</dt><dd id="st-aspd"></dd>
+        <dt>โอกาสคริ</dt><dd id="st-crit"></dd>
       </dl>
+      <div class="stat-head"><b>อัปสถานะ</b><span>แต้มคงเหลือ <b id="st-points">0</b></span></div>
+      <div id="stat-rows"></div>
+      <p class="panel-hint">ได้ 5 แต้มทุกครั้งที่เลเวลอัป</p>
     </section>
 
     <section id="bag" class="window panel-pop" hidden aria-label="กระเป๋า">

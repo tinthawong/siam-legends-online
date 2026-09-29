@@ -50,9 +50,22 @@ export const expToNext = (level: number) => 20 + level * 15;
 export const playerAtk = (level: number) => 10 + level * 2;
 export const playerMaxHp = (level: number) => 90 + level * 10;
 
-export function rollDamage(atk: number, def: number, rng: () => number = Math.random) {
+// ---------- แต้มสถานะ (อัปเองในหน้าสถานะ) ----------
+export type StatKey = "str" | "vit" | "agi" | "luk";
+export type Stats = Record<StatKey, number>;
+export const STAT_KEYS: StatKey[] = ["str", "vit", "agi", "luk"];
+export const STAT_POINTS_PER_LEVEL = 5;
+export const statPointsTotal = (level: number) => (level - 1) * STAT_POINTS_PER_LEVEL;
+export const statPointsLeft = (level: number, s: Stats) => statPointsTotal(level) - STAT_KEYS.reduce((a, k) => a + s[k], 0);
+/** ค่าที่ได้จากแต้ม: พลัง +1 ATK/แต้ม, อึด +5 HP/แต้ม, ว่องไว ตีเร็วขึ้น 1%/แต้ม (สูงสุด 50%), โชค คริ +0.5%/แต้ม (สูงสุด 50%) */
+export const statAtk = (level: number, s: Stats) => playerAtk(level) + s.str;
+export const statMaxHp = (level: number, s: Stats) => playerMaxHp(level) + s.vit * 5;
+export const statAspdMs = (base: number, s: Stats) => Math.round(base * (1 - Math.min(0.5, s.agi * 0.01)));
+export const statCrit = (s: Stats) => Math.min(0.5, 0.1 + s.luk * 0.005);
+
+export function rollDamage(atk: number, def: number, rng: () => number = Math.random, critChance = 0.1) {
   let dmg = Math.max(1, Math.round(atk * (0.85 + rng() * 0.3)) - def);
-  const crit = rng() < 0.1;
+  const crit = rng() < critChance;
   if (crit) dmg = Math.round(dmg * 1.5);
   return { dmg, crit };
 }
