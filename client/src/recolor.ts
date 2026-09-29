@@ -12,8 +12,10 @@ function hsl(r: number, g: number, b: number): [number, number, number] {
   return [h * 60, s, l];
 }
 
-/** ผม = ก้อนสีเข้มโทนน้ำเงินเทาขนาดใหญ่ที่เริ่มจากบนหัว (ตัดที่แนวเอว) */
-export function hairMask(d: ImageData, eyes: Set<number>, waist = 34): Set<number> {
+/** ผม = ก้อนสีเข้มโทนน้ำเงินเทาขนาดใหญ่ที่เริ่มจากบนหัว (ตัดที่แนวเอว)
+ *  oy = ตัวละครเลื่อนลงกี่พิกเซลเทียบกับภาพ base 48×48 (เฟรม animation 64×64 ของ PixelLab = 8) */
+export function hairMask(d: ImageData, eyes: Set<number>, oy = 0): Set<number> {
+  const waist = 34 + oy;
   const { width: W, height: H, data } = d;
   const ok = (i: number) => {
     if (data[i * 4 + 3] === 0 || eyes.has(i)) return false; // ตาไม่นับเป็นผม แม้จะอยู่ติดคิ้ว
@@ -41,7 +43,7 @@ export function hairMask(d: ImageData, eyes: Set<number>, waist = 34): Set<numbe
         }
     }
     const top = Math.min(...comp.map((i) => (i / W) | 0));
-    if (comp.length >= 12 && top < 14) for (const i of comp) if (((i / W) | 0) < waist) mask.add(i);
+    if (comp.length >= 12 && top < 14 + oy) for (const i of comp) if (((i / W) | 0) < waist) mask.add(i);
   }
   return mask;
 }
@@ -102,7 +104,7 @@ function applyRamp(d: ImageData, mask: Set<number>, [dark, lite]: [RGB, RGB]) {
 }
 
 /** สร้างภาพใหม่จากภาพ base ตามสีผม/สีตาที่เลือก */
-export function recolorSprite(src: CanvasImageSource & { width: number; height: number }, look: Look): HTMLCanvasElement {
+export function recolorSprite(src: CanvasImageSource & { width: number; height: number }, look: Look, oy = 0): HTMLCanvasElement {
   const cv = document.createElement("canvas");
   cv.width = src.width; cv.height = src.height;
   const ctx = cv.getContext("2d", { willReadFrequently: true })!;
@@ -112,7 +114,7 @@ export function recolorSprite(src: CanvasImageSource & { width: number; height: 
   if (!hairRamp && !eyeRamp) return cv;
   const d = ctx.getImageData(0, 0, cv.width, cv.height);
   const eyes = eyeMask(d);        // หาตาก่อน แล้วกันออกจากผม (หาจากภาพต้นฉบับก่อนเปลี่ยนสี)
-  const hair = hairMask(d, eyes);
+  const hair = hairMask(d, eyes, oy);
   if (hairRamp) applyRamp(d, hair, hairRamp);
   if (eyeRamp) applyRamp(d, eyes, eyeRamp);
   ctx.putImageData(d, 0, 0);

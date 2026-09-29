@@ -112,6 +112,9 @@ npm run typecheck       # tsc ทั้ง client และ server
   - มอน: `cute chibi monster, big expressive eyes with bright highlights, smooth soft shading, colored darker outlines instead of pure black, vivid saturated colors`
   - ไอเท็ม: `centered, fills most of the frame, pixel art, clean pixels, limited color palette, cute stylized game item, colored darker outlines instead of pure black, vivid saturated colors, transparent background, no text`
 - ห้ามย่อ/ขยาย pixel art ด้วยอัตราส่วนที่ไม่ลงตัว (เช่น 48→32) ในเกม เพราะพิกเซลจะขาด ให้สร้างภาพใหม่ในขนาดที่ต้องการแทน
+- **ท่ายืน (idle) ผู้เล่น:** มีแล้วเฉพาะทิศใต้ ชาย/หญิง 9 เฟรม 200ms/เฟรม กรอบ 64×64 (ตัวเลื่อน +8px จาก base, เท้าบรรทัด 53) ต้นฉบับที่ `art/pixellab/base-<เพศ>-idle/` ไฟล์เกมที่ `client/public/sprites/base-<เพศ>/idle-south/0..8.png` ได้ทิศอื่นมา: วางไฟล์ `idle-<ทิศ>/` แล้วเพิ่มทิศใน `IDLE_DIRS` (`GameScene.ts`) — ยืนนิ่งและหันทิศที่มี idle = เล่น animation นอกนั้นใช้ภาพนิ่ง
+  - `recolorSprite(src, look, oy)` / `hairMask(d, eyes, oy)` รับค่า oy = ระยะที่ตัวเลื่อนลงจาก base (idle 64×64 = 8) เส้นเอวจึงเป็น 34+oy
+  - ปลายผมยาวที่ต่ำกว่าเส้นเอว (ข้างมือ) ไม่ถูกเปลี่ยนสี เป็นแบบนี้ทั้งภาพนิ่งและ idle
 - **ปูนา:** มีภาพนิ่ง 8 ทิศแล้วที่ `art/pixellab/rice-field-crab/` (PixelLab, 48×48, ตัวกว้างเกือบเต็มกรอบ ใหญ่กว่าตัวละครผู้เล่น) ยังไม่มีท่าทาง ผู้ใช้ยังไม่ได้ตัดสินใจว่าจะสร้างใหม่ที่ 32px, ใช้ตัวนี้เป็นปูถ้ำยักษ์แทน หรือใช้ขนาดนี้ต่อ
   - **ทดสอบในเกมแล้ว (ผู้ใช้สั่ง):** `mud_crab` ใน `shared/game.ts` เกิด 8 ตัวในแมพแรกคู่กับ Poring ค่าพลังอ่านจาก `monsters.json` (mob003) ภาพเกมอยู่ที่ `client/public/sprites/mud-crab/` (สำเนาจาก art) เท้าอยู่บรรทัด 43 ยังไม่มีของดรอป
 

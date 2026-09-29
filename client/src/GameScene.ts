@@ -12,7 +12,7 @@ interface View {
   id: string;
   kind: EntityState["kind"];
   c: Phaser.GameObjects.Container;
-  body: Phaser.GameObjects.Image;
+  body: Phaser.GameObjects.Sprite;
   hpBar: Phaser.GameObjects.Graphics | null;
   hp: number;
   maxHp: number;
@@ -20,7 +20,16 @@ interface View {
   moveMs: number;
   sprite: string | null; // มี = ภาพ 8 ทิศ (ผู้เล่น หรือมอนที่มีภาพ)
   topY: number;          // ขอบบนของตัว (ใช้วางแถบ HP / ตัวเลขดาเมจ)
+  dir: Dir;              // ทิศที่หันอยู่
+  pose: string;          // texture/animation ที่แสดงอยู่ (กันตั้งซ้ำทุกเฟรม)
 }
+
+// ท่ายืน (idle) จาก PixelLab: เฟรม 64×64 ตัวละครเลื่อน +8px จากภาพ base 48×48 (เท้าบรรทัด 53)
+// ตอนนี้มีเฉพาะทิศใต้ ได้ทิศอื่นมาให้วางไฟล์ที่ sprites/base-<เพศ>/idle-<ทิศ>/0..8.png แล้วเพิ่มทิศในลิสต์นี้
+const IDLE_DIRS = ["south"] as const;
+const IDLE_FRAMES = 9;
+const IDLE_FPS = 5; // 200ms ต่อเฟรม ตามไฟล์ต้นฉบับ
+const IDLE_OFFSET = 8;
 
 const center = (n: number) => n * TILE + TILE / 2;
 
@@ -52,6 +61,9 @@ export class GameScene extends Phaser.Scene {
     // ตัว base ของแต่ละเพศ (client/public/sprites/base-<เพศ>/<ทิศ>.png)
     for (const g of Object.keys(GENDERS))
       for (const d of DIRS) this.load.image(`base_${g}_${d}`, `sprites/base-${g}/${d}.png`);
+    for (const g of Object.keys(GENDERS))
+      for (const d of IDLE_DIRS)
+        for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, `sprites/base-${g}/idle-${d}/${i}.png`);
     // มอนที่มีภาพ 8 ทิศ (client/public/sprites/<sprite>/<ทิศ>.png)
     for (const def of Object.values(MOBS))
       if (def.sprite) for (const d of DIRS) this.load.image(`mob_${def.sprite}_${d}`, `sprites/${def.sprite}/${d}.png`);
@@ -174,8 +186,8 @@ export class GameScene extends Phaser.Scene {
     // sprite 48px: ตั้ง origin ให้เท้าตรงกลางช่อง (ผู้เล่นเท้าอยู่บรรทัด 45, ปูนาบรรทัด 43)
     const feet = mobSprite ? 43 : 45;
     const body = sprite
-      ? this.add.image(0, 8, tex).setOrigin(0.5, feet / 48)
-      : this.add.image(0, 4, tex).setOrigin(0.5, 1);
+      ? this.add.sprite(0, 8, tex).setOrigin(0.5, feet / 48)
+      : this.add.sprite(0, 4, tex).setOrigin(0.5, 1);
     const topY = sprite ? 8 - feet + 2 : 4 - body.height;
     const label = this.add.text(0, 7, e.name, {
       fontFamily: "Mitr, sans-serif", fontSize: "10px", color: isMob ? "#ffe0ec" : "#ffffff",
@@ -197,8 +209,9 @@ export class GameScene extends Phaser.Scene {
       });
     }
 
-    const v: View = { id: e.id, kind: e.kind, c, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs, sprite, topY };
+    const v: View = { id: e.id, kind: e.kind, c, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs, sprite, topY, dir: "south", pose: tex };
     this.views.set(e.id, v);
+    this.updatePose(v);
     this.drawHp(v);
     c.setDepth(c.y);
   }
@@ -235,15 +248,43 @@ export class GameScene extends Phaser.Scene {
         const src = this.textures.get(`base_${look.gender}_${d}`).getSourceImage() as HTMLImageElement;
         this.textures.addCanvas(`${prefix}_${d}`, recolorSprite(src, look));
       }
+      // ท่ายืน: เปลี่ยนสีทุกเฟรม (เลื่อนเส้นเอวตามตำแหน่งตัวในกรอบ 64×64) แล้วสร้าง animation
+      for (const d of IDLE_DIRS) {
+        const frames: Phaser.Types.Animations.AnimationFrame[] = [];
+        for (let i = 0; i < IDLE_FRAMES; i++) {
+          const key = `base_${look.gender}_idle_${d}_${i}`;
+          if (!this.textures.exists(key)) break;
+          const src = this.textures.get(key).getSourceImage() as HTMLImageElement;
+          this.textures.addCanvas(`${prefix}_idle_${d}_${i}`, recolorSprite(src, look, IDLE_OFFSET));
+          frames.push({ key: `${prefix}_idle_${d}_${i}` });
+        }
+        if (frames.length === IDLE_FRAMES) this.anims.create({ key: `${prefix}_idle_${d}`, frames, frameRate: IDLE_FPS, repeat: -1 });
+      }
     }
     return prefix;
   }
 
-  /** หันหน้า: ตัวละคร 8 ทิศเปลี่ยนภาพ, มอนพลิกซ้าย-ขวา */
+  /** หันหน้า: ภาพ 8 ทิศเปลี่ยนภาพ, Poring พลิกซ้าย-ขวา */
   private face(v: View, dx: number, dy: number) {
     if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
-    if (v.sprite) v.body.setTexture(`${v.sprite}_${dirOf(dx, dy)}`);
+    v.dir = dirOf(dx, dy);
+    if (v.sprite) this.updatePose(v);
     else if (Math.abs(dx) > 0.5) v.body.setFlipX(dx < 0);
+  }
+
+  /** ยืนนิ่งและมีท่ายืนของทิศนั้น = เล่น animation, นอกนั้นใช้ภาพนิ่งของทิศ */
+  private updatePose(v: View) {
+    if (!v.sprite) return;
+    const idle = `${v.sprite}_idle_${v.dir}`;
+    const pose = !v.path.length && this.anims.exists(idle) ? idle : `${v.sprite}_${v.dir}`;
+    if (pose === v.pose) return;
+    v.pose = pose;
+    if (pose === idle) {
+      v.body.setOrigin(0.5, (45 + IDLE_OFFSET) / 64).play(idle);
+    } else {
+      v.body.stop();
+      v.body.setTexture(pose).setOrigin(0.5, (v.kind === "mob" ? 43 : 45) / 48);
+    }
   }
 
   private setTarget(id: string | null) {
@@ -271,6 +312,7 @@ export class GameScene extends Phaser.Scene {
         else { v.c.x += (dx / dist) * step; v.c.y += (dy / dist) * step; }
         this.face(v, dx, dy);
       }
+      this.updatePose(v);
       v.c.setDepth(v.c.y);
     }
     const t = this.targetId ? this.views.get(this.targetId) : undefined;
