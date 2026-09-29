@@ -13,7 +13,7 @@ export interface MobDef {
   sheet?: string;
   // ชุดท่าเพิ่มที่ตัดแยกโฟลเดอร์ (sheet.json ของตัวเอง ขนาดเฟรม/จุดยึดต่างจากชุดหลักได้) เช่น ["hit"]
   sheetParts?: string[];
-  level?: number;      // แสดงต่อท้ายชื่อ เช่น "ปูนา Lv.3"
+  level?: number;      // แสดงต่อท้ายชื่อ เช่น "ปูนา Lv.1"
   atk?: number;        // พลังโจมตี (ใช้ตอนตีกลับ)
   retaliate?: boolean; // โดนผู้เล่นตีแล้วตีกลับ + ไล่ตาม (ดู MOB_* ใน constants.ts)
 }

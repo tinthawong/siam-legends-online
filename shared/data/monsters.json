@@ -31,15 +31,15 @@
   "id": "mob003",
   "name": "ปูนา",
   "map": "ทุ่งนาริมคลอง",
-  "level": 3,
+  "level": 1,
   "boss": false,
   "aggressive": false,
-  "hp": 81,
+  "hp": 57,
   "def": 1,
-  "atk": 10,
-  "exp": 43,
-  "moneyMin": 15,
-  "moneyMax": 22
+  "atk": 8,
+  "exp": 3,
+  "moneyMin": 1,
+  "moneyMax": 2
  },
  {
   "id": "mob004",
