@@ -365,17 +365,47 @@ export class GameScene extends Phaser.Scene {
     c.setDepth(c.y);
   }
 
-  /** ของหล่นบนพื้น: รูป 16px กลางช่อง กดได้ทั้งช่อง (bounce = เพิ่งหล่นจากมอน) */
-  private addGround(g: GroundItem, bounce: boolean) {
+  /** ของหล่นบนพื้น: รูป 16px ในช่องที่มอนตาย กดได้ทั้งช่อง (pop = เพิ่งหล่นจากมอน ให้เด้งออกมา) */
+  private addGround(g: GroundItem, pop: boolean) {
     const def = ITEMS[g.item];
     if (!def || this.groundViews.has(g.id)) return;
-    const img = this.add.image(center(g.x), center(g.y) + 6, `item_${def.icon}`)
+    // จุดตกเยื้องจากกลางช่องเล็กน้อย (แค่ภาพ ตำแหน่งจริงบน server ยังเป็นช่องเดิม)
+    const x1 = center(g.x) + (pop ? Phaser.Math.Between(-7, 7) : 0);
+    const y1 = center(g.y) + 6 + (pop ? Phaser.Math.Between(-3, 3) : 0);
+    const shadow = this.add.ellipse(x1, y1 + 6, 12, 4, 0x000000, 0.25).setDepth(center(g.y) - 3);
+    const img = this.add.image(x1, y1, `item_${def.icon}`)
       .setDepth(center(g.y) - 2)
       // พื้นที่กดใหญ่เท่า 1 ช่อง (32px) แม้รูปจะเล็ก เพื่อให้กดบนมือถือง่าย
       .setInteractive({ hitArea: new Phaser.Geom.Rectangle(-8, -8, 32, 32), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
     img.setData("groundId", g.id).setData("item", g.item);
+    img.once(Phaser.GameObjects.Events.DESTROY, () => shadow.destroy());
     this.groundViews.set(g.id, img);
-    if (bounce) this.tweens.add({ targets: img, y: { from: img.y - 18, to: img.y }, duration: 380, ease: "Bounce.easeOut" });
+    if (!pop) return;
+
+    // เด้งออกจากตัวมอนเป็นโค้ง (หมุนนิดหน่อย ขยายจากเล็กไปเต็ม) แล้วกระดอนเบา ๆ อีกครั้ง
+    const x0 = center(g.x), y0 = center(g.y) - 8;
+    const arc = (from: { x: number; y: number }, h: number, t: number) => ({
+      x: Phaser.Math.Linear(from.x, x1, t),
+      y: Phaser.Math.Linear(from.y, y1, t) - h * 4 * t * (1 - t),
+    });
+    const first = (t: number) => {
+      const p = arc({ x: x0, y: y0 }, 22, t);
+      img.setPosition(p.x, p.y).setScale(0.4 + 0.6 * t).setRotation((1 - t) * -0.9);
+      shadow.setScale(0.3 + 0.7 * t).setAlpha(0.25 * t);
+    };
+    first(0);
+    this.tweens.addCounter({
+      from: 0, to: 1, duration: 480, ease: "Sine.easeOut",
+      onUpdate: (tw) => first(tw.getValue() ?? 1),
+      onComplete: () => {
+        first(1);
+        this.tweens.addCounter({
+          from: 0, to: 1, duration: 200, ease: "Sine.easeInOut",
+          onUpdate: (tw) => { const p = arc({ x: x1, y: y1 }, 4, tw.getValue() ?? 1); img.setPosition(p.x, p.y); },
+          onComplete: () => img.setPosition(x1, y1),
+        });
+      },
+    });
   }
 
   private removeView(id: string) {
