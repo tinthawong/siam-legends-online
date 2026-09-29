@@ -4,6 +4,9 @@
 export const MAP_W = 48;
 export const MAP_H = 36;
 export const SPAWN = { x: 6, y: 6 };
+/** เขตหมู่บ้านรอบจุดเกิด (เมืองหลักชั่วคราว): มอนไม่เกิดและไม่เดินเล่นเข้ามา (ไล่ตามผู้เล่นเข้ามาได้) */
+export const TOWN = { x0: 1, y0: 1, x1: 18, y1: 8 };
+export const inTown = (x: number, y: number) => x >= TOWN.x0 && x <= TOWN.x1 && y >= TOWN.y0 && y <= TOWN.y1;
 
 // พื้น: รูปอยู่ที่ client/public/sprites/tiles/<ชื่อ>.png (64×64 ปูซ้ำ)
 export const GRASS = 0;
@@ -18,6 +21,7 @@ export interface MapProp {
   x: number;
   y: number;
   kind: string;
+  foot?: number[]; // ช่องที่ขวางทางในแถวฐาน (ระยะ x จากตัวชิ้น) — สิ่งก่อสร้างกว้างหลายช่อง / ประตูที่เว้นช่องกลาง
 }
 
 // ชุดของประดับ: ไฟล์เกมที่ client/public/sprites/props/<ชุด>/ (มี props.json ของแต่ละชุด)
@@ -25,13 +29,15 @@ export const PROP_SETS: Record<string, string[]> = {
   set1: ["flowers-yellow", "flowers-pink", "tall-grass", "fern", "bush", "rock", "rocks-3", "mossy-boulder",
     "seashell", "starfish", "driftwood", "coconut", "beach-grass", "rice-straw", "clay-jar", "lotus"],
   set2: ["banyan", "coconut-palm", "sugar-palm", "coconut-palm-leaning", "bamboo", "hibiscus-bush"], // ต้นไม้ใหญ่
+  set3: ["stilt-house", "stilt-hut", "sala", "market-stall", "fish-rack", "village-gate", "pier", "longtail-boat", "dragon-jars"], // หมู่บ้าน
 };
 export const PROP_SET_OF: Record<string, string> = Object.fromEntries(
   Object.entries(PROP_SETS).flatMap(([set, kinds]) => kinds.map((k) => [k, set])),
 );
 
 // ชิ้นที่ขวางทาง (เดินทะลุไม่ได้ เฉพาะช่องฐาน) นอกนั้นเป็นของประดับเดินผ่านได้
-export const BLOCKING_PROPS = new Set(["bush", "rock", "rocks-3", "mossy-boulder", "clay-jar", ...PROP_SETS.set2]);
+export const BLOCKING_PROPS = new Set(["bush", "rock", "rocks-3", "mossy-boulder", "clay-jar", ...PROP_SETS.set2,
+  "stilt-house", "stilt-hut", "sala", "market-stall", "fish-rack", "village-gate", "dragon-jars"]);
 
 function mulberry32(seed: number) {
   let a = seed;
@@ -98,6 +104,15 @@ function generate() {
     props.push({ x, y, kind });
     return true;
   };
+  /** สิ่งก่อสร้าง: จองพื้นที่ภาพ (กว้าง ±rw ช่อง สูง rh ช่องเหนือฐาน) ไม่ให้ของอื่นมาทับ ขวางทางตาม foot */
+  const building = (x: number, y: number, kind: string, foot: number[], rw: number, rh: number) => {
+    for (let dy = -rh; dy <= 0; dy++)
+      for (let dx = -rw; dx <= rw; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < MAP_W && ny < MAP_H) taken[ny * MAP_W + nx] = 1;
+      }
+    props.push({ x, y, kind, foot });
+  };
   const nearSpawn = (x: number, y: number) => Math.abs(x - SPAWN.x) <= 2 && Math.abs(y - SPAWN.y) <= 2;
   const onFord = (y: number) => FORDS.some((f) => y === f || y === f + 1);
 
@@ -135,8 +150,17 @@ function generate() {
   scatter(7, ["sugar-palm"], [GRASS], (x, y) => y > 2 && nearTerrain(x, y, PADDY, 2), 2);
   scatter(5, ["bamboo"], [GRASS], (x, y) => inner(x, y), 2);
   scatter(7, ["hibiscus-bush"], [GRASS], (x, y) => y > 1, 1);
-  place(SPAWN.x + 2, SPAWN.y - 2, "clay-jar");
-  place(SPAWN.x - 2, SPAWN.y - 2, "clay-jar");
+  // หมู่บ้านรอบจุดเกิด (= เมืองหลักชั่วคราว ที่กลับมาหลังสลบ) ประตูหมู่บ้านคร่อมถนนดิน เว้นช่องกลางให้เดินผ่าน
+  building(3, 4, "stilt-house", [-1, 0, 1], 2, 3);
+  building(11, 4, "stilt-hut", [-1, 0, 1], 1, 2);
+  building(16, 5, "sala", [-1, 0, 1], 1, 2);
+  building(9, 7, "market-stall", [0], 1, 1);
+  building(14, 8, "fish-rack", [0], 1, 1);
+  building(SPAWN.x, 8, "village-gate", [-1, 1], 1, 2);
+  building(2, 8, "dragon-jars", [0], 0, 1);
+  building(13, 6, "dragon-jars", [0], 0, 1);
+  // เรือหางยาวจอดในคลอง
+  building(canalX(15), 15, "longtail-boat", [], 1, 1);
   scatter(7, ["mossy-boulder"], [GRASS]);
   scatter(10, ["rock", "rocks-3"], [GRASS, SAND], (x, y) => !onFord(y));
   scatter(12, ["bush"], [GRASS]);
@@ -148,7 +172,9 @@ function generate() {
 
   // ช่องที่เดินได้แต่ไปไม่ถึงจากจุดเกิด → กันไว้ ไม่ให้มอนเกิดในที่ปิดตาย
   const blocked = new Uint8Array(MAP_W * MAP_H);
-  for (const p of props) if (BLOCKING_PROPS.has(p.kind)) blocked[p.y * MAP_W + p.x] = 1;
+  for (const p of props)
+    for (const dx of p.foot ?? (BLOCKING_PROPS.has(p.kind) ? [0] : []))
+      if (p.x + dx >= 0 && p.x + dx < MAP_W) blocked[p.y * MAP_W + p.x + dx] = 1;
   const open = (i: number) => T[i] !== WATER && !blocked[i];
   const seen = new Uint8Array(MAP_W * MAP_H);
   const stack = [SPAWN.y * MAP_W + SPAWN.x];

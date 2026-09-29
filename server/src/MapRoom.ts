@@ -6,7 +6,7 @@ import {
   POTION_COOLDOWN_MS, MAX_BUY,
   stepMs, cheb,
 } from "../../shared/constants";
-import { MAP_W, MAP_H, SPAWN, isWalkable } from "../../shared/map";
+import { MAP_W, MAP_H, SPAWN, isWalkable, inTown } from "../../shared/map";
 import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
 import { MOBS, expToNext, playerAtk, playerMaxHp, rollDamage } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
@@ -564,7 +564,7 @@ export class MapRoom extends DurableObject<Env> {
     for (let i = 0; i < 6; i++) {
       const x = m.x + Math.floor(Math.random() * 7) - 3;
       const y = m.y + Math.floor(Math.random() * 7) - 3;
-      if ((x === m.x && y === m.y) || !isWalkable(x, y)) continue;
+      if ((x === m.x && y === m.y) || !isWalkable(x, y) || inTown(x, y)) continue;
       const path = pathTo(m.x, m.y, x, y);
       if (path && path.length <= 8) { this.setPath(m, path, now); return; }
     }
@@ -574,7 +574,7 @@ export class MapRoom extends DurableObject<Env> {
     for (;;) {
       const x = Math.floor(Math.random() * MAP_W);
       const y = Math.floor(Math.random() * MAP_H);
-      if (isWalkable(x, y) && cheb(x, y, SPAWN.x, SPAWN.y) > 4) return { x, y };
+      if (isWalkable(x, y) && !inTown(x, y) && cheb(x, y, SPAWN.x, SPAWN.y) > 4) return { x, y };
     }
   }
 

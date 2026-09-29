@@ -18,6 +18,7 @@ interface View {
   c: Phaser.GameObjects.Container;
   body: Phaser.GameObjects.Sprite;
   hpBar: Phaser.GameObjects.Graphics | null;
+  oc: Phaser.GameObjects.Container; // ชื่อ + แถบ HP ลอยอยู่ชั้นบนสุด ไม่โดนต้นไม้/หลังคาบัง (ตามตำแหน่ง c ทุกเฟรม)
   hp: number;
   maxHp: number;
   path: Cell[];
@@ -312,9 +313,9 @@ export class GameScene extends Phaser.Scene {
             v.pose = "death";
             this.playSheet(v, "death");
             v.body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () =>
-              this.tweens.add({ targets: v.c, alpha: 0, delay: 250, duration: 300, onComplete: () => v.c.destroy() }));
+              this.tweens.add({ targets: [v.c, v.oc], alpha: 0, delay: 250, duration: 300, onComplete: () => { v.c.destroy(); v.oc.destroy(); } }));
           } else {
-            this.tweens.add({ targets: v.c, alpha: 0, scaleY: 0.2, duration: 300, onComplete: () => v.c.destroy() });
+            this.tweens.add({ targets: [v.c, v.oc], alpha: 0, scaleY: 0.2, duration: 300, onComplete: () => { v.c.destroy(); v.oc.destroy(); } });
           }
         }
         break;
@@ -364,12 +365,13 @@ export class GameScene extends Phaser.Scene {
     // เงาวงรีที่พื้นใต้เท้า (อยู่กับที่ ไม่ขยับตามตัวตอนเด้ง/เดิน/ท่ายืน): มอนจาก sheet และผู้เล่น
     if (sheet) c.add(this.add.ellipse(0, 7, 26, 8, 0x000000, 0.3));
     else if (sprite) c.add(this.add.ellipse(0, 7, 22, 7, 0x000000, 0.3));
-    c.add([body, label]);
+    c.add(body);
+    const oc = this.add.container(c.x, c.y, [label]).setDepth(90000);
 
     let hpBar: Phaser.GameObjects.Graphics | null = null;
     if (isMob) {
       hpBar = this.add.graphics();
-      c.add(hpBar);
+      oc.add(hpBar);
       // พื้นที่แตะใหญ่กว่าตัว เพื่อให้กดบนมือถือง่าย
       body.setInteractive(new Phaser.Geom.Circle(body.width / 2, body.height / 2, 22), Phaser.Geom.Circle.Contains);
       body.setData("mobId", e.id);
@@ -384,7 +386,7 @@ export class GameScene extends Phaser.Scene {
       : null;
 
     const v: View = {
-      id: e.id, kind: e.kind, c, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
+      id: e.id, kind: e.kind, c, oc, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
       sprite, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
@@ -448,6 +450,7 @@ export class GameScene extends Phaser.Scene {
     const v = this.views.get(id);
     if (!v) return;
     v.c.destroy();
+    v.oc.destroy();
     this.views.delete(id);
   }
 
@@ -576,6 +579,7 @@ export class GameScene extends Phaser.Scene {
       }
       this.updatePose(v);
       v.c.setDepth(v.c.y);
+      v.oc.setPosition(v.c.x, v.c.y);
     }
     const t = this.targetId ? this.views.get(this.targetId) : undefined;
     if (t) this.targetRing.setPosition(t.c.x, t.c.y + 2).setDepth(t.c.y - 1).setVisible(true);
@@ -618,7 +622,8 @@ export class GameScene extends Phaser.Scene {
       const m = meta[p.kind];
       if (!m) continue;
       const x = p.x * TILE + TILE / 2, y = p.y * TILE + TILE - 6;
-      const block = BLOCKING_PROPS.has(p.kind);
+      // ชิ้นใหญ่ (ต้นไม้/สิ่งก่อสร้าง/เรือ) และชิ้นที่ขวางทาง เรียงตามแกน y กับตัวละคร
+      const block = BLOCKING_PROPS.has(p.kind) || PROP_SET_OF[p.kind] !== "set1";
       const depth = block ? y - 8 : -1;
       this.add.ellipse(x, y, m.shadowWidth, Math.max(3, Math.round(m.shadowWidth * 0.3)), 0x000000, 70 / 255).setDepth(block ? depth - 0.5 : -2);
       this.add.image(x, y, `prop_${p.kind}`).setOrigin(m.anchor.x / m.width, (m.anchor.y + 1) / m.height).setDepth(depth);

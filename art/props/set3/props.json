@@ -1,0 +1,92 @@
+{
+ "stilt-house": {
+  "file": "stilt-house.png",
+  "width": 104,
+  "height": 115,
+  "anchor": {
+   "x": 52,
+   "y": 114
+  },
+  "shadowWidth": 83
+ },
+ "stilt-hut": {
+  "file": "stilt-hut.png",
+  "width": 80,
+  "height": 82,
+  "anchor": {
+   "x": 40,
+   "y": 81
+  },
+  "shadowWidth": 64
+ },
+ "sala": {
+  "file": "sala.png",
+  "width": 80,
+  "height": 92,
+  "anchor": {
+   "x": 40,
+   "y": 91
+  },
+  "shadowWidth": 64
+ },
+ "market-stall": {
+  "file": "market-stall.png",
+  "width": 52,
+  "height": 51,
+  "anchor": {
+   "x": 26,
+   "y": 50
+  },
+  "shadowWidth": 42
+ },
+ "fish-rack": {
+  "file": "fish-rack.png",
+  "width": 56,
+  "height": 50,
+  "anchor": {
+   "x": 28,
+   "y": 49
+  },
+  "shadowWidth": 45
+ },
+ "village-gate": {
+  "file": "village-gate.png",
+  "width": 72,
+  "height": 65,
+  "anchor": {
+   "x": 36,
+   "y": 64
+  },
+  "shadowWidth": 58
+ },
+ "pier": {
+  "file": "pier.png",
+  "width": 40,
+  "height": 40,
+  "anchor": {
+   "x": 20,
+   "y": 39
+  },
+  "shadowWidth": 32
+ },
+ "longtail-boat": {
+  "file": "longtail-boat.png",
+  "width": 88,
+  "height": 52,
+  "anchor": {
+   "x": 44,
+   "y": 51
+  },
+  "shadowWidth": 70
+ },
+ "dragon-jars": {
+  "file": "dragon-jars.png",
+  "width": 40,
+  "height": 40,
+  "anchor": {
+   "x": 20,
+   "y": 39
+  },
+  "shadowWidth": 32
+ }
+}
