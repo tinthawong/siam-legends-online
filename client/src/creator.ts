@@ -1,7 +1,7 @@
 // หน้าสร้างตัวละคร: ตัวอย่างหมุนได้ + เลือกเพศ / สีผม / สีตา
 import { DEFAULT_LOOK, GENDERS, HAIR_COLORS, EYE_COLORS, lookKey, type Gender, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
-import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, idleFrameUrl } from "./sprites";
+import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, animSource, idleFrameUrl } from "./sprites";
 
 // เรียงตามเข็มนาฬิกาเวลามองจากด้านบน ใช้กับปุ่มหมุน
 const ROTATION = ["south", "south-west", "west", "north-west", "north", "north-east", "east", "south-east"];
@@ -42,7 +42,7 @@ export class Creator {
           loads.push(img.decode().catch(() => undefined));
         }
     setInterval(() => {
-      if (!this.canvas.offsetParent || !IDLE_DIRS.includes(ROTATION[this.dir])) return; // ซ่อนอยู่ / ทิศนี้ไม่มีท่ายืน
+      if (!this.canvas.offsetParent || !animSource(IDLE_DIRS, ROTATION[this.dir])) return; // ซ่อนอยู่ / ทิศนี้ไม่มีท่ายืน
       this.frame = (this.frame + 1) % IDLE_FRAMES;
       this.render();
     }, 1000 / IDLE_FPS);
@@ -78,14 +78,15 @@ export class Creator {
 
   private render() {
     const d = ROTATION[this.dir];
-    const idle = IDLE_DIRS.includes(d) ? `idle_${d}_${this.frame}` : null;
+    const anim = animSource(IDLE_DIRS, d); // ทิศฝั่งตะวันตกใช้ท่ายืนของฝั่งตะวันออกกลับภาพ
+    const idle = anim ? `idle_${anim.dir}_${this.frame}` : null;
     const src = idle ?? d;
     const key = `${lookKey(this.look)}_${src}`;
     let sprite = this.cache.get(key);
     if (!sprite) {
       const img = this.images.get(`${this.look.gender}_${src}`);
       if (!img || !img.complete || !img.naturalWidth) return;
-      sprite = recolorSprite(img, this.look, idle ? IDLE_OFFSET : 0);
+      sprite = recolorSprite(img, this.look);
       this.cache.set(key, sprite);
     }
     const ctx = this.canvas.getContext("2d")!;
@@ -94,6 +95,11 @@ export class Creator {
     // ขยายเท่ากับภาพ base 48px ทุกกรณี และเลื่อนเฟรม 64px กลับ 8px ให้ตัวละครอยู่ตำแหน่งเดียวกัน
     const s = Math.floor(this.canvas.width / 48);
     const off = idle ? IDLE_OFFSET * s : 0;
-    ctx.drawImage(sprite, (this.canvas.width - 48 * s) / 2 - off, this.canvas.height - 48 * s - off, sprite.width * s, sprite.height * s);
+    const x = (this.canvas.width - 48 * s) / 2 - off, y = this.canvas.height - 48 * s - off;
+    const w = sprite.width * s, h = sprite.height * s;
+    ctx.save();
+    if (anim?.flip) { ctx.translate(this.canvas.width, 0); ctx.scale(-1, 1); } // กลับซ้าย-ขวารอบกลางกรอบ
+    ctx.drawImage(sprite, x, y, w, h);
+    ctx.restore();
   }
 }

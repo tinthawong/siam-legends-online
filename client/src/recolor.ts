@@ -12,11 +12,22 @@ function hsl(r: number, g: number, b: number): [number, number, number] {
   return [h * 60, s, l];
 }
 
-/** ผม = ก้อนสีเข้มโทนน้ำเงินเทาขนาดใหญ่ที่เริ่มจากบนหัว (ตัดที่แนวเอว)
- *  oy = ตัวละครเลื่อนลงกี่พิกเซลเทียบกับภาพ base 48×48 (เฟรม animation 64×64 ของ PixelLab = 8) */
-export function hairMask(d: ImageData, eyes: Set<number>, oy = 0): Set<number> {
-  const waist = 34 + oy;
+/** ขอบบน/ล่างของตัวละครในภาพ (รองรับทั้งกรอบ 48 และ 64 และท่าที่ตัวขยับขึ้นลง) */
+function spriteBounds(d: ImageData): { top: number; bottom: number } {
   const { width: W, height: H, data } = d;
+  let top = -1, bottom = -1;
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++)
+      if (data[(y * W + x) * 4 + 3]) { if (top < 0) top = y; bottom = y; break; }
+  return { top: Math.max(0, top), bottom: Math.max(0, bottom) };
+}
+
+/** ผม = ก้อนสีเข้มโทนน้ำเงินเทาขนาดใหญ่ที่เริ่มจากบนหัว ตัดที่แนวเอว
+ *  ตัว base 48px: หัวแถว 2, เท้าแถว 45 → ผมต้องเริ่มก่อนแถว 14 (หัว+12), เอวที่แถว 34 (เท้า−11) */
+export function hairMask(d: ImageData, eyes: Set<number>): Set<number> {
+  const { width: W, height: H, data } = d;
+  const { top: spriteTop, bottom } = spriteBounds(d);
+  const hairStart = spriteTop + 12, waist = bottom - 11;
   const ok = (i: number) => {
     if (data[i * 4 + 3] === 0 || eyes.has(i)) return false; // ตาไม่นับเป็นผม แม้จะอยู่ติดคิ้ว
     const [h, s, l] = hsl(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
@@ -43,7 +54,7 @@ export function hairMask(d: ImageData, eyes: Set<number>, oy = 0): Set<number> {
         }
     }
     const top = Math.min(...comp.map((i) => (i / W) | 0));
-    if (comp.length >= 12 && top < 14 + oy) for (const i of comp) if (((i / W) | 0) < waist) mask.add(i);
+    if (comp.length >= 12 && top < hairStart) for (const i of comp) if (((i / W) | 0) < waist) mask.add(i);
   }
   return mask;
 }
@@ -104,7 +115,7 @@ function applyRamp(d: ImageData, mask: Set<number>, [dark, lite]: [RGB, RGB]) {
 }
 
 /** สร้างภาพใหม่จากภาพ base ตามสีผม/สีตาที่เลือก */
-export function recolorSprite(src: CanvasImageSource & { width: number; height: number }, look: Look, oy = 0): HTMLCanvasElement {
+export function recolorSprite(src: CanvasImageSource & { width: number; height: number }, look: Look): HTMLCanvasElement {
   const cv = document.createElement("canvas");
   cv.width = src.width; cv.height = src.height;
   const ctx = cv.getContext("2d", { willReadFrequently: true })!;
@@ -114,7 +125,7 @@ export function recolorSprite(src: CanvasImageSource & { width: number; height: 
   if (!hairRamp && !eyeRamp) return cv;
   const d = ctx.getImageData(0, 0, cv.width, cv.height);
   const eyes = eyeMask(d);        // หาตาก่อน แล้วกันออกจากผม (หาจากภาพต้นฉบับก่อนเปลี่ยนสี)
-  const hair = hairMask(d, eyes, oy);
+  const hair = hairMask(d, eyes);
   if (hairRamp) applyRamp(d, hair, hairRamp);
   if (eyeRamp) applyRamp(d, eyes, eyeRamp);
   ctx.putImageData(d, 0, 0);

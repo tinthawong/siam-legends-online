@@ -7,7 +7,7 @@ import { MAP_W, MAP_H, TILES, ROCK, TREE, isWalkable } from "../../shared/map";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
 import { MOBS } from "../../shared/game";
-import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, idleFrameUrl } from "./sprites";
+import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, animSource, idleFrameUrl } from "./sprites";
 
 interface View {
   id: string;
@@ -242,14 +242,14 @@ export class GameScene extends Phaser.Scene {
         const src = this.textures.get(`base_${look.gender}_${d}`).getSourceImage() as HTMLImageElement;
         this.textures.addCanvas(`${prefix}_${d}`, recolorSprite(src, look));
       }
-      // ท่ายืน: เปลี่ยนสีทุกเฟรม (เลื่อนเส้นเอวตามตำแหน่งตัวในกรอบ 64×64) แล้วสร้าง animation
+      // ท่ายืน: เปลี่ยนสีทุกเฟรม แล้วสร้าง animation (ทิศฝั่งตะวันตกใช้ของฝั่งตะวันออกกลับภาพ ดู updatePose)
       for (const d of IDLE_DIRS) {
         const frames: Phaser.Types.Animations.AnimationFrame[] = [];
         for (let i = 0; i < IDLE_FRAMES; i++) {
           const key = `base_${look.gender}_idle_${d}_${i}`;
           if (!this.textures.exists(key)) break;
           const src = this.textures.get(key).getSourceImage() as HTMLImageElement;
-          this.textures.addCanvas(`${prefix}_idle_${d}_${i}`, recolorSprite(src, look, IDLE_OFFSET));
+          this.textures.addCanvas(`${prefix}_idle_${d}_${i}`, recolorSprite(src, look));
           frames.push({ key: `${prefix}_idle_${d}_${i}` });
         }
         if (frames.length === IDLE_FRAMES) this.anims.create({ key: `${prefix}_idle_${d}`, frames, frameRate: IDLE_FPS, repeat: -1 });
@@ -266,18 +266,19 @@ export class GameScene extends Phaser.Scene {
     else if (Math.abs(dx) > 0.5) v.body.setFlipX(dx < 0);
   }
 
-  /** ยืนนิ่งและมีท่ายืนของทิศนั้น = เล่น animation, นอกนั้นใช้ภาพนิ่งของทิศ */
+  /** ยืนนิ่งและมีท่ายืนของทิศนั้น (หรือทิศกระจก) = เล่น animation, นอกนั้นใช้ภาพนิ่งของทิศ */
   private updatePose(v: View) {
     if (!v.sprite) return;
-    const idle = `${v.sprite}_idle_${v.dir}`;
-    const pose = !v.path.length && this.anims.exists(idle) ? idle : `${v.sprite}_${v.dir}`;
+    const src = v.kind === "player" && !v.path.length ? animSource(IDLE_DIRS, v.dir) : null;
+    const idle = src && this.anims.exists(`${v.sprite}_idle_${src.dir}`) ? `${v.sprite}_idle_${src.dir}` : null;
+    const pose = idle ? `${idle}${src!.flip ? ":flip" : ""}` : `${v.sprite}_${v.dir}`;
     if (pose === v.pose) return;
     v.pose = pose;
-    if (pose === idle) {
-      v.body.setOrigin(0.5, (45 + IDLE_OFFSET) / 64).play(idle);
+    if (idle) {
+      v.body.setFlipX(src!.flip).setOrigin(0.5, (45 + IDLE_OFFSET) / 64).play(idle, true);
     } else {
       v.body.stop();
-      v.body.setTexture(pose).setOrigin(0.5, (v.kind === "mob" ? 43 : 45) / 48);
+      v.body.setFlipX(false).setTexture(pose).setOrigin(0.5, (v.kind === "mob" ? 43 : 45) / 48);
     }
   }
 
