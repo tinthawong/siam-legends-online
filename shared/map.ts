@@ -13,15 +13,25 @@ export const DIRT = 3;
 export const PADDY = 4;
 export const TERRAIN_NAMES = ["grass", "water", "sand", "dirt", "paddy"] as const;
 
-/** ของประดับชิ้นหนึ่งในแมพ (kind = ชื่อไฟล์ใน art/props/set1/) */
+/** ของประดับชิ้นหนึ่งในแมพ (kind = ชื่อไฟล์ใน art/props/<ชุด>/) */
 export interface MapProp {
   x: number;
   y: number;
   kind: string;
 }
 
-// ชิ้นที่ขวางทาง (เดินทะลุไม่ได้) นอกนั้นเป็นของประดับเดินผ่านได้
-export const BLOCKING_PROPS = new Set(["bush", "rock", "rocks-3", "mossy-boulder", "clay-jar"]);
+// ชุดของประดับ: ไฟล์เกมที่ client/public/sprites/props/<ชุด>/ (มี props.json ของแต่ละชุด)
+export const PROP_SETS: Record<string, string[]> = {
+  set1: ["flowers-yellow", "flowers-pink", "tall-grass", "fern", "bush", "rock", "rocks-3", "mossy-boulder",
+    "seashell", "starfish", "driftwood", "coconut", "beach-grass", "rice-straw", "clay-jar", "lotus"],
+  set2: ["banyan", "coconut-palm", "sugar-palm", "coconut-palm-leaning", "bamboo", "hibiscus-bush"], // ต้นไม้ใหญ่
+};
+export const PROP_SET_OF: Record<string, string> = Object.fromEntries(
+  Object.entries(PROP_SETS).flatMap(([set, kinds]) => kinds.map((k) => [k, set])),
+);
+
+// ชิ้นที่ขวางทาง (เดินทะลุไม่ได้ เฉพาะช่องฐาน) นอกนั้นเป็นของประดับเดินผ่านได้
+export const BLOCKING_PROPS = new Set(["bush", "rock", "rocks-3", "mossy-boulder", "clay-jar", ...PROP_SETS.set2]);
 
 function mulberry32(seed: number) {
   let a = seed;
@@ -96,15 +106,35 @@ function generate() {
     for (let x = 0; x < MAP_W; x++)
       if ((x === 0 || y === 0 || x === MAP_W - 1 || y === MAP_H - 1) && at(x, y) !== WATER) place(x, y, "bush");
 
-  const scatter = (count: number, kinds: string[], on: number[], ok: (x: number, y: number) => boolean = () => true) => {
+  // space = ต้องไม่มีของอื่นในระยะกี่ช่อง (ต้นไม้ใหญ่ต้องการที่ว่างรอบ ๆ ไม่ให้ภาพทับกัน)
+  const clear = (x: number, y: number, r: number) => {
+    for (let dy = -r; dy <= r; dy++)
+      for (let dx = -r; dx <= r; dx++) {
+        const nx = x + dx, ny = y + dy;
+        if (nx >= 0 && ny >= 0 && nx < MAP_W && ny < MAP_H && taken[ny * MAP_W + nx]) return false;
+      }
+    return true;
+  };
+  const scatter = (count: number, kinds: string[], on: number[], ok: (x: number, y: number) => boolean = () => true, space = 0) => {
     let n = 0;
-    for (let tries = 0; n < count && tries < count * 40; tries++) {
+    for (let tries = 0; n < count && tries < count * 60; tries++) {
       const x = 1 + Math.floor(rng() * (MAP_W - 2));
       const y = 1 + Math.floor(rng() * (MAP_H - 2));
-      if (!on.includes(at(x, y)) || nearSpawn(x, y) || !ok(x, y)) continue;
+      if (!on.includes(at(x, y)) || nearSpawn(x, y) || !ok(x, y) || !clear(x, y, space)) continue;
       if (place(x, y, kinds[Math.floor(rng() * kinds.length)])) n++;
     }
   };
+  // ต้นไม้ใหญ่ก่อน (ต้องการที่ว่างรอบตัว) แล้วค่อยโรยของเล็ก
+  const nearTerrain = (x: number, y: number, kind: number, r: number) => {
+    for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++) if (at(Math.min(MAP_W - 1, Math.max(0, x + dx)), Math.min(MAP_H - 1, Math.max(0, y + dy))) === kind) return true;
+    return false;
+  };
+  const inner = (x: number, y: number) => x > 2 && y > 3 && x < MAP_W - 3 && y < MAP_H - 2;
+  scatter(3, ["banyan"], [GRASS], (x, y) => inner(x, y) && !nearTerrain(x, y, DIRT, 1), 3);
+  scatter(10, ["coconut-palm", "coconut-palm-leaning"], [SAND], (x, y) => !onFord(y) && y > 2, 2);
+  scatter(7, ["sugar-palm"], [GRASS], (x, y) => y > 2 && nearTerrain(x, y, PADDY, 2), 2);
+  scatter(5, ["bamboo"], [GRASS], (x, y) => inner(x, y), 2);
+  scatter(7, ["hibiscus-bush"], [GRASS], (x, y) => y > 1, 1);
   place(SPAWN.x + 2, SPAWN.y - 2, "clay-jar");
   place(SPAWN.x - 2, SPAWN.y - 2, "clay-jar");
   scatter(7, ["mossy-boulder"], [GRASS]);

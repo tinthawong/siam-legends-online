@@ -36,21 +36,52 @@ def main():
     if len(names) != n or len(widths) != n: raise SystemExit(f"ต้องมีชื่อและความกว้างครบ {n} ชิ้น")
 
     img = Image.open(a.sheet).convert("RGBA"); W, H = img.size
-    alpha = img.getchannel("A"); ap = alpha.load()
-    rows = bands([any(ap[x, y] > 40 for x in range(0, W, 2)) for y in range(H)], 20)
-    rows = sorted(sorted(rows, key=lambda b: b[1] - b[0], reverse=True)[: a.rows])
-    if len(rows) != a.rows: raise SystemExit(f"เจอ {len(rows)} แถว แต่ระบุ --rows {a.rows}")
+    alpha = img.getchannel("A")
+
+    # แยกตามก้อนภาพ (ทนต่อกรณีวัตถุในแถวติดกัน): ย่อ mask ลง 4 เท่าเพื่อความเร็ว
+    f = 4; sw, sh = (W + f - 1) // f, (H + f - 1) // f
+    small = alpha.point(lambda v: 255 if v > 40 else 0).resize((sw, sh), Image.BOX)
+    sp = small.load(); lab = [[0] * sw for _ in range(sh)]; comps = []
+    for y in range(sh):
+        for x in range(sw):
+            if sp[x, y] == 0 or lab[y][x]: continue
+            cid = len(comps) + 1; lab[y][x] = cid; st = [(x, y)]; cells = []
+            while st:
+                cx, cy = st.pop(); cells.append((cx, cy))
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        nx, ny = cx + dx, cy + dy
+                        if 0 <= nx < sw and 0 <= ny < sh and sp[nx, ny] and not lab[ny][nx]:
+                            lab[ny][nx] = cid; st.append((nx, ny))
+            xs = [c[0] for c in cells]; ys = [c[1] for c in cells]
+            comps.append({"id": cid, "n": len(cells), "box": (min(xs), min(ys), max(xs) + 1, max(ys) + 1),
+                          "cx": sum(xs) / len(xs), "cy": sum(ys) / len(ys)})
+    if len(comps) < n: raise SystemExit(f"เจอ {len(comps)} ก้อน แต่ต้องการ {n} ชิ้น")
+    big = sorted(comps, key=lambda c: c["n"], reverse=True)[:n]
+    big.sort(key=lambda c: c["cy"])
+    grid = []
+    for r in range(a.rows): grid += sorted(big[r * a.cols:(r + 1) * a.cols], key=lambda c: c["cx"])
+    owner = {c["id"]: k for k, c in enumerate(grid)}
+    def gap(c, g):  # ระยะห่างระหว่างกรอบ
+        bx0, by0, bx1, by1 = c["box"]; gx0, gy0, gx1, gy1 = g["box"]
+        return max(0, gx0 - bx1, bx0 - gx1) + max(0, gy0 - by1, by0 - gy1)
+    for c in comps:
+        if c["id"] not in owner: owner[c["id"]] = min(range(n), key=lambda k: gap(c, grid[k]))
 
     pieces = []
-    for r, (y0, y1) in enumerate(rows):
-        occ = [any(ap[x, y] > 40 for y in range(y0, y1, 2)) for x in range(W)]
-        xb = sorted(sorted(bands(occ, 1), key=lambda t: t[1] - t[0], reverse=True)[: a.cols])
-        if len(xb) != a.cols: raise SystemExit(f"แถว {r+1}: เจอ {len(xb)} ชิ้น แต่ระบุ --cols {a.cols}")
-        for c, (x0, x1) in enumerate(xb):
-            crop = img.crop((x0, y0, x1, y1)); box = crop.getchannel("A").point(lambda v: 255 if v > 40 else 0).getbbox()
-            crop = crop.crop(box)
-            k = r * a.cols + c; w = widths[k]; h = max(1, round(crop.height * w / crop.width))
-            pieces.append((names[k], crop.resize((w, h), Image.BOX)))
+    for k, g in enumerate(grid):
+        ids = {cid for cid, o in owner.items() if o == k}
+        m = Image.new("L", (sw, sh), 0); mp = m.load()
+        for y in range(sh):
+            row = lab[y]
+            for x in range(sw):
+                if row[x] in ids: mp[x, y] = 255
+        m = m.resize((sw * f, sh * f), Image.NEAREST).crop((0, 0, W, H))
+        keep = Image.new("L", (W, H), 0); keep.paste(alpha, (0, 0), m)
+        piece = img.copy(); piece.putalpha(keep)
+        box = keep.point(lambda v: 255 if v > 40 else 0).getbbox()
+        crop = piece.crop(box); w = widths[k]; h = max(1, round(crop.height * w / crop.width))
+        pieces.append((names[k], crop.resize((w, h), Image.BOX)))
 
     strip = Image.new("RGB", (sum(s.width for _, s in pieces), max(s.height for _, s in pieces)))
     x = 0

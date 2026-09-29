@@ -1,0 +1,62 @@
+{
+ "banyan": {
+  "file": "banyan.png",
+  "width": 112,
+  "height": 106,
+  "anchor": {
+   "x": 56,
+   "y": 105
+  },
+  "shadowWidth": 90
+ },
+ "coconut-palm": {
+  "file": "coconut-palm.png",
+  "width": 64,
+  "height": 81,
+  "anchor": {
+   "x": 32,
+   "y": 80
+  },
+  "shadowWidth": 51
+ },
+ "sugar-palm": {
+  "file": "sugar-palm.png",
+  "width": 56,
+  "height": 73,
+  "anchor": {
+   "x": 28,
+   "y": 72
+  },
+  "shadowWidth": 45
+ },
+ "coconut-palm-leaning": {
+  "file": "coconut-palm-leaning.png",
+  "width": 68,
+  "height": 58,
+  "anchor": {
+   "x": 34,
+   "y": 57
+  },
+  "shadowWidth": 54
+ },
+ "bamboo": {
+  "file": "bamboo.png",
+  "width": 52,
+  "height": 56,
+  "anchor": {
+   "x": 26,
+   "y": 55
+  },
+  "shadowWidth": 42
+ },
+ "hibiscus-bush": {
+  "file": "hibiscus-bush.png",
+  "width": 36,
+  "height": 29,
+  "anchor": {
+   "x": 18,
+   "y": 28
+  },
+  "shadowWidth": 29
+ }
+}

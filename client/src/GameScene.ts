@@ -3,7 +3,7 @@ import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
 import type { Cell } from "../../shared/pathfind";
 import { TILE } from "../../shared/constants";
-import { MAP_W, MAP_H, PROPS, BLOCKING_PROPS, TERRAIN_NAMES, isWalkable } from "../../shared/map";
+import { MAP_W, MAP_H, PROPS, BLOCKING_PROPS, TERRAIN_NAMES, PROP_SETS, PROP_SET_OF, isWalkable } from "../../shared/map";
 import { renderGround, TILE_URLS } from "./mapRender";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
@@ -95,8 +95,8 @@ export class GameScene extends Phaser.Scene {
     // พื้นหญ้า 64×64 ปูซ้ำทั้งแมพ (ขนาดเดิม ไม่ย่อ/ขยาย)
     TILE_URLS.forEach((url, i) => this.load.image(`tile_${TERRAIN_NAMES[i]}`, url));
     // ของประดับในแมพ: props.json (ขนาด, จุดยึด, ความกว้างเงา) + รูปแต่ละชิ้น
-    this.load.json("props_set1", "sprites/props/set1/props.json");
-    for (const kind of new Set(PROPS.map((p) => p.kind))) this.load.image(`prop_${kind}`, `sprites/props/set1/${kind}.png`);
+    for (const set of Object.keys(PROP_SETS)) this.load.json(`props_${set}`, `sprites/props/${set}/props.json`);
+    for (const kind of new Set(PROPS.map((p) => p.kind))) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
     // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น (ชุดหลัก + ชุดท่าเพิ่มแต่ละโฟลเดอร์)
@@ -613,7 +613,7 @@ export class GameScene extends Phaser.Scene {
 
     // ของประดับ: จุดยึดกึ่งกลางฐานวางใกล้ขอบล่างของช่อง พร้อมเงาวงรี
     // ชิ้นที่ขวางทางเรียงลำดับตามแกน y กับตัวละคร/มอน ชิ้นเล็กเดินผ่านได้อยู่ระดับพื้น (ใต้ตัวละครเสมอ)
-    const meta = (this.cache.json.get("props_set1") ?? {}) as Record<string, { width: number; height: number; anchor: { x: number; y: number }; shadowWidth: number }>;
+    const meta = Object.assign({}, ...Object.keys(PROP_SETS).map((set) => this.cache.json.get(`props_${set}`) ?? {})) as Record<string, { width: number; height: number; anchor: { x: number; y: number }; shadowWidth: number }>;
     for (const p of PROPS) {
       const m = meta[p.kind];
       if (!m) continue;
