@@ -265,6 +265,21 @@
     #auto-btn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom));
       width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--window-edge);
       background: var(--window); color: var(--ink); font-size: 17px; font-weight: 600; }
+    #bag-btn { position: fixed; right: calc(104px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom));
+      width: 60px; height: 60px; border-radius: 50%; border: 3px solid var(--window-edge); background: var(--window); color: var(--ink);
+      display: grid; place-items: center; padding: 0; }
+    #bag-btn svg { width: 28px; height: 28px; }
+    #bag-btn[aria-expanded="true"] { border-color: var(--exp); color: var(--exp); }
+    #bag { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(110px + env(safe-area-inset-bottom));
+      width: min(320px, calc(100vw - 32px)); padding: 10px 12px 12px; }
+    .bag-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    #bag-close { background: none; border: 0; color: var(--ink-dim); font-size: 16px; padding: 2px 6px; }
+    #bag-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+    .slot { position: relative; aspect-ratio: 1; border-radius: 6px; background: rgba(10, 18, 32, 0.7); border: 1px solid rgba(159, 192, 236, 0.35);
+      display: grid; place-items: center; }
+    .slot img { width: 80%; height: 80%; image-rendering: pixelated; }
+    .slot .n { position: absolute; right: 4px; bottom: 2px; font-size: 12px; font-weight: 600; text-shadow: 0 1px 2px #000; }
+    #bag-empty { margin: 4px 0 0; font-size: 13px; color: var(--ink-dim); text-align: center; }
     #auto-btn.on { background: var(--auto); border-color: #d9fff2; color: #06291f; box-shadow: 0 0 0 6px rgba(63,208,164,0.3); }
 
     #dc { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8,14,24,0.6); }
@@ -426,6 +441,14 @@
       <button id="logout">ออกจากระบบ</button><button id="link-google" hidden>ผูกบัญชี Google</button>
     </div>
     <button id="auto-btn" aria-pressed="false">AUTO</button>
+    <button id="bag-btn" aria-expanded="false" aria-controls="bag" title="กระเป๋า (I)">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8h12l1 12H5z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
+    </button>
+    <section id="bag" class="window" hidden aria-label="กระเป๋า">
+      <div class="bag-head"><b>กระเป๋า</b><button id="bag-close" aria-label="ปิด">✕</button></div>
+      <div id="bag-grid"></div>
+      <p id="bag-empty">ยังไม่มีของ</p>
+    </section>
   </div>
 
   <!-- ฉากหลังหน้าเข้าเกม (ซ่อนเองเมื่อเข้าเกม) -->

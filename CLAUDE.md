@@ -111,7 +111,8 @@ npm run typecheck       # tsc ทั้ง client และ server
 - ภาพต้นฉบับจาก PixelLab เก็บที่ `art/pixellab/<ชื่อภาษาอังกฤษ>/` (ตั้งชื่อโฟลเดอร์และไฟล์เป็นภาษาอังกฤษเสมอ) แต่ละชุดมี `metadata.json` บอกทิศและเฟรม ถ้า `animations` ว่าง แปลว่ามีแค่ภาพนิ่ง 8 ทิศ
 - ภาพมอนเก็บที่ `art/monsters/<ชื่อภาษาอังกฤษ>/`
 - รูปไอเท็ม/ของดรอปเก็บที่ `art/items/` เป็น pixel art ขนาด 32×32 (มีสำรอง 64×64 ได้) พื้นโปร่งใส
-  - มีแล้ว: `crab-claw-32.png`, `crab-claw-64.png` (ก้ามปูนา)
+  - มีแล้ว: `crab-claw-16.png`, `crab-claw-32.png`, `crab-claw-64.png` (ก้ามปูนา; 16 ย่อจาก 64 แบบลงตัว 4:1)
+  - ในเกม: หล่นบนพื้นใช้ `<icon>-16.png` (ผู้ใช้ขอให้เล็กลง, พื้นที่กดยังเท่า 1 ช่อง) ในกระเป๋าใช้ `<icon>-64.png` วางไฟล์เกมที่ `client/public/sprites/items/` และลงทะเบียนใน `shared/items.ts`
 - สไตล์ท้าย prompt ที่ต้องใช้เหมือนกันทุกชิ้น:
   - ตัวละคร: `stylized anime chibi hero, large head about 40% of total height, sharp anime eyes with bright highlights, smooth soft shading, colored darker outlines instead of pure black, vivid saturated colors`
   - มอน: `cute chibi monster, big expressive eyes with bright highlights, smooth soft shading, colored darker outlines instead of pure black, vivid saturated colors`

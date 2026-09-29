@@ -101,9 +101,11 @@ export default {
         .bind(uid).first<CharacterRow>();
       if (!row) return new Response("no character", { status: 404 });
 
+      const inv = await env.DB.prepare("SELECT item, count FROM inventory WHERE user_id = ? AND count > 0")
+        .bind(uid).all<{ item: string; count: number }>();
       const join: JoinCharacter = {
         userId: row.user_id, name: row.name, level: row.level, exp: row.exp, x: row.x, y: row.y,
-        look: lookOf(row),
+        look: lookOf(row), inv: inv.results,
       };
       // สร้าง request ใหม่ทั้งก้อน client จึงปลอม X-Character มาเองไม่ได้
       const headers = new Headers(req.headers);

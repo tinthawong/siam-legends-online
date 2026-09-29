@@ -6,6 +6,8 @@ import { CLOSE_KICKED } from "../../shared/protocol";
 import type { Look } from "../../shared/appearance";
 import { Creator } from "./creator";
 import { NAME_RE } from "../../shared/constants";
+import { ITEMS } from "../../shared/items";
+import type { InvItem } from "../../shared/protocol";
 
 interface Character { name: string; level: number; exp: number; look: Look }
 
@@ -120,13 +122,17 @@ function startGame(ch: Character, session: Session) {
     if (error) toast(`ผูกบัญชีไม่สำเร็จ: ${error.message}`);
   };
 
+  const scene = new GameScene(net);
+  scene.onInventory = renderBag;
+  bindBag();
+
   new Phaser.Game({
     type: Phaser.AUTO,
     parent: "game",
     backgroundColor: "#3d6b35",
     pixelArt: true,
     scale: { mode: Phaser.Scale.RESIZE, width: window.innerWidth, height: window.innerHeight },
-    scene: [new GameScene(net)],
+    scene: [scene],
   });
 }
 
@@ -200,6 +206,41 @@ function bindForms() {
     } finally {
       btn.disabled = false;
     }
+  });
+}
+
+/** หน้ากระเป๋า: ไอเท็ม 64px + จำนวน */
+function renderBag(items: InvItem[]) {
+  const grid = $("bag-grid");
+  grid.innerHTML = "";
+  for (const it of items) {
+    const def = ITEMS[it.item];
+    if (!def) continue;
+    const slot = document.createElement("div");
+    slot.className = "slot";
+    slot.title = `${def.name} ×${it.count}`;
+    const img = document.createElement("img");
+    img.src = `/sprites/items/${def.icon}-64.png`;
+    img.alt = def.name;
+    const n = document.createElement("span");
+    n.className = "n";
+    n.textContent = String(it.count);
+    slot.append(img, n);
+    grid.appendChild(slot);
+  }
+  $("bag-empty").hidden = grid.children.length > 0;
+}
+
+function bindBag() {
+  const btn = $("bag-btn"), bag = $("bag");
+  const toggle = (open = bag.hidden) => {
+    bag.hidden = !open;
+    btn.setAttribute("aria-expanded", String(open));
+  };
+  btn.onclick = () => toggle();
+  $("bag-close").onclick = () => toggle(false);
+  window.addEventListener("keydown", (e) => {
+    if (e.key === "i" || e.key === "I" || e.key === "ไ") toggle(); // ไ = ปุ่ม I บนแป้นไทย
   });
 }
 

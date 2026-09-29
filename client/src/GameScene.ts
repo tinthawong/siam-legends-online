@@ -7,6 +7,8 @@ import { MAP_W, MAP_H, TILES, ROCK, TREE, isWalkable } from "../../shared/map";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
 import { MOBS } from "../../shared/game";
+import { ITEMS } from "../../shared/items";
+import type { GroundItem, InvItem } from "../../shared/protocol";
 import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, animSource, idleFrameUrl } from "./sprites";
 
 interface View {
@@ -60,6 +62,7 @@ function dirOf(dx: number, dy: number): Dir {
 // Poring, แมพ, วงเป้าหมาย ยังเป็นภาพ placeholder วาดด้วยโค้ดใน makeTextures() / drawMap()
 export class GameScene extends Phaser.Scene {
   private views = new Map<string, View>();
+  private groundViews = new Map<string, Phaser.GameObjects.Image>(); // ของบนพื้น
   private sheets = new Map<string, SheetMeta & { name: string }>();
   private animOrigin = new Map<string, [number, number]>(); // key animation → origin ของจุดยึดเท้า
   private me: string | null = null;
@@ -68,6 +71,9 @@ export class GameScene extends Phaser.Scene {
   private tapMarker!: Phaser.GameObjects.Image;
   private autoOn = false;
   private autoBtn = document.getElementById("auto-btn") as HTMLButtonElement;
+
+  /** กระเป๋าเปลี่ยน → main.ts วาดหน้ากระเป๋า (HTML) */
+  onInventory: ((items: InvItem[]) => void) | null = null;
 
   constructor(private net: Net) {
     super("game");
@@ -80,6 +86,8 @@ export class GameScene extends Phaser.Scene {
     for (const g of Object.keys(GENDERS))
       for (const d of IDLE_DIRS)
         for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
+    // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
+    for (const it of Object.values(ITEMS)) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
     // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น (ชุดหลัก + ชุดท่าเพิ่มแต่ละโฟลเดอร์)
     for (const { name, part } of sheetList()) {
       const dir = `sprites/monsters/${name}${part ? `/${part}` : ""}`;
@@ -147,6 +155,13 @@ export class GameScene extends Phaser.Scene {
   // ---------- input ----------
 
   private onTap(pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) {
+    // กดที่ของบนพื้น → เดินไปเก็บ
+    const item = over.find((o) => o.getData("groundId"));
+    if (item) {
+      this.net.send({ t: "pickup", id: item.getData("groundId") as string });
+      this.setTarget(null);
+      return;
+    }
     const mob = over.find((o) => o.getData("mobId"));
     if (mob) {
       const id = mob.getData("mobId") as string;
@@ -170,8 +185,27 @@ export class GameScene extends Phaser.Scene {
       case "welcome":
         this.me = m.you;
         for (const e of m.entities) this.addView(e);
+        for (const g of m.ground) this.addGround(g, false);
         this.cameras.main.startFollow(this.views.get(m.you)!.c, true, 0.2, 0.2);
         this.updateStats(m.self);
+        this.onInventory?.(m.inv);
+        break;
+      case "drop":
+        this.addGround(m.g, true);
+        break;
+      case "picked": {
+        const img = this.groundViews.get(m.id);
+        if (!img) break;
+        this.groundViews.delete(m.id);
+        const name = ITEMS[img.getData("item") as string]?.name;
+        if (m.by === this.me && name) this.floatText(img.x, img.y - 18, `+${name}`, "#b9f0c8", 1100);
+        const by = this.views.get(m.by);
+        // ของลอยเข้าหาคนเก็บแล้วหายไป
+        this.tweens.add({ targets: img, x: by?.c.x ?? img.x, y: (by?.c.y ?? img.y) - 16, alpha: 0, scale: 0.5, duration: 220, onComplete: () => img.destroy() });
+        break;
+      }
+      case "inv":
+        this.onInventory?.(m.items);
         break;
       case "spawn":
         this.addView(m.e);
@@ -322,6 +356,19 @@ export class GameScene extends Phaser.Scene {
     this.updatePose(v);
     this.drawHp(v);
     c.setDepth(c.y);
+  }
+
+  /** ของหล่นบนพื้น: รูป 16px กลางช่อง กดได้ทั้งช่อง (bounce = เพิ่งหล่นจากมอน) */
+  private addGround(g: GroundItem, bounce: boolean) {
+    const def = ITEMS[g.item];
+    if (!def || this.groundViews.has(g.id)) return;
+    const img = this.add.image(center(g.x), center(g.y) + 6, `item_${def.icon}`)
+      .setDepth(center(g.y) - 2)
+      // พื้นที่กดใหญ่เท่า 1 ช่อง (32px) แม้รูปจะเล็ก เพื่อให้กดบนมือถือง่าย
+      .setInteractive({ hitArea: new Phaser.Geom.Rectangle(-8, -8, 32, 32), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
+    img.setData("groundId", g.id).setData("item", g.item);
+    this.groundViews.set(g.id, img);
+    if (bounce) this.tweens.add({ targets: img, y: { from: img.y - 18, to: img.y }, duration: 380, ease: "Bounce.easeOut" });
   }
 
   private removeView(id: string) {

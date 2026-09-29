@@ -8,8 +8,9 @@ import {
 import { MAP_W, MAP_H, SPAWN, isWalkable } from "../../shared/map";
 import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
 import { MOBS, expToNext, playerAtk, playerMaxHp, rollDamage } from "../../shared/game";
+import { ITEMS } from "../../shared/items";
 import { CLOSE_KICKED } from "../../shared/protocol";
-import type { ClientMsg, ServerMsg, EntityState, PlayerStats, JoinCharacter } from "../../shared/protocol";
+import type { ClientMsg, ServerMsg, EntityState, PlayerStats, JoinCharacter, GroundItem, InvItem } from "../../shared/protocol";
 import type { Look } from "../../shared/appearance";
 
 const SAVE_EVERY_MS = 30_000;
@@ -39,6 +40,8 @@ interface Player extends Ent {
   chaseKey: string | null; // ตำแหน่งมอนตอนคำนวณเส้นทางไล่ล่าสุด
   lastCombatAt: number;    // ตีหรือโดนตีล่าสุด (เลือดฟื้นเมื่อพ้น REGEN_DELAY_MS)
   nextRegenAt: number;
+  pickup: string | null;   // ของบนพื้นที่กำลังเดินไปเก็บ
+  inv: Map<string, number>; // กระเป๋า: item → จำนวน
 }
 
 interface Mob extends Ent {
@@ -63,6 +66,8 @@ type Entity = Player | Mob;
 export class MapRoom extends DurableObject<Env> {
   private players = new Map<string, Player>();
   private mobs = new Map<string, Mob>();
+  private ground = new Map<string, GroundItem>(); // ของหล่นบนพื้น
+  private groundSeq = 0;
   private loop: ReturnType<typeof setInterval> | null = null;
   private nextSaveAt = 0;
 
@@ -86,7 +91,7 @@ export class MapRoom extends DurableObject<Env> {
     // บัญชีเดียวกันเข้าซ้ำ → เตะตัวเก่า และใช้ค่าล่าสุดในหน่วยความจำ (ใหม่กว่าใน D1)
     for (const old of this.players.values()) {
       if (old.userId !== ch.userId) continue;
-      ch = { ...ch, level: old.level, exp: old.exp, x: old.x, y: old.y };
+      ch = { ...ch, level: old.level, exp: old.exp, x: old.x, y: old.y, inv: invList(old.inv) };
       this.players.delete(old.id);
       this.broadcast({ t: "despawn", id: old.id });
       this.send(old, { t: "kicked" }); // แจ้งก่อน เพราะ close event อาจมาช้า
@@ -109,10 +114,14 @@ export class MapRoom extends DurableObject<Env> {
       ws: server, level: ch.level, exp: ch.exp,
       target: null, auto: false, nextAttackAt: 0, chaseKey: null,
       lastCombatAt: 0, nextRegenAt: 0,
+      pickup: null, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
     };
     this.players.set(id, p);
 
-    this.send(p, { t: "welcome", you: id, entities: this.snapshot(), self: this.stats(p) });
+    this.send(p, {
+      t: "welcome", you: id, entities: this.snapshot(), self: this.stats(p),
+      ground: [...this.ground.values()], inv: invList(p.inv),
+    });
     this.broadcast({ t: "spawn", e: this.view(p) }, id);
     this.ensureLoop();
 
@@ -139,12 +148,24 @@ export class MapRoom extends DurableObject<Env> {
         if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
         if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
         p.chaseKey = null;
+        p.pickup = null;
         this.setPath(p, path, now);
+        break;
+      }
+      case "pickup": {
+        // กดที่ของบนพื้น = เดินไปเก็บ (ยกเลิกการตีและ auto เหมือนเดินเอง)
+        const g = this.ground.get(String(msg.id));
+        if (!g) return;
+        if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
+        if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
+        p.pickup = g.id;
+        p.chaseKey = null;
         break;
       }
       case "attack": {
         const m = this.mobs.get(String(msg.target));
         if (!m || !m.alive) return;
+        p.pickup = null;
         p.target = m.id;
         p.chaseKey = null;
         this.send(p, { t: "target", id: m.id });
@@ -185,8 +206,14 @@ export class MapRoom extends DurableObject<Env> {
     const stmt = this.env.DB.prepare(
       "UPDATE characters SET level = ?, exp = ?, x = ?, y = ?, updated_at = ? WHERE user_id = ?",
     );
+    const invStmt = this.env.DB.prepare(
+      "INSERT INTO inventory (user_id, item, count) VALUES (?, ?, ?) ON CONFLICT (user_id, item) DO UPDATE SET count = excluded.count",
+    );
     try {
-      await this.env.DB.batch(list.map((p) => stmt.bind(p.level, p.exp, p.x, p.y, now, p.userId)));
+      await this.env.DB.batch(list.flatMap((p) => [
+        stmt.bind(p.level, p.exp, p.x, p.y, now, p.userId),
+        ...[...p.inv].map(([item, count]) => invStmt.bind(p.userId, item, count)),
+      ]));
     } catch (e) {
       console.error("save failed", e);
     }
@@ -250,6 +277,7 @@ export class MapRoom extends DurableObject<Env> {
   // ---------- ผู้เล่น: ตีเป้าหมาย / auto ----------
 
   private updatePlayer(p: Player, now: number) {
+    if (p.pickup) { this.updatePickup(p, now); return; }
     // auto: ไม่มีเป้าหมายที่ยังมีชีวิต → หามอนที่ใกล้ที่สุดในรัศมี
     if (p.auto && !this.aliveMob(p.target)) {
       const t = this.nearestMob(p);
@@ -295,6 +323,28 @@ export class MapRoom extends DurableObject<Env> {
       m.chaseKey = null;
       m.nextAttackAt = now + MOB_ASPD_MS / 2;
       if (m.path.length) this.setPath(m, [], now);
+    }
+  }
+
+  // ---------- ของบนพื้น / กระเป๋า ----------
+
+  /** เดินไปที่ของ ถึงช่องนั้นหรือช่องติดกันแล้วเก็บเข้ากระเป๋า */
+  private updatePickup(p: Player, now: number) {
+    const g = this.ground.get(p.pickup!);
+    if (!g) { p.pickup = null; return; } // มีคนเก็บไปก่อน
+    if (cheb(p.x, p.y, g.x, g.y) <= 1) {
+      if (p.path.length) this.setPath(p, [], now);
+      p.pickup = null;
+      this.ground.delete(g.id);
+      p.inv.set(g.item, (p.inv.get(g.item) ?? 0) + 1);
+      this.broadcast({ t: "picked", id: g.id, by: p.id });
+      this.send(p, { t: "inv", items: invList(p.inv) });
+      return;
+    }
+    if (p.path.length === 0) {
+      const path = pathNear(p.x, p.y, g.x, g.y, 1);
+      if (!path) { p.pickup = null; return; }
+      this.setPath(p, path, now);
     }
   }
 
@@ -348,6 +398,7 @@ export class MapRoom extends DurableObject<Env> {
     p.x = SPAWN.x; p.y = SPAWN.y;
     p.hp = p.maxHp;
     p.chaseKey = null;
+    p.pickup = null;
     if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
     if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
     this.broadcast({ t: "respawn", id: p.id, x: p.x, y: p.y });
@@ -368,6 +419,14 @@ export class MapRoom extends DurableObject<Env> {
     m.aggro = null; m.aggroFrom = null; m.chaseKey = null;
     m.respawnAt = now + MOB_RESPAWN_MS;
     this.broadcast({ t: "die", id: m.id });
+
+    // ของดรอป: หล่นที่ช่องที่มอนตาย
+    const drop = MOBS[m.type].drop;
+    if (drop && ITEMS[drop.item] && Math.random() < drop.chance) {
+      const g: GroundItem = { id: "g" + ++this.groundSeq, item: drop.item, x: m.x, y: m.y };
+      this.ground.set(g.id, g);
+      this.broadcast({ t: "drop", g });
+    }
 
     killer.exp += MOBS[m.type].exp;
     this.send(killer, { t: "exp", x: m.x, y: m.y, exp: MOBS[m.type].exp });
@@ -484,3 +543,6 @@ export class MapRoom extends DurableObject<Env> {
     }
   }
 }
+
+const invList = (inv: Map<string, number>): InvItem[] =>
+  [...inv].filter(([, count]) => count > 0).map(([item, count]) => ({ item, count }));
