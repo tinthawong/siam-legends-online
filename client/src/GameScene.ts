@@ -99,7 +99,7 @@ export class GameScene extends Phaser.Scene {
     for (const set of Object.keys(PROP_SETS)) this.load.json(`props_${set}`, `sprites/props/${set}/props.json`);
     for (const kind of new Set(PROPS.map((p) => p.kind))) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
-    for (const it of Object.values(ITEMS)) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
+    for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
     // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น (ชุดหลัก + ชุดท่าเพิ่มแต่ละโฟลเดอร์)
     for (const { name, part } of sheetList()) {
       const dir = `sprites/monsters/${name}${part ? `/${part}` : ""}`;
@@ -404,7 +404,7 @@ export class GameScene extends Phaser.Scene {
     const x1 = center(g.x) + (pop ? Phaser.Math.Between(-7, 7) : 0);
     const y1 = center(g.y) + 6 + (pop ? Phaser.Math.Between(-3, 3) : 0);
     const shadow = this.add.ellipse(x1, y1 + 7, 16, 6, 0x000000, 0.35).setDepth(center(g.y) - 3);
-    const img = this.add.image(x1, y1, `item_${def.icon}`)
+    const img = this.add.image(x1, y1, def.icon ? `item_${def.icon}` : "marker")
       .setDepth(center(g.y) - 2)
       // พื้นที่กดใหญ่เท่า 1 ช่อง (32px) แม้รูปจะเล็ก เพื่อให้กดบนมือถือง่าย
       .setInteractive({ hitArea: new Phaser.Geom.Rectangle(-8, -8, 32, 32), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });

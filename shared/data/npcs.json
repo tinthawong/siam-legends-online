@@ -1,0 +1,18 @@
+[
+  {
+    "id": "npc_monk",
+    "name": "หลวงพี่",
+    "map": "ban-pak-ao",
+    "x": 0, "y": 0,
+    "sprite": "npcs/monk",
+    "quests": ["q001", "q006"]
+  },
+  {
+    "id": "npc_headman",
+    "name": "ผู้ใหญ่ทองดี",
+    "map": "ban-pak-ao",
+    "x": 0, "y": 0,
+    "sprite": "npcs/headman",
+    "quests": ["q003", "q004", "q005"]
+  }
+]

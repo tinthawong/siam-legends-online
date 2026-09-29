@@ -1,0 +1,21 @@
+{
+ "frameWidth": 34,
+ "frameHeight": 42,
+ "anchor": {
+  "x": 17,
+  "y": 41,
+  "note": "จุดกึ่งกลางเท้า วางตรงตำแหน่งมอนในเกม"
+ },
+ "animations": {
+  "idle": {
+   "frames": [
+    "idle_0.png",
+    "idle_1.png",
+    "idle_2.png",
+    "idle_3.png"
+   ],
+   "frameMs": 150,
+   "loop": true
+  }
+ }
+}

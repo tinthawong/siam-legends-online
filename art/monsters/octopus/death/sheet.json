@@ -1,0 +1,19 @@
+{
+ "frameWidth": 37,
+ "frameHeight": 32,
+ "anchor": {
+  "x": 18,
+  "y": 31,
+  "note": "จุดกึ่งกลางเท้า วางตรงตำแหน่งมอนในเกม"
+ },
+ "animations": {
+  "death": {
+   "frames": [
+    "death_0.png",
+    "death_1.png"
+   ],
+   "frameMs": 140,
+   "loop": false
+  }
+ }
+}

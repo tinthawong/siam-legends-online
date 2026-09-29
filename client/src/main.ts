@@ -293,9 +293,10 @@ function bindHud(net: Net) {
       const slot = document.createElement("div");
       slot.className = "slot" + (def.heal ? " usable" : "");
       slot.title = `${def.name} ×${it.count}${def.heal ? ` · กดเพื่อกิน (เติมเลือด ${def.heal})` : ""}`;
-      const img = document.createElement("img");
-      img.src = `/sprites/items/${def.icon}-64.png`;
-      img.alt = def.name;
+      // ไอเท็มที่ยังไม่มีภาพ แสดงชื่อแทน
+      const img = def.icon ? document.createElement("img") : document.createElement("small");
+      if (img instanceof HTMLImageElement) { img.src = `/sprites/items/${def.icon}-64.png`; img.alt = def.name; }
+      else { img.textContent = def.name; img.style.cssText = "font-size:11px;text-align:center;padding:2px"; }
       const n = document.createElement("span");
       n.className = "n";
       n.textContent = String(it.count);

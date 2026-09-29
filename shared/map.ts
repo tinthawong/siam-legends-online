@@ -22,6 +22,7 @@ export const TERRAIN_NAMES = ["grass", "water", "sand", "dirt", "paddy"] as cons
 /** โซนที่เกิดมอน: มอนเกิดและเดินเล่นอยู่ในโซนของตัวเอง (ไล่ตามผู้เล่นออกนอกโซนได้) */
 export const ZONES: Record<string, { x0: number; y0: number; x1: number; y1: number }> = {
   paddy: { x0: 33, y0: 1, x1: 44, y1: 11 },
+  pond: { x0: 2, y0: 1, x1: 12, y1: 4 },   // สระบัวของหมู่บ้าน (กบบัว)
   beach: { x0: 29, y0: 22, x1: 46, y1: 27 },
 };
 export const inZone = (zone: string, x: number, y: number) => {
@@ -81,6 +82,9 @@ function generate() {
   for (let y = 0; y < MAP_H; y++)
     for (let x = 0; x < MAP_W; x++) T[y * MAP_W + x] = y >= seaTop(x) ? WATER : y >= sandTop(x) ? SAND : GRASS;
   rect(33, 0, 44, 11, PADDY);                         // นาข้าว
+  // สระบัวของหมู่บ้าน (ย่านบ้านเรือน) — วงรีเล็ก
+  for (let y = 1; y <= 4; y++)
+    for (let x = 3; x <= 11; x++) if (((x - 7) / 3.2) ** 2 + ((y - 2.6) / 1.4) ** 2 <= 1) T[y * MAP_W + x] = WATER;
   // ลานดินเป็นวงรี (ไม่ใช่สี่เหลี่ยม) ให้ขอบดูเป็นธรรมชาติ
   const blob = (cx: number, cy: number, rx: number, ry: number, only?: number[]) => {
     for (let y = Math.floor(cy - ry); y <= Math.ceil(cy + ry); y++)
@@ -110,6 +114,9 @@ function generate() {
   P(24, 3, "bush"); P(28, 3, "bush"); P(23, 3, "bush"); P(29, 3, "bush");
   P(22, 4, "fern"); P(30, 4, "flowers-yellow");
 
+  // ── สระบัว ──
+  P(5, 2, "lotus"); P(8, 3, "lotus"); P(9, 2, "lotus");
+  P(11, 1, "tall-grass"); P(2, 3, "fern"); P(12, 3, "flowers-pink");
   // ── ย่านบ้านเรือน (ตะวันตก) ──
   P(4, 7, "stilt-house", [-1, 0, 1]);
   P(8, 7, "dragon-jars");

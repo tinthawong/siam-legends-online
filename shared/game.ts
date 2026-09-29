@@ -35,6 +35,17 @@ export const MOBS: Record<string, MobDef> = {
   // ปูแดง (mob039)
   red_crab: fromData("mob039", { moveMs: 420, count: 6, sheet: "red-crab", sheetParts: ["idle"], retaliate: true,
     zone: "beach", drop: { item: "red_crab_claw", chance: 1 } }),
+  // หุ่นไล่กา = หุ่นไล่กาเดินได้ (mob007) ในนาข้าว
+  scarecrow: fromData("mob007", { moveMs: 480, count: 4, sheet: "scarecrow", sheetParts: ["idle"], retaliate: true,
+    zone: "paddy", drop: { item: "straw_hat", chance: 1 } }),
+  // กบบัว (mob005 เดิมชื่อกบเขียว) รอบสระบัว
+  lotus_frog: fromData("mob005", { moveMs: 520, count: 6, sheet: "lotus-frog", sheetParts: ["idle"], retaliate: true,
+    zone: "pond", drop: { item: "lotus", chance: 1 } }),
+  // ยังไม่มีเลเวล/ค่าพลังในตารางสมดุล — ใส่ภาพกับของดรอปไว้ก่อน ยังไม่เกิดบนแมพ (count 0)
+  grasshopper: { name: "ตั๊กแตนเคียว", maxHp: 1, def: 0, exp: 0, moveMs: 420, count: 0, sheet: "grasshopper", sheetParts: ["idle"],
+    drop: { item: "sickle", chance: 1 } },
+  octopus: { name: "หมึกหมวกเหล็ก", maxHp: 1, def: 0, exp: 0, moveMs: 420, count: 0, sheet: "octopus", sheetParts: ["hit", "death", "idle"],
+    drop: { item: "iron_helmet", chance: 1 } },
 };
 
 export const expToNext = (level: number) => 20 + level * 15;
