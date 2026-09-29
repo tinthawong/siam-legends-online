@@ -355,6 +355,8 @@ export class GameScene extends Phaser.Scene {
       fontFamily: "Mitr, sans-serif", fontSize: "10px", color: isMob ? "#ffe0ec" : "#ffffff",
       stroke: "#10192a", strokeThickness: 3,
     }).setOrigin(0.5, 0).setResolution(2);
+    // มอนจาก sheet: เงาวงรีที่พื้นใต้เท้า (อยู่กับที่ ไม่ขยับตามตัวตอนเด้ง/เดิน)
+    if (sheet) c.add(this.add.ellipse(0, 7, 26, 8, 0x000000, 0.3));
     c.add([body, label]);
 
     let hpBar: Phaser.GameObjects.Graphics | null = null;
@@ -392,7 +394,7 @@ export class GameScene extends Phaser.Scene {
     // จุดตกเยื้องจากกลางช่องเล็กน้อย (แค่ภาพ ตำแหน่งจริงบน server ยังเป็นช่องเดิม)
     const x1 = center(g.x) + (pop ? Phaser.Math.Between(-7, 7) : 0);
     const y1 = center(g.y) + 6 + (pop ? Phaser.Math.Between(-3, 3) : 0);
-    const shadow = this.add.ellipse(x1, y1 + 6, 12, 4, 0x000000, 0.25).setDepth(center(g.y) - 3);
+    const shadow = this.add.ellipse(x1, y1 + 7, 16, 6, 0x000000, 0.35).setDepth(center(g.y) - 3);
     const img = this.add.image(x1, y1, `item_${def.icon}`)
       .setDepth(center(g.y) - 2)
       // พื้นที่กดใหญ่เท่า 1 ช่อง (32px) แม้รูปจะเล็ก เพื่อให้กดบนมือถือง่าย
@@ -411,7 +413,7 @@ export class GameScene extends Phaser.Scene {
     const first = (t: number) => {
       const p = arc({ x: x0, y: y0 }, 22, t);
       img.setPosition(p.x, p.y).setScale(0.4 + 0.6 * t).setRotation((1 - t) * -0.9);
-      shadow.setScale(0.3 + 0.7 * t).setAlpha(0.25 * t);
+      shadow.setScale(0.3 + 0.7 * t).setAlpha(0.35 * t);
     };
     first(0);
     this.tweens.addCounter({
