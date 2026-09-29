@@ -115,7 +115,11 @@ npm run typecheck       # tsc ทั้ง client และ server
 
 - ภาพต้นฉบับจาก PixelLab เก็บที่ `art/pixellab/<ชื่อภาษาอังกฤษ>/` (ตั้งชื่อโฟลเดอร์และไฟล์เป็นภาษาอังกฤษเสมอ) แต่ละชุดมี `metadata.json` บอกทิศและเฟรม ถ้า `animations` ว่าง แปลว่ามีแค่ภาพนิ่ง 8 ทิศ
 - ภาพมอนเก็บที่ `art/monsters/<ชื่อภาษาอังกฤษ>/`
-- พื้นแมพ: `art/tiles/grass.png` (64×64 จากผู้ใช้) ปูซ้ำทั้งแมพด้วย tileSprite ขนาดเดิม (`client/public/sprites/tiles/grass.png`) หิน/ต้นไม้ยังวาดด้วยโค้ด
+- **ของประดับ/วัตถุในแมพ (ChatGPT):** sheet 4×4 หนึ่งช่องหนึ่งชิ้น ChatGPT มักวาดทุกชิ้นเต็มช่องเท่ากัน จึงตัดด้วย `tools/slice_props.py` ที่กำหนดความกว้างในเกมทีละชิ้น (ตัวละครกว้างราว 22px) ได้ `<ชื่อ>.png`, `props.json` (ขนาด, จุดยึดกึ่งกลางฐาน, ความกว้างเงา) และ `preview.png`
+  - ชุดแรก `art/props/set1/sheet.png`: `python tools/slice_props.py art/props/set1/sheet.png art/props/set1 --cols 4 --rows 4 --names flowers-yellow,flowers-pink,tall-grass,fern,bush,rock,rocks-3,mossy-boulder,seashell,starfish,driftwood,coconut,beach-grass,rice-straw,clay-jar,lotus --widths 14,14,14,18,24,14,18,28,8,9,18,10,14,14,14,18` (ตัดแล้ว **ยังไม่ได้วางในแมพ**)
+  - วาดเงาด้วยโค้ด: วงรีสีดำโปร่งแสง (alpha ~70/255) ใต้จุดยึดของวัตถุ ตัวละคร และมอนทุกตัว เรียงลำดับการวาดตามแกน y
+- ลายพื้นเก็บที่ `art/tiles/` (grass, sand, water, dirt, paddy ขนาด 64×64 ต่อกันไร้รอยต่อ ผู้ใช้เลือกสีสดตามต้นฉบับ ภาพต้นฉบับจาก ChatGPT ที่ `art/tiles/source/`) ขอบระหว่างพื้นทำให้โค้งด้วย noise, ทรายริมน้ำเข้มขึ้น, ฟองคลื่นสีขาวที่ขอบน้ำ, เส้นหญ้าเข้ม 1px ที่ขอบหญ้า
+  - **ในเกมตอนนี้:** ใช้แค่ grass ปูซ้ำทั้งแมพ (tileSprite ขนาดเดิม `client/public/sprites/tiles/grass.png`) หิน/ต้นไม้ยังวาดด้วยโค้ด sand/water/dirt/paddy ยังไม่ได้ใส่ (ยังไม่มีผังแมพว่าพื้นแต่ละแบบอยู่ตรงไหน)
 - รูปไอเท็ม/ของดรอปเก็บที่ `art/items/` เป็น pixel art ขนาด 32×32 (มีสำรอง 64×64 ได้) พื้นโปร่งใส
   - มีแล้ว: `crab-claw-16.png`, `crab-claw-32.png`, `crab-claw-64.png` (ก้ามปูนา; 16 ย่อจาก 64 แบบลงตัว 4:1), `red-crab-claw-16/32/64.png` (ก้ามปูแดง, ต้นแบบ `red-crab-claw-source.png`)
   - ของบนพื้นหายเองหลัง 60 นาที (`GROUND_ITEM_MS`, ผู้ใช้กำหนด) ใครกดเก็บก็ได้ ต้องกดที่ของเอง (auto ไม่เก็บให้) ตอนนี้ปูนาดรอปก้ามปูนา 100%
@@ -131,18 +135,20 @@ npm run typecheck       # tsc ทั้ง client และ server
 - **มอนสร้างด้วย ChatGPT** (ผู้ใช้ตัดสินใจ): ใช้ทิศเดียว (หันหน้าเข้ากล้อง) ไม่หันตามทิศที่เดิน ขั้นตอนคือ สร้างตัวมอนภาพเดียว → ใช้ภาพนั้นเป็นต้นแบบสร้าง sheet 4 คอลัมน์ × 3 แถว (walk, attack, death) → ตัดด้วย `tools/slice_sheet.py` (ต้องมี Pillow: `pip install pillow`)
   - ตัวอย่าง: `python tools/slice_sheet.py art/monsters/rice-crab/sheet.png art/monsters/rice-crab --cols 4 --rows 3 --names walk,attack,death --width 32 --colors 40`
   - ได้ไฟล์ `<ท่า>_<ลำดับ>.png`, `preview.png` และ `sheet.json` (ขนาดเฟรม, จุดยึดที่เท้า, ลำดับเฟรม, ms ต่อเฟรม, loop)
+  - ถ้าชุดใหม่ของมอนตัวเดิมมีท่าแรกกว้าง/แคบไม่เท่าชุดเก่า ต้องลองหลายค่า `--width` แล้ววางเทียบกระดอง/ลำตัวกับเฟรมชุดเก่าด้วยตา (การนับตามสีไม่แม่น เพราะสีแต่ละชุดจาก ChatGPT ต่างกันเล็กน้อย)
   - `--ref <ลำดับเฟรม>` ใช้เฟรมท่าปกติวัดขนาด (ค่าเริ่มต้นคือเฟรม 0) ถ้าเฟรมแรกไม่ใช่ท่าปกติ เช่นท่า hit ที่ปูหดตัว ต้องใช้ `--ref 2`
   - sheet แต่ละชุดให้ออกคนละโฟลเดอร์ เพราะสคริปต์เขียน `sheet.json` ทับ (ขนาดเฟรมและจุดยึดของแต่ละชุดอาจต่างกัน วางด้วยจุดยึดที่เท้าเสมอ)
   - ท่ายืนของมอนทำด้วยโค้ด (ขยับขึ้นลง) ใช้เฟรมแรกของ walk เป็นภาพยืน
   - ท่าโดนตี (hit) เล่นพร้อมกะพริบขาวด้วยโค้ด ไม่ขัดท่า attack ที่กำลังเล่นอยู่
   - **ใส่เข้าเกม:** คัดลอก `<ท่า>_*.png` + `sheet.json` ไป `client/public/sprites/monsters/<ชื่อ>/` แล้วตั้ง `sheet: "<ชื่อ>"` ใน `MOBS` (`shared/game.ts`) ชุดท่าเพิ่มที่ตัดแยกโฟลเดอร์ให้คัดลอกไป `client/public/sprites/monsters/<ชื่อ>/<ชุด>/` และใส่ `sheetParts: ["<ชุด>"]` — GameScene โหลด sheet.json สร้าง animation ตาม ms ต่อเฟรม วางจุดยึดเท้าระดับเดียวกับเท้าผู้เล่น เดิน = walk, ยืน = walk_0 + ขยับขึ้นลง, โดนตี = เล่น hit (ถ้ามี) + กะพริบขาว แล้วกลับท่าเดิม, ตาย = เล่น death จนจบแล้วจางหาย (attack ยังไม่ได้ใช้ เพราะมอนยังไม่ตีกลับ) แต่ละท่าตั้งจุดยึดเท้าตาม sheet.json ของชุดตัวเอง
-- **ปูนา (rice-crab):** ใช้ชุดจาก ChatGPT แทนตัวจาก PixelLab (ตัวเก่า 48px ใหญ่เกินไป เลิกใช้ — ต้นฉบับยังเก็บที่ `art/pixellab/rice-field-crab/`) ภาพต้นแบบ `art/monsters/rice-crab/source.png` และ sheet ต้นฉบับ 12 เฟรมที่ `art/monsters/rice-crab/sheet.png` ตัวกว้าง 32px ในเฟรม 35×32 จุดยึด (17,30) และท่าโดนตี 3 เฟรมที่ `art/monsters/rice-crab/hit-sheet.png` (ตัดด้วย `--cols 3 --rows 1 --names hit --width 32 --ref 2 --colors 40 --ms hit=80` ออกไปที่ `art/monsters/rice-crab/hit` ได้เฟรม 35×28 จุดยึด (17,26))
-  - ท่ายืน 6 เฟรม 150ms ที่ `art/monsters/rice-crab/idle-sheet.png` (ตัดด้วย `--cols 6 --rows 1 --names idle --width 32 --colors 40 --ms idle=150` ออกไปที่ `art/monsters/rice-crab/idle` ได้เฟรม 34×30 จุดยึด (17,29)) มีท่า idle แล้วเกมเล่นท่านี้ตอนยืนแทนการขยับขึ้นลงด้วยโค้ด
+- **ปูนา (rice-crab):** ใช้ชุดจาก ChatGPT แทนตัวจาก PixelLab (ตัวเก่า 48px ใหญ่เกินไป เลิกใช้ — ต้นฉบับยังเก็บที่ `art/pixellab/rice-field-crab/`) ภาพต้นแบบ `art/monsters/rice-crab/source.png` ภาพนิ่ง 32×32 `art/monsters/rice-crab/rice-crab.png` และ sheet ต้นฉบับ 12 เฟรมที่ `art/monsters/rice-crab/sheet.png` ตัวกว้าง 32px ในเฟรม 35×32 จุดยึด (17,30) และท่าโดนตี 3 เฟรมที่ `art/monsters/rice-crab/hit-sheet.png` (ตัดด้วย `--cols 3 --rows 1 --names hit --width 32 --ref 2 --colors 40 --ms hit=80` ออกไปที่ `art/monsters/rice-crab/hit` ได้เฟรม 35×28 จุดยึด (17,26))
+  - ท่ายืนประจำตัว (โบกก้าม) 6 เฟรม 150ms ที่ `art/monsters/rice-crab/idle-sheet.png` (ตัดด้วย `--cols 6 --rows 1 --names idle --width 33 --colors 40 --ms idle=150` ออกไปที่ `art/monsters/rice-crab/idle` ได้เฟรม 35×31 จุดยึด (18,29) — ใช้ 33 ไม่ใช่ 32 เพราะเฟรมแรกกางก้ามกว้างกว่าท่าเดิน เทียบด้วยตาแล้วกระดองเท่ากันที่ 33) มีท่า idle แล้วเกมเล่นท่านี้ตอนยืนแทนการขยับขึ้นลงด้วยโค้ด
   - อยู่ในเกมแล้ว (ทดสอบ): `mud_crab` ใน `shared/game.ts` เกิด 8 ตัวในแมพแรกคู่กับ Poring ค่าพลังจาก `monsters.json` (mob003) ยังไม่มีของดรอป
 
 - **ปูแดง (red-crab, mob039):** มอนจาก ChatGPT Lv.3 ในทุ่งนาริมคลอง (แถวที่ 43 ท้ายชีต มอน, ตัวคูณ HP 1.3 / EXP 1.15 → HP 81, ATK 10, EXP 43) ตีกลับเหมือนปูนา เกิด 6 ตัว ดรอปก้ามปูแดง 100%
-  - sheet หลัก 4×4 (walk, attack, hit, death) ตัดด้วย `--cols 4 --rows 4 --names walk,attack,hit,death --width 32 --colors 40 --ms walk=120,attack=90,hit=80,death=140` ได้เฟรม 35×28 จุดยึด (17,26)
-  - ท่ายืน 6 เฟรม 150ms ตัดเหมือนปูนาไปที่ `art/monsters/red-crab/idle` ได้เฟรม 35×33 จุดยึด (17,32)
+  - หน้าโกรธ ภาพตัวหลัก `art/monsters/red-crab/red-crab-source.png` (= `source.png`)
+  - sheet หลัก 4×4 (walk, attack, hit, death) ตัดด้วย `--cols 4 --rows 4 --names walk,attack,hit,death --width 35 --colors 40 --ms walk=120,attack=90,hit=80,death=140` (ใช้ 35 เพราะก้ามใหญ่ ที่ 35 กระดองเท่าปูนา) ได้เฟรม 38×30 จุดยึด (19,29)
+  - ท่ายืนประจำตัว (ฮึดฮัด หนีบก้าม มีไอพ่นเหนือหัวเฟรม 3–4) 6 เฟรมที่ `art/monsters/red-crab/idle-sheet.png` ตัดด้วย `--cols 6 --rows 1 --names idle --width 33 --colors 40 --ms idle=150` ออกไปที่ `art/monsters/red-crab/idle` ได้เฟรม 36×34 จุดยึด (18,33) (33 ตรงกับขนาดชุดท่าหลักที่ 35)
   - มอนใหม่ให้เพิ่มแถว**ท้าย**ชีต มอน เสมอ (id มอนนับจากลำดับแถว แทรกกลางจะทำให้ id ตัวอื่นเลื่อน)
 
 ## ไอเดียที่คุยไว้แล้ว

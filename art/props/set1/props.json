@@ -1,0 +1,162 @@
+{
+ "flowers-yellow": {
+  "file": "flowers-yellow.png",
+  "width": 14,
+  "height": 14,
+  "anchor": {
+   "x": 7,
+   "y": 13
+  },
+  "shadowWidth": 11
+ },
+ "flowers-pink": {
+  "file": "flowers-pink.png",
+  "width": 14,
+  "height": 13,
+  "anchor": {
+   "x": 7,
+   "y": 12
+  },
+  "shadowWidth": 11
+ },
+ "tall-grass": {
+  "file": "tall-grass.png",
+  "width": 14,
+  "height": 14,
+  "anchor": {
+   "x": 7,
+   "y": 13
+  },
+  "shadowWidth": 11
+ },
+ "fern": {
+  "file": "fern.png",
+  "width": 18,
+  "height": 16,
+  "anchor": {
+   "x": 9,
+   "y": 15
+  },
+  "shadowWidth": 14
+ },
+ "bush": {
+  "file": "bush.png",
+  "width": 24,
+  "height": 20,
+  "anchor": {
+   "x": 12,
+   "y": 19
+  },
+  "shadowWidth": 19
+ },
+ "rock": {
+  "file": "rock.png",
+  "width": 14,
+  "height": 11,
+  "anchor": {
+   "x": 7,
+   "y": 10
+  },
+  "shadowWidth": 11
+ },
+ "rocks-3": {
+  "file": "rocks-3.png",
+  "width": 18,
+  "height": 14,
+  "anchor": {
+   "x": 9,
+   "y": 13
+  },
+  "shadowWidth": 14
+ },
+ "mossy-boulder": {
+  "file": "mossy-boulder.png",
+  "width": 28,
+  "height": 24,
+  "anchor": {
+   "x": 14,
+   "y": 23
+  },
+  "shadowWidth": 22
+ },
+ "seashell": {
+  "file": "seashell.png",
+  "width": 8,
+  "height": 7,
+  "anchor": {
+   "x": 4,
+   "y": 6
+  },
+  "shadowWidth": 6
+ },
+ "starfish": {
+  "file": "starfish.png",
+  "width": 9,
+  "height": 7,
+  "anchor": {
+   "x": 4,
+   "y": 6
+  },
+  "shadowWidth": 7
+ },
+ "driftwood": {
+  "file": "driftwood.png",
+  "width": 18,
+  "height": 10,
+  "anchor": {
+   "x": 9,
+   "y": 9
+  },
+  "shadowWidth": 14
+ },
+ "coconut": {
+  "file": "coconut.png",
+  "width": 10,
+  "height": 10,
+  "anchor": {
+   "x": 5,
+   "y": 9
+  },
+  "shadowWidth": 8
+ },
+ "beach-grass": {
+  "file": "beach-grass.png",
+  "width": 14,
+  "height": 14,
+  "anchor": {
+   "x": 7,
+   "y": 13
+  },
+  "shadowWidth": 11
+ },
+ "rice-straw": {
+  "file": "rice-straw.png",
+  "width": 14,
+  "height": 16,
+  "anchor": {
+   "x": 7,
+   "y": 15
+  },
+  "shadowWidth": 11
+ },
+ "clay-jar": {
+  "file": "clay-jar.png",
+  "width": 14,
+  "height": 14,
+  "anchor": {
+   "x": 7,
+   "y": 13
+  },
+  "shadowWidth": 11
+ },
+ "lotus": {
+  "file": "lotus.png",
+  "width": 18,
+  "height": 16,
+  "anchor": {
+   "x": 9,
+   "y": 15
+  },
+  "shadowWidth": 14
+ }
+}

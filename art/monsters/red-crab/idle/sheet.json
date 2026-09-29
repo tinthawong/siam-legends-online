@@ -1,9 +1,9 @@
 {
- "frameWidth": 35,
- "frameHeight": 33,
+ "frameWidth": 36,
+ "frameHeight": 34,
  "anchor": {
-  "x": 17,
-  "y": 32,
+  "x": 18,
+  "y": 33,
   "note": "จุดกึ่งกลางเท้า วางตรงตำแหน่งมอนในเกม"
  },
  "animations": {
