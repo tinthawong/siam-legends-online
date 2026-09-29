@@ -13,10 +13,10 @@ function hsl(r: number, g: number, b: number): [number, number, number] {
 }
 
 /** ผม = ก้อนสีเข้มโทนน้ำเงินเทาขนาดใหญ่ที่เริ่มจากบนหัว (ตัดที่แนวเอว) */
-function hairMask(d: ImageData, waist = 34): Set<number> {
+export function hairMask(d: ImageData, eyes: Set<number>, waist = 34): Set<number> {
   const { width: W, height: H, data } = d;
   const ok = (i: number) => {
-    if (data[i * 4 + 3] === 0) return false;
+    if (data[i * 4 + 3] === 0 || eyes.has(i)) return false; // ตาไม่นับเป็นผม แม้จะอยู่ติดคิ้ว
     const [h, s, l] = hsl(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
     if (l < 0.05 || l > 0.55) return false; // เส้นขอบดำสนิท / สีสว่าง
     return (h >= 200 && h <= 310) || s < 0.1;
@@ -46,26 +46,46 @@ function hairMask(d: ImageData, waist = 34): Set<number> {
   return mask;
 }
 
-/** ม่านตา = พิกเซลโทนฟ้ากลาง ๆ ในช่วงหัว ที่อยู่ติดกับตาขาว */
-function eyeMask(d: ImageData, hair: Set<number>): Set<number> {
+/** ม่านตา = พิกเซลในช่วงหัวที่ไม่ใช่ผิวหรือเส้นขอบ และอยู่ติดกับตาขาว */
+export function eyeMask(d: ImageData): Set<number> {
   const { width: W, height: H, data } = d;
   let top = 0;
   outer: for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) if (data[(y * W + x) * 4 + 3]) { top = y; break outer; }
   const px = (i: number) => hsl(data[i * 4], data[i * 4 + 1], data[i * 4 + 2]);
   const opaque = (i: number) => data[i * 4 + 3] > 0;
   const sclera = (i: number) => { const [h, , l] = px(i); return opaque(i) && l > 0.72 && h >= 160 && h <= 240; };
+  const lo = top + 10, hi = Math.min(H - 1, top + 20);
+  const inBand = (y: number) => y >= lo && y <= hi;
+  const iris = (i: number) => {
+    if (!opaque(i)) return false;
+    const [h, s, l] = px(i);
+    if (l < 0.12 || l > 0.68) return false;           // เส้นขอบ/รูม่านตาดำสนิท หรือตาขาว
+    return !(s > 0.25 && (h < 40 || h > 340));          // ไม่ใช่ผิว
+  };
+  // ตาขาวในช่วงหัว
+  const whites: [number, number][] = [];
+  for (let y = lo; y <= hi; y++) for (let x = 0; x < W; x++) if (sclera(y * W + x)) whites.push([x, y]);
+  const nearWhite = (x: number, y: number, r: number) =>
+    whites.some(([wx, wy]) => Math.max(Math.abs(wx - x), Math.abs(wy - y)) <= r);
+
+  // เริ่มจากพิกเซลตาที่ติดตาขาว แล้วลามไปพิกเซลตาที่ต่อกัน ภายในระยะ 3 ช่องจากตาขาว
   const mask = new Set<number>();
-  for (let y = top + 10; y <= Math.min(H - 1, top + 20); y++)
+  const stack: number[] = [];
+  for (let y = lo; y <= hi; y++)
     for (let x = 1; x < W - 1; x++) {
       const i = y * W + x;
-      if (!opaque(i) || hair.has(i)) continue;
-      const [h, s, l] = px(i);
-      if (l < 0.12 || l > 0.6 || s < 0.12 || h < 190 || h > 260) continue;
-      let nearWhite = false;
-      for (let dy = -1; dy <= 1 && !nearWhite; dy++)
-        for (let dx = -1; dx <= 1; dx++) if (sclera((y + dy) * W + x + dx)) { nearWhite = true; break; }
-      if (nearWhite) mask.add(i);
+      if (iris(i) && nearWhite(x, y, 1)) { mask.add(i); stack.push(i); }
     }
+  while (stack.length) {
+    const i = stack.pop()!;
+    const x = i % W, y = (i / W) | 0;
+    for (let dy = -1; dy <= 1; dy++)
+      for (let dx = -1; dx <= 1; dx++) {
+        const nx = x + dx, ny = y + dy, n = ny * W + nx;
+        if (nx < 0 || nx >= W || !inBand(ny) || mask.has(n)) continue;
+        if (iris(n) && nearWhite(nx, ny, 3)) { mask.add(n); stack.push(n); }
+      }
+  }
   return mask;
 }
 
@@ -91,8 +111,8 @@ export function recolorSprite(src: CanvasImageSource & { width: number; height: 
   const eyeRamp = EYE_COLORS[look.eyes]?.ramp;
   if (!hairRamp && !eyeRamp) return cv;
   const d = ctx.getImageData(0, 0, cv.width, cv.height);
-  const hair = hairMask(d);
-  const eyes = eyeMask(d, hair); // หาจากภาพต้นฉบับก่อนเปลี่ยนสี
+  const eyes = eyeMask(d);        // หาตาก่อน แล้วกันออกจากผม (หาจากภาพต้นฉบับก่อนเปลี่ยนสี)
+  const hair = hairMask(d, eyes);
   if (hairRamp) applyRamp(d, hair, hairRamp);
   if (eyeRamp) applyRamp(d, eyes, eyeRamp);
   ctx.putImageData(d, 0, 0);
