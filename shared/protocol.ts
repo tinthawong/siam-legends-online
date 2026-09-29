@@ -60,6 +60,7 @@ export type ServerMsg =
   | { t: "drop"; g: GroundItem }          // ของหล่นบนพื้น
   | { t: "picked"; id: string; by: string } // ของบนพื้นถูกเก็บแล้ว (by = id ผู้เล่นที่เก็บ)
   | { t: "inv"; items: InvItem[] }          // กระเป๋าของเราเปลี่ยน
+  | { t: "expire"; id: string }             // ของบนพื้นหมดเวลา หายไป
   | { t: "stats"; self: PlayerStats }
   | { t: "target"; id: string | null }
   | { t: "auto"; on: boolean }

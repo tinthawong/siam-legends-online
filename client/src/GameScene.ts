@@ -207,6 +207,13 @@ export class GameScene extends Phaser.Scene {
       case "inv":
         this.onInventory?.(m.items);
         break;
+      case "expire": {
+        const img = this.groundViews.get(m.id);
+        if (!img) break;
+        this.groundViews.delete(m.id);
+        this.tweens.add({ targets: img, alpha: 0, duration: 400, onComplete: () => img.destroy() });
+        break;
+      }
       case "spawn":
         this.addView(m.e);
         break;

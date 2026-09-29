@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./index";
 import {
-  TICK_MS, PLAYER_MOVE_MS, PLAYER_ASPD_MS, PLAYER_RANGE, AUTO_RADIUS, MOB_RESPAWN_MS,
+  TICK_MS, GROUND_ITEM_MS, PLAYER_MOVE_MS, PLAYER_ASPD_MS, PLAYER_RANGE, AUTO_RADIUS, MOB_RESPAWN_MS,
   MOB_ASPD_MS, MOB_RANGE, MOB_CHASE_RANGE, REGEN_DELAY_MS, REGEN_EVERY_MS, REGEN_PCT,
   stepMs, cheb,
 } from "../../shared/constants";
@@ -67,6 +67,7 @@ export class MapRoom extends DurableObject<Env> {
   private players = new Map<string, Player>();
   private mobs = new Map<string, Mob>();
   private ground = new Map<string, GroundItem>(); // ของหล่นบนพื้น
+  private groundExpire = new Map<string, number>(); // id ของบนพื้น → เวลาที่จะหาย
   private groundSeq = 0;
   private loop: ReturnType<typeof setInterval> | null = null;
   private nextSaveAt = 0;
@@ -247,6 +248,12 @@ export class MapRoom extends DurableObject<Env> {
     }
     for (const p of this.players.values()) this.updatePlayer(p, now);
     for (const p of this.players.values()) this.regen(p, now);
+    for (const [id, at] of this.groundExpire) {
+      if (now < at) continue;
+      this.groundExpire.delete(id);
+      this.ground.delete(id);
+      this.broadcast({ t: "expire", id });
+    }
 
     // autosave เผื่อ DO ถูกปิดกะทันหัน จะเสียข้อมูลไม่เกินรอบนี้
     if (now >= this.nextSaveAt) {
@@ -336,6 +343,7 @@ export class MapRoom extends DurableObject<Env> {
       if (p.path.length) this.setPath(p, [], now);
       p.pickup = null;
       this.ground.delete(g.id);
+      this.groundExpire.delete(g.id);
       p.inv.set(g.item, (p.inv.get(g.item) ?? 0) + 1);
       this.broadcast({ t: "picked", id: g.id, by: p.id });
       this.send(p, { t: "inv", items: invList(p.inv) });
@@ -425,6 +433,7 @@ export class MapRoom extends DurableObject<Env> {
     if (drop && ITEMS[drop.item] && Math.random() < drop.chance) {
       const g: GroundItem = { id: "g" + ++this.groundSeq, item: drop.item, x: m.x, y: m.y };
       this.ground.set(g.id, g);
+      this.groundExpire.set(g.id, now + GROUND_ITEM_MS);
       this.broadcast({ t: "drop", g });
     }
 

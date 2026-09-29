@@ -8,6 +8,7 @@ export const PLAYER_ASPD_MS = 700;   // ตีได้ทุก ๆ กี่ m
 export const PLAYER_RANGE = 1;       // ระยะตี (ช่อง)
 export const AUTO_RADIUS = 12;       // รัศมีหามอนของระบบ auto (ช่อง)
 export const MOB_RESPAWN_MS = 8000;
+export const GROUND_ITEM_MS = 60 * 60_000; // ของบนพื้นหายเองหลัง 60 นาที (ผู้ใช้กำหนด)
 
 // มอนตีกลับ (เฉพาะมอนที่ตั้ง retaliate ใน MOBS)
 export const MOB_ASPD_MS = 1500;     // มอนตีได้ทุก ๆ กี่ ms
