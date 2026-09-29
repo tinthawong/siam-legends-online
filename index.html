@@ -1,0 +1,409 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#1a0d0a" />
+  <title>Siam Legends Online</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Chonburi&family=Mitr:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      /* โทนลายรดน้ำ: พื้นรักดำ + ทองคำเปลว */
+      --lacquer: #1a0d0a;
+      --lacquer-2: #2a140e;
+      --gold: #e9b949;
+      --gold-lite: #ffe39a;
+      --gold-deep: #9a6a1c;
+      --cinnabar: #a4281b;
+      --ink: #fbf1dc;
+      --ink-dim: #d9c7a3;
+
+      /* ใช้ใน HUD ในเกม */
+      --window: rgba(22, 38, 63, 0.86);
+      --window-edge: #9fc0ec;
+      --exp: #f2c14e;
+      --auto: #3fd0a4;
+      --meadow: #3d6b35;
+
+      --font: "Mitr", "Noto Sans Thai", system-ui, sans-serif;
+      --font-title: "Chonburi", "Mitr", serif;
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; overflow: hidden; background: var(--lacquer); font-family: var(--font); color: var(--ink); touch-action: none; -webkit-user-select: none; user-select: none; }
+    #game { position: fixed; inset: 0; z-index: 0; }
+    [hidden] { display: none !important; }
+    button { font: inherit; cursor: pointer; }
+    :focus-visible { outline: 3px solid var(--gold-lite); outline-offset: 2px; }
+
+    /* ---------- ฉากหลังหน้าเข้าเกม ----------
+       ภาพพื้นหลังอยู่ที่ client/public/ui/login-bg.webp เปลี่ยนภาพได้โดยวางไฟล์ชื่อเดิมทับ */
+    #backdrop {
+      position: fixed; inset: 0; z-index: 1; overflow: hidden;
+      background:
+        linear-gradient(180deg, rgba(26, 10, 12, 0.10) 0%, rgba(26, 10, 12, 0.25) 45%, rgba(26, 10, 12, 0.65) 100%),
+        url("/ui/login-bg.webp") center / cover no-repeat,
+        radial-gradient(ellipse 60% 40% at 50% 78%, rgba(255, 214, 120, 0.55), transparent 70%),
+        linear-gradient(180deg, #2b0f2e 0%, #6b1f3a 32%, #c4532f 58%, #f0a44a 76%, #f7cf7a 88%);
+    }
+    #hud:not([hidden]) ~ #backdrop { display: none; } /* เข้าเกมแล้วปิดฉากหลัง ประหยัดเครื่อง */
+
+
+    .mote { position: absolute; bottom: -10px; width: 4px; height: 4px; border-radius: 50%;
+      background: var(--gold-lite); box-shadow: 0 0 8px 2px rgba(255, 215, 120, 0.8);
+      animation: rise linear infinite; opacity: 0; }
+    @keyframes rise {
+      0% { transform: translate(0, 0); opacity: 0; }
+      15% { opacity: 0.9; }
+      100% { transform: translate(var(--drift, 20px), -85vh); opacity: 0; }
+    }
+
+    /* ---------- หน้าต่างลายรดน้ำ ---------- */
+    .screen { position: fixed; inset: 0; z-index: 2; display: grid; place-items: center;
+      padding: calc(20px + env(safe-area-inset-top)) 16px calc(20px + env(safe-area-inset-bottom));
+      overflow-y: auto; touch-action: pan-y; }
+
+    .title { text-align: center; margin: 0 0 -6px; position: relative; z-index: 1; }
+    .title img { display: block; margin: 0 auto; width: min(420px, 92vw); max-height: 30vh; object-fit: contain;
+      filter: drop-shadow(0 6px 18px rgba(0, 0, 0, 0.55)); }
+    .title h1 { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+    .panel { position: relative; width: min(380px, 100%); padding: 30px 26px 24px;
+      background:
+        radial-gradient(ellipse at 50% 0%, rgba(233, 185, 73, 0.10), transparent 60%),
+        linear-gradient(180deg, var(--lacquer-2), var(--lacquer));
+      border: 2px solid var(--gold);
+      outline: 1px solid var(--gold-deep); outline-offset: -8px;
+      border-radius: 6px;
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), inset 0 0 30px rgba(0, 0, 0, 0.6); }
+    .corner { position: absolute; width: 44px; height: 44px; color: var(--gold); pointer-events: none; }
+    .corner.tl { top: -3px; left: -3px; }
+    .corner.tr { top: -3px; right: -3px; transform: scaleX(-1); }
+    .corner.bl { bottom: -3px; left: -3px; transform: scaleY(-1); }
+    .corner.br { bottom: -3px; right: -3px; transform: scale(-1, -1); }
+    .crest { position: absolute; top: -26px; left: 50%; transform: translateX(-50%); width: 64px; height: 40px; color: var(--gold); }
+
+    .panel h2 { margin: 0 0 6px; text-align: center; font-weight: 600; font-size: 20px; color: var(--gold-lite); }
+    .panel p { margin: 0 0 18px; text-align: center; color: var(--ink-dim); font-size: 14px; line-height: 1.55; }
+
+    .panel input, .card input:not([type=checkbox]) { width: 100%; font: inherit; font-size: 17px; padding: 12px 14px; margin-bottom: 12px;
+      border-radius: 4px; border: 1px solid var(--gold-deep); background: rgba(0, 0, 0, 0.45); color: var(--ink);
+      user-select: text; transition: border-color 150ms, box-shadow 150ms; }
+    .panel input::placeholder, .card input::placeholder { color: #9c8a6a; }
+    .panel input:focus, .card input:focus { outline: none; border-color: var(--gold); box-shadow: 0 0 0 3px rgba(233, 185, 73, 0.25); }
+
+    .btn { position: relative; width: 100%; padding: 12px; border-radius: 4px; font-size: 17px; font-weight: 600; overflow: hidden;
+      transition: transform 80ms, filter 150ms; }
+    .btn:active { transform: translateY(1px); }
+    .btn:disabled { opacity: 0.6; cursor: default; }
+    .btn + .btn { margin-top: 10px; }
+    .btn-gold { border: 1px solid var(--gold-lite); color: #3a1a05;
+      background: linear-gradient(180deg, var(--gold-lite), var(--gold) 50%, #c98f2a); box-shadow: 0 3px 0 #6b4410; }
+    .btn-gold::after { content: ""; position: absolute; top: 0; left: -60%; width: 40%; height: 100%;
+      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.55), transparent);
+      transform: skewX(-20deg); animation: shine 3.2s ease-in-out infinite; }
+    @keyframes shine { 0%, 60% { left: -60%; } 100% { left: 130%; } }
+    .btn-gold:hover { filter: brightness(1.06); }
+    .btn-line { border: 1px solid var(--gold); background: rgba(0, 0, 0, 0.3); color: var(--gold-lite); font-weight: 400; }
+    .btn-line:hover { background: rgba(233, 185, 73, 0.12); }
+
+    .divider { display: flex; align-items: center; gap: 10px; margin: 16px 0; color: var(--gold); font-size: 13px; }
+    .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, transparent, var(--gold-deep), transparent); }
+
+    .msg { min-height: 1.5em; margin: 14px 0 0 !important; font-size: 14px !important; color: #ff9d8a !important; }
+    .msg.ok { color: #b9f0c8 !important; }
+
+    /* ---------- หน้าเข้าเกม (โลโก้ + การ์ด + ลิงก์ + footer) ---------- */
+    #login { place-items: start center; grid-template-columns: minmax(0, 1fr); padding-bottom: calc(76px + env(safe-area-inset-bottom)); }
+    .login-col { width: min(400px, 100%); min-width: 0; display: flex; flex-direction: column; align-items: center; }
+    .card .msg:empty { display: none; }
+    .tagline { margin: 2px 0 18px; font-size: 15px; letter-spacing: 0.08em; color: var(--gold-lite);
+      text-shadow: 0 2px 6px rgba(0, 0, 0, 0.8); display: flex; align-items: center; gap: 12px; }
+    .tagline::before, .tagline::after { content: ""; width: 42px; height: 1px; background: linear-gradient(90deg, transparent, var(--gold)); }
+    .tagline::after { transform: scaleX(-1); }
+
+    .card { position: relative; width: 100%; border: 2px solid var(--gold); border-radius: 8px; overflow: visible;
+      background: linear-gradient(180deg, var(--lacquer-2), var(--lacquer));
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.55), 0 0 0 1px var(--gold-deep) inset; }
+    .card-head { margin: 0; padding: 12px 16px; text-align: center; border-radius: 6px 6px 0 0;
+      font-family: var(--font-title); font-weight: 400; font-size: 24px; color: var(--gold-lite);
+      background: linear-gradient(180deg, #b8321f, var(--cinnabar) 55%, #6e150c);
+      border-bottom: 2px solid var(--gold); text-shadow: 0 2px 0 rgba(0, 0, 0, 0.45); }
+    .card-head span { color: var(--gold); font-size: 16px; margin: 0 10px; vertical-align: middle; }
+    .card-body { padding: 22px 24px 20px; }
+    .card-body h2 { margin: 0 0 2px; text-align: center; font-weight: 600; font-size: 22px; color: var(--gold-lite); }
+    .card-body .sub { margin: 0 0 18px; text-align: center; font-size: 14px; color: var(--ink-dim); }
+
+    .btn-google { display: flex; align-items: center; justify-content: center; gap: 12px; border: 1px solid #dadce0;
+      background: #fff; color: #1f1f1f; box-shadow: 0 2px 0 rgba(0, 0, 0, 0.35); }
+    .btn-google:hover { background: #f4f6f8; }
+    .btn-google svg { width: 22px; height: 22px; flex: none; }
+    .btn-guest { display: flex; align-items: center; justify-content: center; gap: 10px; }
+    .btn-guest svg { width: 20px; height: 20px; }
+    .note { margin: 12px 0 0; text-align: center; font-size: 13px; line-height: 1.6; color: var(--ink-dim); }
+
+    details.email { margin-top: 14px; border-top: 1px dashed var(--gold-deep); padding-top: 12px; }
+    details.email summary { cursor: pointer; text-align: center; font-size: 14px; color: var(--gold); list-style: none; }
+    details.email summary::-webkit-details-marker { display: none; }
+    details.email summary::after { content: " ▾"; }
+    details.email[open] summary::after { content: " ▴"; }
+    details.email[open] summary { margin-bottom: 12px; }
+
+    .sect { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--gold-deep); }
+    .sect h3 { margin: 0 0 10px; text-align: center; font-size: 14px; font-weight: 600; color: var(--gold); }
+    .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+    .chip { display: flex; align-items: center; justify-content: center; gap: 7px; min-height: 40px; padding: 8px 10px;
+      border: 1px solid var(--gold-deep); border-radius: 5px; background: rgba(0, 0, 0, 0.3);
+      color: var(--ink); font-size: 13px; text-decoration: none; transition: background 150ms, border-color 150ms; }
+    .chip:hover { background: rgba(233, 185, 73, 0.12); border-color: var(--gold); }
+    .chip svg { width: 16px; height: 16px; flex: none; color: var(--gold); }
+    .chip small { color: var(--ink-dim); font-size: 11px; }
+    .chip.discord { grid-column: 1 / -1; background: #4a55c9; border-color: #7b85f0; color: #fff; font-size: 14px; }
+    .chip.discord svg { color: #fff; width: 20px; height: 20px; }
+    .chip.discord:hover { background: #5865f2; }
+
+    .quote { position: fixed; right: 4vw; top: 34vh; max-width: 340px; margin: 0; z-index: 2; pointer-events: none;
+      font-size: 22px; font-style: italic; line-height: 1.7; text-align: right; color: #fff;
+      text-shadow: 0 2px 10px rgba(0, 0, 0, 0.85), 0 0 2px rgba(0, 0, 0, 0.9); }
+    @media (max-width: 1100px) { .quote { display: none; } }
+
+    .site-footer { position: fixed; left: 0; right: 0; bottom: 0; z-index: 3;
+      display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+      padding: 10px 20px calc(10px + env(safe-area-inset-bottom));
+      background: rgba(20, 8, 6, 0.88); border-top: 1px solid var(--gold-deep); backdrop-filter: blur(6px);
+      font-size: 14px; }
+    .site-footer .brand { display: flex; align-items: center; gap: 10px; color: var(--ink); }
+    .site-footer .brand b { font-weight: 600; }
+    .site-footer .brand i { font-style: normal; color: var(--gold); }
+    .site-footer .brand .slogan { color: var(--ink-dim); font-size: 13px; padding-left: 12px; border-left: 1px solid var(--gold-deep); }
+    .site-footer nav { display: flex; align-items: center; justify-content: center; flex-wrap: wrap; gap: 4px 0; }
+    .site-footer nav a { white-space: nowrap; color: var(--ink); text-decoration: none; padding: 4px 10px; border-right: 1px solid var(--gold-deep); }
+    .site-footer nav a:last-of-type { border-right: 0; }
+    .site-footer nav a:hover { color: var(--gold-lite); }
+    #btn-settings { width: 34px; height: 34px; margin-left: 8px; display: grid; place-items: center; padding: 0;
+      border: 1px solid var(--gold-deep); border-radius: 6px; background: rgba(0, 0, 0, 0.35); color: var(--gold); }
+    #btn-settings svg { width: 18px; height: 18px; }
+    #settings-pop { position: fixed; right: 16px; bottom: calc(62px + env(safe-area-inset-bottom)); z-index: 4;
+      padding: 14px 16px; min-width: 220px; background: var(--lacquer-2); border: 1px solid var(--gold); border-radius: 6px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.6); font-size: 14px; }
+    #settings-pop label { display: flex; align-items: center; gap: 10px; cursor: pointer; }
+    body.no-fx .mote { display: none; }
+    #toast { position: fixed; left: 50%; bottom: calc(80px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6;
+      padding: 10px 16px; border-radius: 6px; background: rgba(0, 0, 0, 0.85); border: 1px solid var(--gold-deep); font-size: 14px; }
+    @media (max-width: 700px) {
+      .site-footer { justify-content: center; padding: 8px 12px calc(8px + env(safe-area-inset-bottom)); font-size: 13px; }
+      .site-footer .brand { display: none; }
+      .site-footer nav a { padding: 2px 7px; font-size: 12px; }
+      #btn-settings { width: 30px; height: 30px; }
+      #login { padding-bottom: calc(96px + env(safe-area-inset-bottom)); }
+      .card-body { padding: 18px 16px 16px; }
+    }
+
+    #link-google { background: none; border: 0; padding: 0; margin: 6px 0 0 12px; color: var(--auto); font-size: 12px; text-decoration: underline; }
+
+    #loading .panel { text-align: center; }
+    #loading-text { margin: 0 !important; }
+
+    .window { background: var(--window); border: 2px solid var(--window-edge); border-radius: 10px;
+      box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
+    #dc { z-index: 5; }
+
+    #logout { background: none; border: 0; padding: 0; margin-top: 6px; color: var(--ink-dim); font-size: 12px; text-decoration: underline; }
+
+    /* HUD */
+    #status { position: fixed; top: calc(10px + env(safe-area-inset-top)); left: calc(10px + env(safe-area-inset-left));
+      padding: 8px 12px 10px; min-width: 190px; }
+    #status .row { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; }
+    #hud-name { font-weight: 600; font-size: 16px; }
+    #hud-lv { font-size: 14px; color: var(--exp); }
+    .bar { height: 8px; margin-top: 6px; background: #0f1b2e; border-radius: 4px; overflow: hidden; }
+    .bar i { display: block; height: 100%; width: 0; background: var(--exp); transition: width 200ms; }
+    #hud-exp-text { font-size: 12px; color: var(--ink-dim); margin-top: 3px; }
+
+    #auto-btn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom));
+      width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--window-edge);
+      background: var(--window); color: var(--ink); font-size: 17px; font-weight: 600; }
+    #auto-btn.on { background: var(--auto); border-color: #d9fff2; color: #06291f; box-shadow: 0 0 0 6px rgba(63,208,164,0.3); }
+
+    #dc { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8,14,24,0.6); }
+    #dc .window { padding: 20px 24px; text-align: center; max-width: 320px; }
+    #dc p { margin: 0 0 14px; line-height: 1.5; }
+    #dc button { padding: 10px 18px; border: 0; border-radius: 8px; background: var(--exp); color: #2b1d00; font-weight: 600; }
+
+    @media (prefers-reduced-motion: reduce) { .bar i { transition: none; } }
+    @media (prefers-reduced-motion: reduce) {
+      .mote, .btn-gold::after { animation: none; display: none; }
+    }
+  </style>
+</head>
+<body>
+  <div id="game"></div>
+
+  <!-- ลายมุมกรอบ (ใช้ซ้ำ 4 มุม) -->
+  <svg width="0" height="0" style="position:absolute" aria-hidden="true">
+    <defs>
+      <symbol id="kanok" viewBox="0 0 44 44">
+        <path d="M3 41 V8 Q3 3 8 3 H41" fill="none" stroke="currentColor" stroke-width="2.5"/>
+        <path d="M9 36 V13 Q9 9 13 9 H36" fill="none" stroke="currentColor" stroke-width="1" opacity="0.7"/>
+        <path d="M14 14 C14 22 20 26 24 22 C27 19 24 15 21 17 C19 19 21 21 22 20" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/>
+        <path d="M14 14 C22 14 26 20 22 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity="0.8"/>
+        <circle cx="14" cy="14" r="2.2" fill="currentColor"/>
+      </symbol>
+      <symbol id="chedi" viewBox="0 0 64 40">
+        <path d="M32 0 L33.2 12 H30.8 Z" fill="currentColor"/>
+        <rect x="29" y="12" width="6" height="3" fill="currentColor"/>
+        <path d="M22 26 Q22 15 32 15 Q42 15 42 26 Z" fill="currentColor"/>
+        <rect x="18" y="26" width="28" height="4" fill="currentColor"/>
+        <rect x="14" y="31" width="36" height="3" fill="currentColor"/>
+        <path d="M2 36 H24 M40 36 H62" stroke="currentColor" stroke-width="1.5"/>
+        <circle cx="32" cy="22" r="2" fill="#1a0d0a"/>
+      </symbol>
+    </defs>
+  </svg>
+
+  <div id="loading" class="screen">
+    <div class="panel">
+      <p id="loading-text">กำลังโหลด…</p>
+    </div>
+  </div>
+
+  <div id="login" class="screen" hidden>
+    <div class="login-col">
+      <div class="title"><img src="/ui/logo.webp" alt="" /><h1>Siam Legends Online</h1></div>
+      <p class="tagline">ตำนานของคุณรออยู่</p>
+
+      <section class="card">
+        <svg class="corner tl"><use href="#kanok"/></svg><svg class="corner tr"><use href="#kanok"/></svg>
+        <svg class="corner bl"><use href="#kanok"/></svg><svg class="corner br"><use href="#kanok"/></svg>
+        <h2 class="card-head"><span>✦</span>เข้าสู่ระบบ<span>✦</span></h2>
+        <div class="card-body">
+          <h2>ยินดีต้อนรับ นักผจญภัย</h2>
+          <p class="sub">เริ่มการผจญภัยครั้งใหม่ได้ทันที</p>
+
+          <button type="button" class="btn btn-google" id="btn-google">
+            <svg viewBox="0 0 48 48" aria-hidden="true"><path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3C33.7 32.7 29.2 36 24 36c-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 12.9 4 4 12.9 4 24s8.9 20 20 20 20-8.9 20-20c0-1.3-.1-2.4-.4-3.5z"/><path fill="#FF3D00" d="m6.3 14.7 6.6 4.8C14.7 15.1 19 12 24 12c3.1 0 5.8 1.2 7.9 3.1l5.7-5.7C34 6.1 29.3 4 24 4 16.3 4 9.7 8.3 6.3 14.7z"/><path fill="#4CAF50" d="M24 44c5.2 0 9.9-2 13.4-5.2l-6.2-5.2C29.2 35.1 26.7 36 24 36c-5.2 0-9.6-3.3-11.3-8l-6.5 5C9.5 39.6 16.2 44 24 44z"/><path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.2-2.2 4.2-4.1 5.6l6.2 5.2C37 39.2 44 34 44 24c0-1.3-.1-2.4-.4-3.5z"/></svg>
+            เข้าสู่ระบบด้วย Google
+          </button>
+          <div class="divider">หรือ</div>
+          <button type="button" class="btn btn-gold btn-guest" id="btn-guest">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="8" r="4.5"/><path d="M3.5 21c0-4.7 3.8-8 8.5-8s8.5 3.3 8.5 8z"/></svg>
+            เล่นแบบผู้เยี่ยมชม
+          </button>
+          <p class="note">เล่นได้ทันทีโดยไม่ต้องสมัคร แต่ตัวละครจะอยู่ในเบราว์เซอร์นี้เท่านั้น<br />ล้างคุกกี้หรือเปลี่ยนเครื่องจะหายไป · ผูกบัญชี Google เพื่อเก็บไว้ถาวร</p>
+
+          <details class="email">
+            <summary>เข้าสู่ระบบด้วยอีเมล</summary>
+            <form id="login-form">
+              <input id="email" type="email" placeholder="อีเมล" autocomplete="email" required />
+              <input id="password" type="password" placeholder="รหัสผ่าน (อย่างน้อย 6 ตัว)" autocomplete="current-password" minlength="6" required />
+              <button type="submit" class="btn btn-line" id="btn-signin">เข้าสู่ระบบ</button>
+              <button type="button" class="btn btn-line" id="btn-signup">สมัครสมาชิก</button>
+            </form>
+          </details>
+          <p class="msg" id="login-msg" role="status" style="text-align:center"></p>
+
+          <div class="sect">
+            <h3>ดาวน์โหลดแอป</h3>
+            <div class="grid2">
+              <a class="chip" href="#" data-soon>
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 5.5 10 4.5v7H3zM11 4.3 21 3v8.5H11zM3 12.5h7v7L3 18.5zM11 12.5h10V21l-10-1.3z"/></svg>
+                Windows
+              </a>
+              <a class="chip" href="#" data-soon>
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.4 12.6c0-2.6 2.1-3.8 2.2-3.9-1.2-1.8-3.1-2-3.8-2-1.6-.2-3.1.9-3.9.9s-2.1-.9-3.4-.9C5.8 6.8 4.2 7.8 3.3 9.4c-1.9 3.2-.5 8 1.3 10.6.9 1.3 1.9 2.7 3.3 2.6 1.3-.1 1.8-.8 3.4-.8s2 .8 3.4.8c1.4 0 2.3-1.3 3.2-2.6 1-1.5 1.4-2.9 1.4-3-.1 0-2.9-1.1-2.9-4.4zM13.9 4.9c.7-.9 1.2-2.1 1.1-3.3-1 0-2.3.7-3 1.6-.7.8-1.2 2-1.1 3.2 1.1.1 2.3-.6 3-1.5z"/></svg>
+                macOS
+              </a>
+            </div>
+          </div>
+
+          <div class="sect">
+            <h3>ลิงก์สำหรับผู้เล่น</h3>
+            <div class="grid2">
+              <a class="chip" href="#" data-soon><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M2 5h7a3 3 0 0 1 3 3v12a2 2 0 0 0-2-2H2zM22 5h-7a3 3 0 0 0-3 3v12a2 2 0 0 1 2-2h8z"/></svg>คู่มือเกม</a>
+              <a class="chip" href="#" data-soon><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="10"/><path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01"/></svg>คำถามที่พบบ่อย</a>
+              <a class="chip" href="#" data-soon><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 2l2.4 7.4H22l-6.2 4.5 2.4 7.4L12 16.8l-6.2 4.5 2.4-7.4L2 9.4h7.6z"/></svg>อัปเดตแพตช์</a>
+              <a class="chip" href="#" data-soon><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4z M8 2v16 M16 6v16"/></svg>แผนที่โลก</a>
+              <a class="chip discord" href="#" data-soon><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M20.3 4.4A19.8 19.8 0 0 0 15.4 3l-.6 1.3a18.3 18.3 0 0 0-5.6 0L8.6 3a19.7 19.7 0 0 0-4.9 1.5C.6 9.1-.3 13.7.1 18.2a19.9 19.9 0 0 0 6 3l1.3-2.1c-.7-.3-1.4-.6-2-1l.5-.4a14.2 14.2 0 0 0 12.2 0l.5.4c-.6.4-1.3.7-2 1l1.3 2.1a19.8 19.8 0 0 0 6-3c.5-5.2-.9-9.8-3.6-13.8zM8 15.5c-1.2 0-2.2-1.1-2.2-2.4S6.8 10.7 8 10.7s2.2 1.1 2.2 2.4-1 2.4-2.2 2.4zm8 0c-1.2 0-2.2-1.1-2.2-2.4s1-2.4 2.2-2.4 2.2 1.1 2.2 2.4-1 2.4-2.2 2.4z"/></svg>เข้าร่วม Discord</a>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <p class="quote">“แผ่นดินสยามยังมีตำนานรอให้ค้นพบ<br />การผจญภัยครั้งใหม่เริ่มต้นที่นี่”</p>
+
+    <footer class="site-footer">
+      <div class="brand"><i>✦</i><b>Siam Legends Online</b><span class="slogan">ตำนานแห่งแผ่นดินทอง</span></div>
+      <nav>
+        <a href="#" data-soon>ช่วยเหลือ</a>
+        <a href="#" data-soon>คำถามที่พบบ่อย</a>
+        <a href="#" data-soon>ข้อตกลงการใช้งาน</a>
+        <a href="#" data-soon>นโยบายความเป็นส่วนตัว</a>
+        <button type="button" id="btn-settings" aria-label="ตั้งค่า" aria-expanded="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z"/></svg>
+        </button>
+      </nav>
+    </footer>
+    <div id="settings-pop" hidden>
+      <label><input type="checkbox" id="opt-fx" checked /> เอฟเฟกต์ประกายทอง</label>
+    </div>
+  </div>
+  <div id="toast" role="status" hidden></div>
+
+  <div id="create" class="screen" hidden>
+    <div style="width: min(380px, 100%)">
+      <div class="title"><img src="/ui/logo.webp" alt="" /><h1>Siam Legends Online</h1></div>
+      <form class="panel" id="create-form">
+        <svg class="corner tl"><use href="#kanok"/></svg><svg class="corner tr"><use href="#kanok"/></svg>
+        <svg class="corner bl"><use href="#kanok"/></svg><svg class="corner br"><use href="#kanok"/></svg>
+        <h2>สร้างตัวละคร</h2>
+        <p>ตั้งชื่อ 2–16 ตัว ใช้ตัวอักษรไทย อังกฤษ ตัวเลข หรือ _ ได้<br />ชื่อเปลี่ยนภายหลังไม่ได้</p>
+        <input id="char-name" maxlength="16" placeholder="ชื่อตัวละคร" autocomplete="off" required />
+        <button type="submit" class="btn btn-gold" id="btn-create">สร้างตัวละคร</button>
+        <p class="msg" id="create-msg" role="status"></p>
+      </form>
+    </div>
+  </div>
+
+  <div id="hud" hidden>
+    <div id="status" class="window">
+      <div class="row"><span id="hud-name"></span><span id="hud-lv"></span></div>
+      <div class="bar"><i id="hud-exp"></i></div>
+      <div id="hud-exp-text"></div>
+      <button id="logout">ออกจากระบบ</button><button id="link-google" hidden>ผูกบัญชี Google</button>
+    </div>
+    <button id="auto-btn" aria-pressed="false">AUTO</button>
+  </div>
+
+  <!-- ฉากหลังหน้าเข้าเกม (ซ่อนเองเมื่อเข้าเกม) -->
+  <div id="backdrop" aria-hidden="true">
+  </div>
+
+  <div id="dc" hidden>
+    <div class="window">
+      <p id="dc-text">หลุดการเชื่อมต่อกับเซิร์ฟเวอร์ ตัวละครออกจากแมพแล้ว</p>
+      <button onclick="location.reload()">เชื่อมต่อใหม่</button>
+    </div>
+  </div>
+
+  <script>
+    // ประกายทองลอยขึ้น
+    (function () {
+      var bd = document.getElementById("backdrop");
+      for (var i = 0; i < 22; i++) {
+        var m = document.createElement("span");
+        m.className = "mote";
+        m.style.left = (Math.random() * 100) + "%";
+        m.style.animationDuration = (7 + Math.random() * 8) + "s";
+        m.style.animationDelay = (-Math.random() * 12) + "s";
+        m.style.setProperty("--drift", (Math.random() * 80 - 40) + "px");
+        var s = 2 + Math.random() * 3;
+        m.style.width = m.style.height = s + "px";
+        bd.appendChild(m);
+      }
+    })();
+  </script>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
