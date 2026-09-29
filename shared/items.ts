@@ -7,4 +7,5 @@ export interface ItemDef {
 
 export const ITEMS: Record<string, ItemDef> = {
   crab_claw: { name: "ก้ามปูนา", icon: "crab-claw" },
+  red_crab_claw: { name: "ก้ามปูแดง", icon: "red-crab-claw" },
 };
