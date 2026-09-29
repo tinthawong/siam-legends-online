@@ -1,0 +1,20 @@
+{
+ "frameWidth": 35,
+ "frameHeight": 28,
+ "anchor": {
+  "x": 17,
+  "y": 26,
+  "note": "จุดกึ่งกลางเท้า วางตรงตำแหน่งมอนในเกม"
+ },
+ "animations": {
+  "hit": {
+   "frames": [
+    "hit_0.png",
+    "hit_1.png",
+    "hit_2.png"
+   ],
+   "frameMs": 80,
+   "loop": false
+  }
+ }
+}

@@ -11,10 +11,12 @@ export interface MobDef {
   // ชุดภาพจาก tools/slice_sheet.py ที่ client/public/sprites/monsters/<sheet>/ (sheet.json + เฟรม)
   // หันหน้าเข้ากล้องทิศเดียว ไม่มี = วาดด้วยโค้ดแบบ Poring
   sheet?: string;
+  // ชุดท่าเพิ่มที่ตัดแยกโฟลเดอร์ (sheet.json ของตัวเอง ขนาดเฟรม/จุดยึดต่างจากชุดหลักได้) เช่น ["hit"]
+  sheetParts?: string[];
 }
 
 /** ค่าพลังจาก shared/data/monsters.json (export จาก Excel) */
-function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet">): MobDef {
+function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" | "sheetParts">): MobDef {
   const m = MONSTERS.find((x) => x.id === id);
   if (!m) throw new Error(`ไม่พบมอน ${id} ใน monsters.json`);
   return { name: m.name, maxHp: m.hp, def: m.def, exp: m.exp, ...extra };
@@ -22,7 +24,7 @@ function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet">)
 
 export const MOBS: Record<string, MobDef> = {
   poring: { name: "Poring", maxHp: 50, def: 1, exp: 12, moveMs: 420, count: 16 },
-  mud_crab: fromData("mob003", { moveMs: 420, count: 8, sheet: "rice-crab" }), // ปูนา (ทดสอบ)
+  mud_crab: fromData("mob003", { moveMs: 420, count: 8, sheet: "rice-crab", sheetParts: ["hit"] }), // ปูนา (ทดสอบ)
 };
 
 export const expToNext = (level: number) => 20 + level * 15;

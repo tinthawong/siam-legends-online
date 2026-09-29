@@ -4,7 +4,8 @@
     python tools/slice_sheet.py art/monsters/rice-crab/sheet.png art/monsters/rice-crab \\
         --cols 4 --rows 3 --names walk,attack,death --width 32
 
-- --width   ความกว้าง (px) ของตัวมอนในเฟรมแรก หลังย่อ; ทุกเฟรมใช้สเกลเดียวกัน
+- --width   ความกว้าง (px) ของตัวมอนในเฟรมอ้างอิง หลังย่อ; ทุกเฟรมใช้สเกลเดียวกัน
+- --ref     ลำดับเฟรมที่ใช้วัดขนาด (นับจาก 0 ทั้ง sheet) ควรเป็นเฟรมท่าปกติ เช่นท่า hit ที่เฟรมสุดท้ายเป็นท่าปกติ ใช้ --ref 2
 - --colors  จำนวนสีสูงสุด (ชุดสีร่วมทุกเฟรม)
 - --ms      มิลลิวินาทีต่อเฟรม เช่น walk=120,attack=90,death=140
 ผลลัพธ์: <ชื่อท่า>_<ลำดับ>.png, preview.png และ sheet.json (ขนาดเฟรม, จุดยึด, ลำดับเฟรม)
@@ -67,6 +68,7 @@ def main():
     p.add_argument("--cols", type=int, required=True); p.add_argument("--rows", type=int, required=True)
     p.add_argument("--names", required=True, help="ชื่อท่าแต่ละแถว คั่นด้วย , เช่น walk,attack,death")
     p.add_argument("--width", type=int, default=32)
+    p.add_argument("--ref", type=int, default=0, help="เฟรมที่ใช้วัดขนาด (ท่าปกติ)")
     p.add_argument("--colors", type=int, default=32)
     p.add_argument("--ms", default="walk=120,attack=90,death=140,idle=200")
     a = p.parse_args()
@@ -104,7 +106,8 @@ def main():
             body = largest_component(alpha, (big[c][0], y0, big[c][1], y1))
             cells.append((names[r], c, full, body, (body[0] + body[2]) / 2))
 
-    scale = a.width / (cells[0][3][2] - cells[0][3][0])
+    ref = cells[a.ref][3]
+    scale = a.width / (ref[2] - ref[0])
     small = []
     for k, (name, i, full, body, cx) in enumerate(cells):
         crop = img.crop(full); crop.putalpha(cells_alpha[k].crop(full))

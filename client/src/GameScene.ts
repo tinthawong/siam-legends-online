@@ -35,6 +35,16 @@ interface SheetMeta {
   animations: Record<string, { frames: string[]; frameMs: number; loop: boolean }>;
 }
 
+/** ชุดภาพมอนทั้งหมดที่ต้องโหลด: ชุดหลัก (part = "") และชุดท่าเพิ่มในโฟลเดอร์ย่อย */
+function sheetList(): { name: string; part: string }[] {
+  const out = new Map<string, { name: string; part: string }>();
+  for (const d of Object.values(MOBS)) {
+    if (!d.sheet) continue;
+    for (const part of ["", ...(d.sheetParts ?? [])]) out.set(`${d.sheet}/${part}`, { name: d.sheet, part });
+  }
+  return [...out.values()];
+}
+
 const center = (n: number) => n * TILE + TILE / 2;
 
 // 8 ทิศ เรียงตามมุม atan2 (แกน y ของจอชี้ลง = ทิศใต้)
@@ -51,6 +61,7 @@ function dirOf(dx: number, dy: number): Dir {
 export class GameScene extends Phaser.Scene {
   private views = new Map<string, View>();
   private sheets = new Map<string, SheetMeta & { name: string }>();
+  private animOrigin = new Map<string, [number, number]>(); // key animation → origin ของจุดยึดเท้า
   private me: string | null = null;
   private targetId: string | null = null;
   private targetRing!: Phaser.GameObjects.Image;
@@ -69,31 +80,43 @@ export class GameScene extends Phaser.Scene {
     for (const g of Object.keys(GENDERS))
       for (const d of IDLE_DIRS)
         for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
-    // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น
-    for (const name of new Set(Object.values(MOBS).flatMap((d) => (d.sheet ? [d.sheet] : [])))) {
-      const dir = `sprites/monsters/${name}`;
-      this.load.once(`filecomplete-json-sheet_${name}`, (_key: string, _type: string, data: SheetMeta) => {
+    // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น (ชุดหลัก + ชุดท่าเพิ่มแต่ละโฟลเดอร์)
+    for (const { name, part } of sheetList()) {
+      const dir = `sprites/monsters/${name}${part ? `/${part}` : ""}`;
+      const key = `sheet_${name}${part ? `_${part}` : ""}`;
+      this.load.once(`filecomplete-json-${key}`, (_key: string, _type: string, data: SheetMeta) => {
         for (const a of Object.values(data.animations))
           for (const f of a.frames) this.load.image(`${name}_${f.replace(/\.png$/, "")}`, `${dir}/${f}`);
       });
-      this.load.json(`sheet_${name}`, `${dir}/sheet.json`);
+      this.load.json(key, `${dir}/sheet.json`);
     }
   }
 
-  /** สร้าง animation ของมอนจาก sheet (walk/attack/death) ตาม ms ต่อเฟรมใน sheet.json */
+  /** สร้าง animation ของมอนจาก sheet ตาม ms ต่อเฟรมใน sheet.json และจำจุดยึดเท้าของแต่ละท่า */
   private makeSheetAnims() {
-    for (const name of new Set(Object.values(MOBS).flatMap((d) => (d.sheet ? [d.sheet] : [])))) {
-      const data = this.cache.json.get(`sheet_${name}`) as SheetMeta | undefined;
+    for (const { name, part } of sheetList()) {
+      const data = this.cache.json.get(`sheet_${name}${part ? `_${part}` : ""}`) as SheetMeta | undefined;
       if (!data) continue;
-      this.sheets.set(name, { name, ...data });
-      for (const [anim, a] of Object.entries(data.animations))
+      if (!part) this.sheets.set(name, { name, ...data });
+      for (const [anim, a] of Object.entries(data.animations)) {
+        const key = `${name}_${anim}`;
         this.anims.create({
-          key: `${name}_${anim}`,
+          key,
           frames: a.frames.map((f) => ({ key: `${name}_${f.replace(/\.png$/, "")}` })),
           frameRate: 1000 / a.frameMs,
           repeat: a.loop ? -1 : 0,
         });
+        this.animOrigin.set(key, [data.anchor.x / data.frameWidth, data.anchor.y / data.frameHeight]);
+      }
     }
+  }
+
+  /** เล่นท่าของมอนจาก sheet โดยตั้งจุดยึดเท้าตามชุดของท่านั้น (แต่ละชุดขนาดเฟรมไม่เท่ากัน) */
+  private playSheet(v: View, anim: string) {
+    const key = `${v.sheet}_${anim}`;
+    const o = this.animOrigin.get(key);
+    if (o) v.body.setOrigin(o[0], o[1]);
+    v.body.play(key, true);
   }
 
   create() {
@@ -174,6 +197,16 @@ export class GameScene extends Phaser.Scene {
           this.floatDamage(dst, m.dmg, m.crit);
           dst.body.setTintFill(0xffffff);
           this.time.delayedCall(70, () => dst.body.clearTint());
+          // มอนจาก sheet ที่มีท่าโดนตี: เล่นพร้อมกะพริบขาว แต่ไม่ขัดท่า attack ที่กำลังเล่นอยู่
+          if (dst.sheet && dst.pose !== "attack" && this.anims.exists(`${dst.sheet}_hit`)) {
+            dst.pose = "hit";
+            dst.bob?.pause(); dst.body.y = 8;
+            this.playSheet(dst, "hit");
+            dst.body.once(Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + `${dst.sheet}_hit`, () => {
+              dst.pose = "";
+              this.updatePose(dst);
+            });
+          }
         }
         const src = this.views.get(m.src);
         if (src && dst) this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
@@ -187,7 +220,8 @@ export class GameScene extends Phaser.Scene {
           if (v.sheet && this.anims.exists(`${v.sheet}_death`)) {
             // มอนจาก sheet: เล่นท่าตายจนจบ แล้วค่อยจางหาย
             v.bob?.stop(); v.body.y = 8; v.hpBar?.clear();
-            v.body.play(`${v.sheet}_death`);
+            v.pose = "death";
+            this.playSheet(v, "death");
             v.body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () =>
               this.tweens.add({ targets: v.c, alpha: 0, delay: 250, duration: 300, onComplete: () => v.c.destroy() }));
           } else {
@@ -326,14 +360,17 @@ export class GameScene extends Phaser.Scene {
    *  มอนจาก sheet: เดิน = ท่า walk, ยืน = เฟรมแรกของ walk + ขยับขึ้นลง */
   private updatePose(v: View) {
     if (v.sheet) {
+      if (v.pose === "hit" || v.pose === "attack") return; // ท่าที่เล่นครั้งเดียว รอให้จบก่อน
       const pose = v.path.length ? "walk" : "stand";
       if (pose === v.pose) return;
       v.pose = pose;
       if (pose === "walk") {
         v.bob?.pause(); v.body.y = 8;
-        v.body.play(`${v.sheet}_walk`, true);
+        this.playSheet(v, "walk");
       } else {
         v.body.stop(); v.body.setTexture(`${v.sheet}_walk_0`);
+        const o = this.animOrigin.get(`${v.sheet}_walk`);
+        if (o) v.body.setOrigin(o[0], o[1]);
         v.bob?.resume();
       }
       return;

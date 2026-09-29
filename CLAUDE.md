@@ -120,9 +120,12 @@ npm run typecheck       # tsc ทั้ง client และ server
 - **มอนสร้างด้วย ChatGPT** (ผู้ใช้ตัดสินใจ): ใช้ทิศเดียว (หันหน้าเข้ากล้อง) ไม่หันตามทิศที่เดิน ขั้นตอนคือ สร้างตัวมอนภาพเดียว → ใช้ภาพนั้นเป็นต้นแบบสร้าง sheet 4 คอลัมน์ × 3 แถว (walk, attack, death) → ตัดด้วย `tools/slice_sheet.py` (ต้องมี Pillow: `pip install pillow`)
   - ตัวอย่าง: `python tools/slice_sheet.py art/monsters/rice-crab/sheet.png art/monsters/rice-crab --cols 4 --rows 3 --names walk,attack,death --width 32 --colors 40`
   - ได้ไฟล์ `<ท่า>_<ลำดับ>.png`, `preview.png` และ `sheet.json` (ขนาดเฟรม, จุดยึดที่เท้า, ลำดับเฟรม, ms ต่อเฟรม, loop)
-  - ท่ายืนของมอนทำด้วยโค้ด (ขยับขึ้นลง) ใช้เฟรมแรกของ walk เป็นภาพยืน, โดนตีใช้กะพริบขาวด้วยโค้ด
-  - **ใส่เข้าเกม:** คัดลอก `<ท่า>_*.png` + `sheet.json` ไป `client/public/sprites/monsters/<ชื่อ>/` แล้วตั้ง `sheet: "<ชื่อ>"` ใน `MOBS` (`shared/game.ts`) — GameScene โหลด sheet.json สร้าง animation ตาม ms ต่อเฟรม วางจุดยึดเท้าระดับเดียวกับเท้าผู้เล่น เดิน = walk, ยืน = walk_0 + ขยับขึ้นลง, ตาย = เล่น death จนจบแล้วจางหาย (attack ยังไม่ได้ใช้ เพราะมอนยังไม่ตีกลับ)
-- **ปูนา (rice-crab):** ใช้ชุดจาก ChatGPT แทนตัวจาก PixelLab (ตัวเก่า 48px ใหญ่เกินไป เลิกใช้ — ต้นฉบับยังเก็บที่ `art/pixellab/rice-field-crab/`) ภาพต้นแบบ `art/monsters/rice-crab/source.png` และ sheet ต้นฉบับ 12 เฟรมที่ `art/monsters/rice-crab/sheet.png` ตัวกว้าง 32px ในเฟรม 35×32 จุดยึด (17,30)
+  - `--ref <ลำดับเฟรม>` ใช้เฟรมท่าปกติวัดขนาด (ค่าเริ่มต้นคือเฟรม 0) ถ้าเฟรมแรกไม่ใช่ท่าปกติ เช่นท่า hit ที่ปูหดตัว ต้องใช้ `--ref 2`
+  - sheet แต่ละชุดให้ออกคนละโฟลเดอร์ เพราะสคริปต์เขียน `sheet.json` ทับ (ขนาดเฟรมและจุดยึดของแต่ละชุดอาจต่างกัน วางด้วยจุดยึดที่เท้าเสมอ)
+  - ท่ายืนของมอนทำด้วยโค้ด (ขยับขึ้นลง) ใช้เฟรมแรกของ walk เป็นภาพยืน
+  - ท่าโดนตี (hit) เล่นพร้อมกะพริบขาวด้วยโค้ด ไม่ขัดท่า attack ที่กำลังเล่นอยู่
+  - **ใส่เข้าเกม:** คัดลอก `<ท่า>_*.png` + `sheet.json` ไป `client/public/sprites/monsters/<ชื่อ>/` แล้วตั้ง `sheet: "<ชื่อ>"` ใน `MOBS` (`shared/game.ts`) ชุดท่าเพิ่มที่ตัดแยกโฟลเดอร์ให้คัดลอกไป `client/public/sprites/monsters/<ชื่อ>/<ชุด>/` และใส่ `sheetParts: ["<ชุด>"]` — GameScene โหลด sheet.json สร้าง animation ตาม ms ต่อเฟรม วางจุดยึดเท้าระดับเดียวกับเท้าผู้เล่น เดิน = walk, ยืน = walk_0 + ขยับขึ้นลง, โดนตี = เล่น hit (ถ้ามี) + กะพริบขาว แล้วกลับท่าเดิม, ตาย = เล่น death จนจบแล้วจางหาย (attack ยังไม่ได้ใช้ เพราะมอนยังไม่ตีกลับ) แต่ละท่าตั้งจุดยึดเท้าตาม sheet.json ของชุดตัวเอง
+- **ปูนา (rice-crab):** ใช้ชุดจาก ChatGPT แทนตัวจาก PixelLab (ตัวเก่า 48px ใหญ่เกินไป เลิกใช้ — ต้นฉบับยังเก็บที่ `art/pixellab/rice-field-crab/`) ภาพต้นแบบ `art/monsters/rice-crab/source.png` และ sheet ต้นฉบับ 12 เฟรมที่ `art/monsters/rice-crab/sheet.png` ตัวกว้าง 32px ในเฟรม 35×32 จุดยึด (17,30) และท่าโดนตี 3 เฟรมที่ `art/monsters/rice-crab/hit-sheet.png` (ตัดด้วย `--cols 3 --rows 1 --names hit --width 32 --ref 2 --colors 40 --ms hit=80` ออกไปที่ `art/monsters/rice-crab/hit` ได้เฟรม 35×28 จุดยึด (17,26))
   - อยู่ในเกมแล้ว (ทดสอบ): `mud_crab` ใน `shared/game.ts` เกิด 8 ตัวในแมพแรกคู่กับ Poring ค่าพลังจาก `monsters.json` (mob003) ยังไม่มีของดรอป
 
 ## ไอเดียที่คุยไว้แล้ว
