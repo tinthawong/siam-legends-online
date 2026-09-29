@@ -216,6 +216,7 @@ export class GameScene extends Phaser.Scene {
         if (m.by === this.me && name) this.floatText(img.x, img.y - 18, `+${name}`, "#b9f0c8", 1100);
         const by = this.views.get(m.by);
         // ของลอยเข้าหาคนเก็บแล้วหายไป
+        this.tweens.killTweensOf(img);
         this.tweens.add({ targets: img, x: by?.c.x ?? img.x, y: (by?.c.y ?? img.y) - 16, alpha: 0, scale: 0.5, duration: 220, onComplete: () => img.destroy() });
         break;
       }
@@ -416,9 +417,21 @@ export class GameScene extends Phaser.Scene {
       // พื้นที่กดใหญ่เท่า 1 ช่อง (32px) แม้รูปจะเล็ก เพื่อให้กดบนมือถือง่าย
       .setInteractive({ hitArea: new Phaser.Geom.Rectangle(-8, -8, 32, 32), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
     img.setData("groundId", g.id).setData("item", g.item);
-    img.once(Phaser.GameObjects.Events.DESTROY, () => shadow.destroy());
     this.groundViews.set(g.id, img);
-    if (!pop) return;
+
+    // ให้เห็นชัดบนพื้นหญ้า: เรืองแสงขอบขาว + ลอยขึ้นลงเบา ๆ + ประกายวิบวับเป็นระยะ
+    img.preFX?.addGlow(0xffffff, 3, 0, false, 0.1, 10);
+    const spark = this.add.star(x1 + 5, y1 - 7, 4, 1, 4, 0xfff6c0).setDepth(center(g.y) - 1).setScale(0).setBlendMode(Phaser.BlendModes.ADD);
+    const twinkle = this.tweens.add({
+      targets: spark, scale: { from: 0, to: 1 }, angle: 90, yoyo: true, duration: 260,
+      repeat: -1, repeatDelay: 1400 + Math.random() * 800, delay: 600 + Math.random() * 800,
+    });
+    let bob: Phaser.Tweens.Tween | null = null;
+    const startBob = () => {
+      bob = this.tweens.add({ targets: img, y: img.y - 3, yoyo: true, repeat: -1, duration: 700, ease: "Sine.easeInOut" });
+    };
+    img.once(Phaser.GameObjects.Events.DESTROY, () => { shadow.destroy(); spark.destroy(); twinkle.remove(); bob?.remove(); });
+    if (!pop) { startBob(); return; }
 
     // เด้งออกจากตัวมอนเป็นโค้ง (หมุนนิดหน่อย ขยายจากเล็กไปเต็ม) แล้วกระดอนเบา ๆ อีกครั้ง
     const x0 = center(g.x), y0 = center(g.y) - 8;
@@ -440,7 +453,7 @@ export class GameScene extends Phaser.Scene {
         this.tweens.addCounter({
           from: 0, to: 1, duration: 200, ease: "Sine.easeInOut",
           onUpdate: (tw) => { const p = arc({ x: x1, y: y1 }, 4, tw.getValue() ?? 1); img.setPosition(p.x, p.y); },
-          onComplete: () => img.setPosition(x1, y1),
+          onComplete: () => { img.setPosition(x1, y1); startBob(); },
         });
       },
     });
