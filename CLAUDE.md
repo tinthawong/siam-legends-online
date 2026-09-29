@@ -112,7 +112,8 @@ npm run typecheck       # tsc ทั้ง client และ server
   - มอน: `cute chibi monster, big expressive eyes with bright highlights, smooth soft shading, colored darker outlines instead of pure black, vivid saturated colors`
   - ไอเท็ม: `centered, fills most of the frame, pixel art, clean pixels, limited color palette, cute stylized game item, colored darker outlines instead of pure black, vivid saturated colors, transparent background, no text`
 - ห้ามย่อ/ขยาย pixel art ด้วยอัตราส่วนที่ไม่ลงตัว (เช่น 48→32) ในเกม เพราะพิกเซลจะขาด ให้สร้างภาพใหม่ในขนาดที่ต้องการแทน
-- **ปูนา:** มีภาพนิ่ง 8 ทิศแล้วที่ `art/pixellab/rice-field-crab/` (PixelLab, 48×48, ตัวกว้างเกือบเต็มกรอบ ใหญ่กว่าตัวละครผู้เล่น) ยังไม่มีท่าทาง ผู้ใช้ยังไม่ได้ตัดสินใจว่าจะสร้างใหม่ที่ 32px, ใช้ตัวนี้เป็นปูถ้ำยักษ์แทน หรือใช้ขนาดนี้ต่อ — ถามก่อนใส่เข้าเกม
+- **ปูนา:** มีภาพนิ่ง 8 ทิศแล้วที่ `art/pixellab/rice-field-crab/` (PixelLab, 48×48, ตัวกว้างเกือบเต็มกรอบ ใหญ่กว่าตัวละครผู้เล่น) ยังไม่มีท่าทาง ผู้ใช้ยังไม่ได้ตัดสินใจว่าจะสร้างใหม่ที่ 32px, ใช้ตัวนี้เป็นปูถ้ำยักษ์แทน หรือใช้ขนาดนี้ต่อ
+  - **ทดสอบในเกมแล้ว (ผู้ใช้สั่ง):** `mud_crab` ใน `shared/game.ts` เกิด 8 ตัวในแมพแรกคู่กับ Poring ค่าพลังอ่านจาก `monsters.json` (mob003) ภาพเกมอยู่ที่ `client/public/sprites/mud-crab/` (สำเนาจาก art) เท้าอยู่บรรทัด 43 ยังไม่มีของดรอป
 
 ## ไอเดียที่คุยไว้แล้ว
 

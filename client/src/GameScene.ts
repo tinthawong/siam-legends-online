@@ -6,6 +6,7 @@ import { TILE } from "../../shared/constants";
 import { MAP_W, MAP_H, TILES, ROCK, TREE, isWalkable } from "../../shared/map";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
+import { MOBS } from "../../shared/game";
 
 interface View {
   id: string;
@@ -17,7 +18,8 @@ interface View {
   maxHp: number;
   path: Cell[];
   moveMs: number;
-  sprite: string | null; // มี = ตัวละครแบบ 8 ทิศ
+  sprite: string | null; // มี = ภาพ 8 ทิศ (ผู้เล่น หรือมอนที่มีภาพ)
+  topY: number;          // ขอบบนของตัว (ใช้วางแถบ HP / ตัวเลขดาเมจ)
 }
 
 const center = (n: number) => n * TILE + TILE / 2;
@@ -50,6 +52,9 @@ export class GameScene extends Phaser.Scene {
     // ตัว base ของแต่ละเพศ (client/public/sprites/base-<เพศ>/<ทิศ>.png)
     for (const g of Object.keys(GENDERS))
       for (const d of DIRS) this.load.image(`base_${g}_${d}`, `sprites/base-${g}/${d}.png`);
+    // มอนที่มีภาพ 8 ทิศ (client/public/sprites/<sprite>/<ทิศ>.png)
+    for (const def of Object.values(MOBS))
+      if (def.sprite) for (const d of DIRS) this.load.image(`mob_${def.sprite}_${d}`, `sprites/${def.sprite}/${d}.png`);
   }
 
   create() {
@@ -163,12 +168,15 @@ export class GameScene extends Phaser.Scene {
     this.removeView(e.id);
     const c = this.add.container(center(e.x), center(e.y));
     const isMob = e.kind === "mob";
-    const sprite = isMob ? null : this.lookSprite(e.look ?? DEFAULT_LOOK);
+    const mobSprite = isMob && e.mobType ? MOBS[e.mobType]?.sprite : undefined;
+    const sprite = isMob ? (mobSprite ? `mob_${mobSprite}` : null) : this.lookSprite(e.look ?? DEFAULT_LOOK);
     const tex = sprite ? `${sprite}_south` : "poring";
-    // sprite 48px: เท้าอยู่ที่บรรทัด 45 จึงตั้ง origin ให้เท้าตรงกลางช่อง
+    // sprite 48px: ตั้ง origin ให้เท้าตรงกลางช่อง (ผู้เล่นเท้าอยู่บรรทัด 45, ปูนาบรรทัด 43)
+    const feet = mobSprite ? 43 : 45;
     const body = sprite
-      ? this.add.image(0, 8, tex).setOrigin(0.5, 45 / 48)
+      ? this.add.image(0, 8, tex).setOrigin(0.5, feet / 48)
       : this.add.image(0, 4, tex).setOrigin(0.5, 1);
+    const topY = sprite ? 8 - feet + 2 : 4 - body.height;
     const label = this.add.text(0, 7, e.name, {
       fontFamily: "Mitr, sans-serif", fontSize: "10px", color: isMob ? "#ffe0ec" : "#ffffff",
       stroke: "#10192a", strokeThickness: 3,
@@ -182,13 +190,14 @@ export class GameScene extends Phaser.Scene {
       // พื้นที่แตะใหญ่กว่าตัว เพื่อให้กดบนมือถือง่าย
       body.setInteractive(new Phaser.Geom.Circle(body.width / 2, body.height / 2, 22), Phaser.Geom.Circle.Contains);
       body.setData("mobId", e.id);
-      this.tweens.add({
+      // เด้งดึ๋งเฉพาะ Poring (มอนที่มีภาพ 8 ทิศยังไม่มีท่าทาง ปล่อยนิ่งไว้)
+      if (!sprite) this.tweens.add({
         targets: body, scaleY: 0.86, scaleX: 1.1, yoyo: true, repeat: -1,
         duration: 380 + Math.random() * 120, ease: "Sine.easeInOut",
       });
     }
 
-    const v: View = { id: e.id, kind: e.kind, c, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs, sprite };
+    const v: View = { id: e.id, kind: e.kind, c, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs, sprite, topY };
     this.views.set(e.id, v);
     this.drawHp(v);
     c.setDepth(c.y);
@@ -205,12 +214,13 @@ export class GameScene extends Phaser.Scene {
     if (!v.hpBar) return;
     const g = v.hpBar.clear();
     if (v.hp >= v.maxHp) return; // เต็มแล้วไม่ต้องโชว์
-    g.fillStyle(0x10192a).fillRect(-13, -28, 26, 5);
-    g.fillStyle(0x6fe07a).fillRect(-12, -27, 24 * (v.hp / v.maxHp), 3);
+    const y = v.topY - 7;
+    g.fillStyle(0x10192a).fillRect(-13, y, 26, 5);
+    g.fillStyle(0x6fe07a).fillRect(-12, y + 1, 24 * (v.hp / v.maxHp), 3);
   }
 
   private floatDamage(v: View, dmg: number, crit: boolean) {
-    const t = this.add.text(v.c.x, v.c.y - 30, String(dmg), {
+    const t = this.add.text(v.c.x, v.c.y + v.topY - 9, String(dmg), {
       fontFamily: "Mitr, sans-serif", fontSize: crit ? "16px" : "12px",
       color: crit ? "#ffd84a" : "#ffffff", stroke: "#10192a", strokeThickness: 3,
     }).setOrigin(0.5).setDepth(100000).setResolution(2);

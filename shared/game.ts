@@ -1,4 +1,6 @@
 // ข้อมูลเกมและสูตรคำนวณ — อยู่ใน shared เพื่อให้ client/server ใช้ค่าเดียวกัน
+import MONSTERS from "./data/monsters.json";
+
 export interface MobDef {
   name: string;
   maxHp: number;
@@ -6,10 +8,19 @@ export interface MobDef {
   exp: number;
   moveMs: number;
   count: number; // จำนวนที่เกิดในแมพ
+  sprite?: string; // โฟลเดอร์ภาพ 8 ทิศ client/public/sprites/<sprite>/ (ไม่มี = วาดด้วยโค้ดแบบ Poring)
+}
+
+/** ค่าพลังจาก shared/data/monsters.json (export จาก Excel) */
+function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sprite">): MobDef {
+  const m = MONSTERS.find((x) => x.id === id);
+  if (!m) throw new Error(`ไม่พบมอน ${id} ใน monsters.json`);
+  return { name: m.name, maxHp: m.hp, def: m.def, exp: m.exp, ...extra };
 }
 
 export const MOBS: Record<string, MobDef> = {
   poring: { name: "Poring", maxHp: 50, def: 1, exp: 12, moveMs: 420, count: 16 },
+  mud_crab: fromData("mob003", { moveMs: 420, count: 8, sprite: "mud-crab" }), // ปูนา (ทดสอบ)
 };
 
 export const expToNext = (level: number) => 20 + level * 15;
