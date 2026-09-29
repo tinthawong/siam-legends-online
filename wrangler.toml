@@ -1,0 +1,30 @@
+name = "siam-legends"
+main = "server/src/index.ts"
+compatibility_date = "2025-09-01"
+
+# ไฟล์เกมฝั่ง client (ผลจาก npm run build)
+[assets]
+directory = "./client/dist"
+
+# ค่าจาก Supabase: Project Settings → API
+# anon/publishable key เป็นค่าสาธารณะ ใส่ในไฟล์นี้ได้ (ห้ามใส่ service_role key)
+[vars]
+SUPABASE_URL = "https://ctmbapudylwizbrhfcoy.supabase.co"
+SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN0bWJhcHVkeWx3aXpicmhmY295Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA2NjY0NDQsImV4cCI6MjEwNjI0MjQ0NH0.DEm3TuL0gbOJYJbyHpKDv5ygXtq4eZgOO1mmZleppYo"
+
+# 1 Durable Object = 1 แมพ
+[[durable_objects.bindings]]
+name = "MAP_ROOM"
+class_name = "MapRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["MapRoom"]
+
+# ฐานข้อมูลตัวละคร
+# รันบนเครื่องใช้ค่านี้ได้เลย ก่อน deploy ให้รัน `npx wrangler d1 create siam-legends-db` แล้วเอา id มาแทน
+[[d1_databases]]
+binding = "DB"
+database_name = "siam-legends-db"
+database_id = "local-dev"
+migrations_dir = "migrations"

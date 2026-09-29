@@ -1,0 +1,22 @@
+export const TILE = 32;              // ขนาดช่องเป็นพิกเซล
+export const TICK_MS = 100;          // server tick 10 ครั้ง/วินาที
+export const MAP_ID = "prontera_field";
+export const NAME_RE = /^[\p{L}\p{M}\p{N}_]{2,16}$/u; // ชื่อตัวละคร: ไทย/อังกฤษ/ตัวเลข/_ ยาว 2–16
+
+export const PLAYER_MOVE_MS = 150;   // เวลาเดิน 1 ช่อง (แนวตรง)
+export const PLAYER_ASPD_MS = 700;   // ตีได้ทุก ๆ กี่ ms
+export const PLAYER_RANGE = 1;       // ระยะตี (ช่อง)
+export const AUTO_RADIUS = 12;       // รัศมีหามอนของระบบ auto (ช่อง)
+export const MOB_RESPAWN_MS = 8000;
+
+export const DIAG = 1.4142;
+
+/** เวลาที่ใช้เดิน 1 ก้าว — แนวทแยงช้ากว่าแนวตรง */
+export function stepMs(dx: number, dy: number, moveMs: number): number {
+  return dx !== 0 && dy !== 0 ? moveMs * DIAG : moveMs;
+}
+
+/** ระยะแบบกระดานหมากรุก (ทแยงนับ 1 ช่อง) */
+export function cheb(ax: number, ay: number, bx: number, by: number): number {
+  return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
+}
