@@ -1,5 +1,6 @@
 // ข้อมูลเกมและสูตรคำนวณ — อยู่ใน shared เพื่อให้ client/server ใช้ค่าเดียวกัน
 import MONSTERS from "./data/monsters.json";
+import { ZONES } from "./map";
 
 export interface MobDef {
   name: string;
@@ -29,24 +30,21 @@ function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" |
 }
 
 export const MOBS: Record<string, MobDef> = {
-  // ปูนา (ทดสอบ)
-  mud_crab: fromData("mob003", { moveMs: 420, count: 8, sheet: "rice-crab", sheetParts: ["hit", "idle"], retaliate: true,
-    zone: "paddy", drop: { item: "crab_claw", chance: 1 } }),
-  // ปูแดง (mob039)
-  red_crab: fromData("mob039", { moveMs: 420, count: 6, sheet: "red-crab", sheetParts: ["idle"], retaliate: true,
-    zone: "beach", drop: { item: "red_crab_claw", chance: 1 } }),
-  // หุ่นไล่กา = หุ่นไล่กาเดินได้ (mob007) ในนาข้าว
-  scarecrow: fromData("mob007", { moveMs: 480, count: 4, sheet: "scarecrow", sheetParts: ["idle"], retaliate: true,
-    zone: "paddy", drop: { item: "straw_hat", chance: 1 } }),
-  // กบบัว (mob005 เดิมชื่อกบเขียว) รอบสระบัว
-  lotus_frog: fromData("mob005", { moveMs: 520, count: 6, sheet: "lotus-frog", sheetParts: ["idle"], retaliate: true,
-    zone: "pond", drop: { item: "lotus", chance: 1 } }),
-  // ยังไม่มีเลเวล/ค่าพลังในตารางสมดุล — ใส่ภาพกับของดรอปไว้ก่อน ยังไม่เกิดบนแมพ (count 0)
-  grasshopper: { name: "ตั๊กแตนเคียว", maxHp: 1, def: 0, exp: 0, moveMs: 420, count: 0, sheet: "grasshopper", sheetParts: ["idle"],
-    drop: { item: "sickle", chance: 1 } },
-  octopus: { name: "หมึกหมวกเหล็ก", maxHp: 1, def: 0, exp: 0, moveMs: 420, count: 0, sheet: "octopus", sheetParts: ["hit", "death", "idle"],
-    drop: { item: "iron_helmet", chance: 1 } },
+  mud_crab: fromData("mob003", { moveMs: 420, count: 0, sheet: "rice-crab", sheetParts: ["hit", "idle"], retaliate: true,
+    drop: { item: "crab_claw", chance: 1 } }),                                   // ปูนา Lv1
+  red_crab: fromData("mob039", { moveMs: 420, count: 0, sheet: "red-crab", sheetParts: ["idle"], retaliate: true,
+    drop: { item: "red_crab_claw", chance: 1 } }),                               // ปูแดง Lv3
+  lotus_frog: fromData("mob005", { moveMs: 520, count: 0, sheet: "lotus-frog", sheetParts: ["idle"], retaliate: true,
+    drop: { item: "lotus", chance: 1 } }),                                       // กบบัว Lv5 (เดิมกบเขียว)
+  scarecrow: fromData("mob007", { moveMs: 480, count: 0, sheet: "scarecrow", sheetParts: ["idle"], retaliate: true,
+    drop: { item: "straw_hat", chance: 1 } }),                                   // หุ่นไล่กาเดินได้ Lv8
+  grasshopper: fromData("mob040", { moveMs: 380, count: 0, sheet: "grasshopper", sheetParts: ["idle"], retaliate: true,
+    drop: { item: "sickle", chance: 1 } }),                                      // ตั๊กแตนเคียว Lv10
+  octopus: fromData("mob041", { moveMs: 500, count: 0, sheet: "octopus", sheetParts: ["hit", "death", "idle"], retaliate: true,
+    drop: { item: "iron_helmet", chance: 1 } }),                                 // หมึกหมวกเหล็ก Lv12
 };
+// จำนวนและโซนเกิดมาจาก spawns ใน layout แมพ (shared/data/maps/ban-pak-ao.json) — มอนที่ไม่มีใน spawns ไม่เกิด
+for (const [id, z] of Object.entries(ZONES)) if (MOBS[id]) { MOBS[id].count = z.count; MOBS[id].zone = id; }
 
 export const expToNext = (level: number) => 20 + level * 15;
 export const playerAtk = (level: number) => 10 + level * 2;

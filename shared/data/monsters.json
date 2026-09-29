@@ -544,5 +544,33 @@
   "exp": 43,
   "moneyMin": 15,
   "moneyMax": 22
+ },
+ {
+  "id": "mob040",
+  "name": "ตั๊กแตนเคียว",
+  "map": "บ้านปากอ่าว",
+  "level": 10,
+  "boss": false,
+  "aggressive": false,
+  "hp": 136,
+  "def": 2,
+  "atk": 18,
+  "exp": 215,
+  "moneyMin": 86,
+  "moneyMax": 129
+ },
+ {
+  "id": "mob041",
+  "name": "หมึกหมวกเหล็ก",
+  "map": "บ้านปากอ่าว",
+  "level": 12,
+  "boss": false,
+  "aggressive": false,
+  "hp": 161,
+  "def": 2,
+  "atk": 21,
+  "exp": 265,
+  "moneyMin": 106,
+  "moneyMax": 159
  }
 ]

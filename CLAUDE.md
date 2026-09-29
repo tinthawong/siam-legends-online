@@ -39,7 +39,7 @@ npm run typecheck       # tsc ทั้ง client และ server
 - `shared/` ใช้ร่วมกันทั้งสองฝั่ง
   - `constants.ts` ค่าตัวเลขเกม (TILE=32, tick 100ms, ความเร็วเดิน, ระยะตี, รัศมี auto) และ `NAME_RE` กติกาชื่อตัวละคร (client ตรวจก่อนส่ง server ตรวจซ้ำ)
   - `data/levels.json`, `data/monsters.json` ตัวเลขสมดุลที่ export จาก Excel (ดูหัวข้อ "ตัวเลขสมดุลเกม")
-  - `map.ts` แมพ "บ้านปากอ่าว" 48×36 ช่อง จัดวางด้วยมือตามโซน (ดูหัวข้อ "หลักการจัดวางแมพ"): ชั้นพื้น `TERRAIN` (grass/water/sand/dirt/paddy — น้ำเดินไม่ได้ ยกเว้นสะพานปลา) + ของประดับ `PROPS` (`BLOCKING_PROPS` ขวางทาง, `foot` = ขวางหลายช่อง, `FLAT_PROPS` วาดใต้ตัวละคร) + โซนเกิดมอน `ZONES` จุดเกิด (24,16) กลางลาน รหัสแมพ `ban_pak_ao` (migration 0005 ย้ายตัวละครจาก `prontera_field`)
+  - `map.ts` อ่านแมพจาก **layout ของผู้ใช้** `shared/data/maps/ban-pak-ao.json` (60×44 ช่อง): `terrain` ตัวอักษรต่อช่อง G/S/W/D/P, `props` พิกัดพิกเซล = จุดยึดกึ่งกลางฐาน, `start` จุดเกิด, `npcs` ตำแหน่ง NPC, `spawns` กรอบเกิดมอน+จำนวน **แก้แมพให้แก้ JSON ห้ามวางของในโค้ด** ชื่อใน layout ที่ต่างจากไฟล์ภาพแปลงใน `PROP_ALIAS` (lantern-pole, rattan-baskets, notice-board) ชื่อมอนแปลงใน `MOB_ID` (rice-crab→mud_crab ฯลฯ) ขวางทาง: `BLOCKING_PROPS` + ความกว้างฐาน `FOOT_PX` ประตูหมู่บ้านขวางเฉพาะเสา สะพานปลาเดินได้บนน้ำ รหัสแมพในเกม `ban_pak_ao`
   - `pathfind.ts` A* 8 ทิศ ห้ามตัดมุม
   - `game.ts` ข้อมูลมอน, สูตร EXP/ดาเมจ
   - `protocol.ts` รูปแบบข้อความ client↔server
@@ -165,12 +165,14 @@ npm run typecheck       # tsc ทั้ง client และ server
 
 | id ในเกม | ชื่อ | ตารางสมดุล | โซน | ดรอป | สถานะ |
 |---|---|---|---|---|---|
-| `mud_crab` | ปูนา | mob003 Lv1 | paddy | ก้ามปูนา | ในเกม |
-| `red_crab` | ปูแดง | mob039 Lv3 | beach | ก้ามปูแดง | ในเกม |
-| `scarecrow` | หุ่นไล่กาเดินได้ | mob007 Lv8 | paddy (4 ตัว) | หมวกฟาง `straw_hat` | ในเกม |
-| `lotus_frog` | กบบัว | mob005 Lv5 (เดิมชื่อกบเขียว เปลี่ยนชื่อใน Excel แล้ว) | pond สระบัวในย่านบ้านเรือน (6 ตัว) | ดอกบัว `lotus` | ในเกม |
-| `grasshopper` | ตั๊กแตนเคียว | ยังไม่มี | – | เคียว `sickle` | ภาพ+ไอเท็มพร้อม ยังไม่เกิด (`count: 0`) |
-| `octopus` | หมึกหมวกเหล็ก | ยังไม่มี | – | หมวกเหล็ก `iron_helmet` | ภาพ+ไอเท็มพร้อม ยังไม่เกิด (`count: 0`) ท่าแยก 4 ชุด: sheet (walk,attack 4×2), hit/, death/, idle/ |
+| `mud_crab` | ปูนา | mob003 Lv1 | นาข้าว ×10 | ก้ามปูนา | ในเกม |
+| `red_crab` | ปูแดง | mob039 Lv3 | ชายหาด ×8 | ก้ามปูแดง | ในเกม |
+| `lotus_frog` | กบบัว | mob005 Lv5 (เดิมชื่อกบเขียว) | สระบัว ×6 | ดอกบัว `lotus` | ในเกม |
+| `scarecrow` | หุ่นไล่กาเดินได้ | mob007 Lv8 | นาข้าวฝั่งตะวันออก ×4 | หมวกฟาง `straw_hat` | ในเกม |
+| `grasshopper` | ตั๊กแตนเคียว | mob040 Lv10 (แถวท้ายชีต) | ข้างกังหันน้ำ ×5 | เคียว `sickle` | ในเกม |
+| `octopus` | หมึกหมวกเหล็ก | mob041 Lv12 (แถวท้ายชีต) | ท่าเรือ ×5 | หมวกเหล็ก `iron_helmet` | ในเกม ท่าแยก 4 ชุด: sheet (walk,attack 4×2), hit/, death/, idle/ |
+
+- จำนวนและโซนเกิดมาจาก `spawns` ใน layout (`ZONES` ใน `shared/map.ts`) มอนที่ไม่มีใน spawns ไม่เกิด ค่าพลังจาก `monsters.json`
 
 - ตัดด้วย `slice_sheet.py --width 32 --colors 40 --ms walk=120,attack=90,hit=80,death=140,idle=150` (sheet 4×4 + idle-sheet 4×1 → idle/) ต้นฉบับ `art/monsters/<ชื่อ>/sheet.png`, `idle-sheet.png`
 - ไอคอนไอเท็มใหม่: ย่อจากภาพต้นฉบับ (`<ชื่อ>-source.png`) ให้พอดี 60px ในกรอบ 64 แล้วได้ 32/16 แบบลงตัว
