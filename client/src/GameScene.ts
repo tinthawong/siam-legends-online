@@ -4,6 +4,8 @@ import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol"
 import type { Cell } from "../../shared/pathfind";
 import { TILE } from "../../shared/constants";
 import { MAP_W, MAP_H, TILES, ROCK, TREE, isWalkable } from "../../shared/map";
+import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
+import { recolorSprite } from "./recolor";
 
 interface View {
   id: string;
@@ -23,7 +25,6 @@ const center = (n: number) => n * TILE + TILE / 2;
 // 8 ทิศ เรียงตามมุม atan2 (แกน y ของจอชี้ลง = ทิศใต้)
 const DIRS = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"] as const;
 type Dir = (typeof DIRS)[number];
-const PLAYER_SPRITE = "muaythai"; // โฟลเดอร์ใน client/public/sprites/
 
 function dirOf(dx: number, dy: number): Dir {
   const i = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
@@ -46,7 +47,9 @@ export class GameScene extends Phaser.Scene {
   }
 
   preload() {
-    for (const d of DIRS) this.load.image(`${PLAYER_SPRITE}_${d}`, `sprites/${PLAYER_SPRITE}/${d}.png`);
+    // ตัว base ของแต่ละเพศ (client/public/sprites/base-<เพศ>/<ทิศ>.png)
+    for (const g of Object.keys(GENDERS))
+      for (const d of DIRS) this.load.image(`base_${g}_${d}`, `sprites/base-${g}/${d}.png`);
   }
 
   create() {
@@ -160,7 +163,7 @@ export class GameScene extends Phaser.Scene {
     this.removeView(e.id);
     const c = this.add.container(center(e.x), center(e.y));
     const isMob = e.kind === "mob";
-    const sprite = isMob ? null : PLAYER_SPRITE;
+    const sprite = isMob ? null : this.lookSprite(e.look ?? DEFAULT_LOOK);
     const tex = sprite ? `${sprite}_south` : "poring";
     // sprite 48px: เท้าอยู่ที่บรรทัด 45 จึงตั้ง origin ให้เท้าตรงกลางช่อง
     const body = sprite
@@ -212,6 +215,18 @@ export class GameScene extends Phaser.Scene {
       color: crit ? "#ffd84a" : "#ffffff", stroke: "#10192a", strokeThickness: 3,
     }).setOrigin(0.5).setDepth(100000).setResolution(2);
     this.tweens.add({ targets: t, y: t.y - 22, alpha: 0, duration: 750, ease: "Cubic.easeOut", onComplete: () => t.destroy() });
+  }
+
+  /** สร้าง texture ของรูปลักษณ์นี้ครบ 8 ทิศ (ครั้งแรกครั้งเดียว) แล้วคืนชื่อนำหน้า */
+  private lookSprite(look: Look): string {
+    const prefix = `p_${lookKey(look)}`;
+    if (!this.textures.exists(`${prefix}_south`)) {
+      for (const d of DIRS) {
+        const src = this.textures.get(`base_${look.gender}_${d}`).getSourceImage() as HTMLImageElement;
+        this.textures.addCanvas(`${prefix}_${d}`, recolorSprite(src, look));
+      }
+    }
+    return prefix;
   }
 
   /** หันหน้า: ตัวละคร 8 ทิศเปลี่ยนภาพ, มอนพลิกซ้าย-ขวา */

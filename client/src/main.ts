@@ -3,9 +3,11 @@ import { createClient, type Session, type SupabaseClient } from "@supabase/supab
 import { GameScene } from "./GameScene";
 import { Net } from "./net";
 import { CLOSE_KICKED } from "../../shared/protocol";
+import type { Look } from "../../shared/appearance";
+import { Creator } from "./creator";
 import { NAME_RE } from "../../shared/constants";
 
-interface Character { name: string; level: number; exp: number }
+interface Character { name: string; level: number; exp: number; look: Look }
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const screens = ["loading", "login", "create", "hud"];
@@ -54,6 +56,21 @@ function bindChrome() {
 
 let sb: SupabaseClient;
 let started = false;
+let creator: Creator | null = null;
+
+/** หน้าสร้างตัวละคร: guest = มาจากปุ่มผู้เยี่ยมชม ยังไม่มีบัญชี จะสร้างบัญชีตอนกดยืนยัน */
+let guestFlow = false;
+function showCreate(guest = false) {
+  guestFlow = guest;
+  $("btn-create").textContent = guest ? "เข้าเกม" : "สร้างตัวละคร";
+  $("btn-create-back").hidden = !guest;
+  $("create-guest-note").hidden = !guest;
+  say("create-msg", "");
+  show("create");
+  creator ??= new Creator($<HTMLCanvasElement>("preview"));
+  creator.init();
+  $<HTMLInputElement>("char-name").focus();
+}
 
 async function api(path: string, session: Session, init: RequestInit = {}) {
   const r = await fetch(path, {
@@ -62,18 +79,6 @@ async function api(path: string, session: Session, init: RequestInit = {}) {
   });
   const body = await r.json().catch(() => ({}));
   return { ok: r.ok, status: r.status, body };
-}
-
-/** หน้าตั้งชื่อ: guest = มาจากปุ่มผู้เยี่ยมชม ยังไม่มีบัญชี จะสร้างบัญชีตอนกดยืนยันชื่อ */
-let guestFlow = false;
-function showCreate(guest: boolean) {
-  guestFlow = guest;
-  $("btn-create").textContent = guest ? "เข้าเกม" : "สร้างตัวละคร";
-  $("btn-create-back").hidden = !guest;
-  $("create-guest-note").hidden = !guest;
-  say("create-msg", "");
-  show("create");
-  $<HTMLInputElement>("char-name").focus();
 }
 
 /** ล็อกอินแล้ว: มีตัวละครหรือยัง */
@@ -132,15 +137,6 @@ function bindForms() {
     for (const id of ["btn-signin", "btn-signup", "btn-google", "btn-guest"]) $<HTMLButtonElement>(id).disabled = on;
   };
 
-  $("btn-guest").onclick = () => {
-    say("login-msg", "");
-    showCreate(true);
-  };
-  $("btn-create-back").onclick = () => {
-    guestFlow = false;
-    show("login");
-  };
-
   $<HTMLFormElement>("login-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     busy(true); say("login-msg", "");
@@ -168,6 +164,16 @@ function bindForms() {
     if (error) say("login-msg", `เข้าสู่ระบบด้วย Google ไม่สำเร็จ: ${error.message}`);
   };
 
+  // Guest: ไปหน้าสร้างตัวละครก่อน บัญชีชั่วคราว (Supabase anonymous sign-in) สร้างตอนกด "เข้าเกม"
+  $("btn-guest").onclick = () => {
+    say("login-msg", "");
+    showCreate(true);
+  };
+  $("btn-create-back").onclick = () => {
+    guestFlow = false;
+    show("login");
+  };
+
   $<HTMLFormElement>("create-form").addEventListener("submit", async (e) => {
     e.preventDefault();
     const name = $<HTMLInputElement>("char-name").value.trim();
@@ -178,17 +184,17 @@ function bindForms() {
     say("create-msg", "");
     try {
       let { data: { session } } = await sb.auth.getSession();
-      // ผู้เยี่ยมชม: สร้างบัญชีตอนยืนยันชื่อ (ถ้ามีบัญชีผู้เยี่ยมชมค้างจากรอบก่อน ใช้อันเดิม)
+      // ผู้เยี่ยมชม: สร้างบัญชีตอนยืนยัน (ถ้ามีบัญชีผู้เยี่ยมชมค้างจากรอบก่อน ใช้อันเดิม)
       if (!session && guestFlow) {
         const { data, error } = await sb.auth.signInAnonymously();
-        if (error) return say("create-msg", error.message.includes("disabled")
-          ? "ยังไม่ได้เปิดโหมดผู้เยี่ยมชม (Anonymous sign-ins) ใน Supabase"
-          : `เข้าแบบผู้เยี่ยมชมไม่สำเร็จ: ${error.message}`);
+        if (error) return say("create-msg", /anonymous sign-ins are disabled/i.test(error.message)
+          ? "ยังไม่ได้เปิดโหมด Guest: เปิด Allow anonymous sign-ins ใน Supabase (Authentication → Sign In / Providers)"
+          : `เข้าแบบ Guest ไม่สำเร็จ: ${error.message}`);
         session = data.session;
       }
       if (!session) { show("login"); return; }
 
-      const r = await api("/api/character", session, { method: "POST", body: JSON.stringify({ name }) });
+      const r = await api("/api/character", session, { method: "POST", body: JSON.stringify({ name, look: creator?.look }) });
       if (!r.ok) return say("create-msg", r.body.error ?? "สร้างตัวละครไม่สำเร็จ");
       startGame(r.body.character, session);
     } finally {

@@ -2,6 +2,7 @@ import { MapRoom } from "./MapRoom";
 import { MAP_ID, NAME_RE } from "../../shared/constants";
 import { SPAWN } from "../../shared/map";
 import type { JoinCharacter } from "../../shared/protocol";
+import { parseLook, DEFAULT_LOOK, type Look } from "../../shared/appearance";
 export { MapRoom };
 
 export interface Env {
@@ -19,7 +20,13 @@ interface CharacterRow {
   map: string;
   x: number;
   y: number;
+  gender: string;
+  hair: string;
+  eyes: string;
 }
+
+const lookOf = (r: { gender: string; hair: string; eyes: string }): Look =>
+  parseLook(r) ?? DEFAULT_LOOK;
 
 
 const json = (data: unknown, status = 200) => Response.json(data, { status });
@@ -51,29 +58,33 @@ export default {
       if (!uid) return json({ error: "กรุณาเข้าสู่ระบบใหม่" }, 401);
 
       if (req.method === "GET") {
-        const row = await env.DB.prepare("SELECT name, level, exp FROM characters WHERE user_id = ?")
-          .bind(uid).first();
-        return json({ character: row ?? null });
+        const row = await env.DB.prepare(
+          "SELECT name, level, exp, gender, hair, eyes FROM characters WHERE user_id = ?",
+        ).bind(uid).first<{ name: string; level: number; exp: number; gender: string; hair: string; eyes: string }>();
+        if (!row) return json({ character: null });
+        return json({ character: { name: row.name, level: row.level, exp: row.exp, look: lookOf(row) } });
       }
 
       if (req.method === "POST") {
-        const body = (await req.json().catch(() => ({}))) as { name?: unknown };
+        const body = (await req.json().catch(() => ({}))) as { name?: unknown; look?: unknown };
         const name = String(body.name ?? "").trim();
         if (!NAME_RE.test(name)) {
           return json({ error: "ชื่อต้องยาว 2–16 ตัว ใช้ได้เฉพาะตัวอักษร ตัวเลข และ _" }, 400);
         }
+        const look = parseLook(body.look);
+        if (!look) return json({ error: "ข้อมูลรูปลักษณ์ไม่ถูกต้อง" }, 400);
         const now = Date.now();
         try {
           await env.DB.prepare(
-            "INSERT INTO characters (user_id, name, level, exp, map, x, y, created_at, updated_at) VALUES (?, ?, 1, 0, ?, ?, ?, ?, ?)",
-          ).bind(uid, name, MAP_ID, SPAWN.x, SPAWN.y, now, now).run();
+            "INSERT INTO characters (user_id, name, level, exp, map, x, y, gender, hair, eyes, created_at, updated_at) VALUES (?, ?, 1, 0, ?, ?, ?, ?, ?, ?, ?, ?)",
+          ).bind(uid, name, MAP_ID, SPAWN.x, SPAWN.y, look.gender, look.hair, look.eyes, now, now).run();
         } catch (e) {
           const msg = String(e);
           if (msg.includes("characters.name")) return json({ error: "ชื่อนี้มีคนใช้แล้ว" }, 409);
           if (msg.includes("characters.user_id")) return json({ error: "บัญชีนี้มีตัวละครแล้ว" }, 409);
           throw e;
         }
-        return json({ character: { name, level: 1, exp: 0 } });
+        return json({ character: { name, level: 1, exp: 0, look } });
       }
       return json({ error: "method not allowed" }, 405);
     }
@@ -92,6 +103,7 @@ export default {
 
       const join: JoinCharacter = {
         userId: row.user_id, name: row.name, level: row.level, exp: row.exp, x: row.x, y: row.y,
+        look: lookOf(row),
       };
       // สร้าง request ใหม่ทั้งก้อน client จึงปลอม X-Character มาเองไม่ได้
       const headers = new Headers(req.headers);

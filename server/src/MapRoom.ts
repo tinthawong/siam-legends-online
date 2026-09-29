@@ -9,6 +9,7 @@ import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
 import { MOBS, expToNext, playerAtk, playerMaxHp, rollDamage } from "../../shared/game";
 import { CLOSE_KICKED } from "../../shared/protocol";
 import type { ClientMsg, ServerMsg, EntityState, PlayerStats, JoinCharacter } from "../../shared/protocol";
+import type { Look } from "../../shared/appearance";
 
 const SAVE_EVERY_MS = 30_000;
 
@@ -27,6 +28,7 @@ interface Ent {
 interface Player extends Ent {
   kind: "player";
   userId: string;
+  look: Look;
   ws: WebSocket;
   level: number;
   exp: number;
@@ -92,7 +94,7 @@ export class MapRoom extends DurableObject<Env> {
     server.serializeAttachment({ id });
 
     const p: Player = {
-      id, kind: "player", name: ch.name, userId: ch.userId,
+      id, kind: "player", name: ch.name, userId: ch.userId, look: ch.look,
       x: pos.x, y: pos.y,
       hp: playerMaxHp(ch.level), maxHp: playerMaxHp(ch.level),
       moveMs: PLAYER_MOVE_MS, path: [], nextStepAt: 0,
@@ -365,6 +367,7 @@ export class MapRoom extends DurableObject<Env> {
       x: e.x, y: e.y, hp: e.hp, maxHp: e.maxHp,
       moveMs: e.moveMs, path: e.path,
       mobType: e.kind === "mob" ? e.type : undefined,
+      look: e.kind === "player" ? e.look : undefined,
     };
   }
 

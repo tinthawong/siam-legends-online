@@ -114,6 +114,33 @@
     .msg { min-height: 1.5em; margin: 14px 0 0 !important; font-size: 14px !important; color: #ff9d8a !important; }
     .msg.ok { color: #b9f0c8 !important; }
 
+    /* ---------- หน้าสร้างตัวละคร ---------- */
+    .panel-wide { width: min(540px, 100%); }
+    .creator { display: grid; grid-template-columns: 200px 1fr; gap: 18px; align-items: center; margin: 8px 0 16px; }
+    @media (max-width: 520px) { .creator { grid-template-columns: 1fr; gap: 12px; } }
+    .stage { position: relative; display: flex; align-items: center; justify-content: center; height: 210px;
+      border: 1px solid var(--gold-deep); border-radius: 4px;
+      background:
+        radial-gradient(ellipse 42% 9% at 50% 90%, rgba(233, 185, 73, 0.45), transparent 70%),
+        radial-gradient(circle at 50% 55%, rgba(233, 185, 73, 0.12), transparent 65%),
+        rgba(0, 0, 0, 0.35); }
+    #preview { width: 192px; height: 192px; image-rendering: pixelated; }
+    .rot { position: absolute; top: 50%; transform: translateY(-50%); width: 36px; height: 36px; border-radius: 50%;
+      border: 1px solid var(--gold); background: rgba(0, 0, 0, 0.5); color: var(--gold-lite); font-size: 22px; line-height: 1; padding: 0; }
+    .rot:hover { background: rgba(233, 185, 73, 0.18); }
+    #rot-left { left: 6px; } #rot-right { right: 6px; }
+    .opt-row { margin-bottom: 12px; }
+    .opt-label { display: block; margin-bottom: 6px; font-size: 13px; color: var(--gold); }
+    .opt-list { display: flex; flex-wrap: wrap; gap: 8px; }
+    .choice { padding: 7px 20px; border-radius: 4px; border: 1px solid var(--gold-deep); background: rgba(0, 0, 0, 0.35);
+      color: var(--ink-dim); font-size: 15px; }
+    .choice[aria-pressed="true"] { border-color: var(--gold-lite); color: #3a1a05; font-weight: 600;
+      background: linear-gradient(180deg, var(--gold-lite), var(--gold)); }
+    .swatch { width: 30px; height: 30px; padding: 0; border-radius: 50%; border: 2px solid rgba(0, 0, 0, 0.6);
+      background: var(--c); box-shadow: 0 0 0 1px var(--gold-deep); }
+    .swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--lacquer), 0 0 0 4px var(--gold-lite); }
+    .panel .hint { margin: -4px 0 14px; text-align: left; font-size: 12.5px; }
+
     /* ---------- หน้าเข้าเกม: ล็อบบี้ 2 คอลัมน์ (ซ้าย = โลโก้ + ลิงก์, ขวา = การ์ดเข้าสู่ระบบ) ---------- */
     #login { display: flex; flex-direction: column; align-items: stretch; padding: 0; }
     .lobby { flex: 1; width: min(440px, 100%); margin: 0 auto; min-width: 0;
@@ -363,20 +390,29 @@
   <div id="toast" role="status" hidden></div>
 
   <div id="create" class="screen" hidden>
-    <div style="width: min(380px, 100%)">
-      <div class="title"><img src="/ui/logo.webp" alt="" /><h1>Siam Legends Online</h1></div>
-      <form class="panel" id="create-form">
-        <svg class="corner tl"><use href="#kanok"/></svg><svg class="corner tr"><use href="#kanok"/></svg>
-        <svg class="corner bl"><use href="#kanok"/></svg><svg class="corner br"><use href="#kanok"/></svg>
-        <h2>สร้างตัวละคร</h2>
-        <p>ตั้งชื่อ 2–16 ตัว ใช้ตัวอักษรไทย อังกฤษ ตัวเลข หรือ _ ได้<br />ชื่อเปลี่ยนภายหลังไม่ได้</p>
-        <input id="char-name" maxlength="16" placeholder="ชื่อตัวละคร" autocomplete="off" required />
-        <button type="submit" class="btn btn-gold" id="btn-create">สร้างตัวละคร</button>
-        <button type="button" class="btn btn-line" id="btn-create-back" hidden>← กลับ</button>
-        <p class="msg" id="create-msg" role="status"></p>
-        <p id="create-guest-note" style="margin:10px 0 0;font-size:12.5px" hidden>เล่นแบบผู้เยี่ยมชม · ตัวละครอยู่ในเบราว์เซอร์นี้เท่านั้น ผูก Google ในเกมเพื่อเก็บไว้ถาวร</p>
-      </form>
-    </div>
+    <form class="panel panel-wide" id="create-form">
+      <svg class="corner tl"><use href="#kanok"/></svg><svg class="corner tr"><use href="#kanok"/></svg>
+      <svg class="corner bl"><use href="#kanok"/></svg><svg class="corner br"><use href="#kanok"/></svg>
+      <h2>สร้างตัวละคร</h2>
+      <div class="creator">
+        <div class="stage">
+          <button type="button" class="rot" id="rot-left" aria-label="หมุนซ้าย">‹</button>
+          <canvas id="preview" width="192" height="192"></canvas>
+          <button type="button" class="rot" id="rot-right" aria-label="หมุนขวา">›</button>
+        </div>
+        <div class="opts">
+          <div class="opt-row"><span class="opt-label">เพศ</span><div class="opt-list" id="gender-opts"></div></div>
+          <div class="opt-row"><span class="opt-label">สีผม</span><div class="opt-list" id="hair-opts"></div></div>
+          <div class="opt-row"><span class="opt-label">สีตา</span><div class="opt-list" id="eye-opts"></div></div>
+        </div>
+      </div>
+      <input id="char-name" maxlength="16" placeholder="ชื่อตัวละคร" autocomplete="off" required />
+      <p class="hint">ชื่อ 2–16 ตัว ใช้ตัวอักษรไทย อังกฤษ ตัวเลข หรือ _ ได้ ชื่อเปลี่ยนภายหลังไม่ได้</p>
+      <button type="submit" class="btn btn-gold" id="btn-create">สร้างตัวละคร</button>
+      <button type="button" class="btn btn-line" id="btn-create-back" hidden>← กลับ</button>
+      <p class="msg" id="create-msg" role="status"></p>
+      <p id="create-guest-note" class="hint" hidden>เล่นแบบผู้เยี่ยมชม · ตัวละครอยู่ในเบราว์เซอร์นี้เท่านั้น ผูก Google ในเกมเพื่อเก็บไว้ถาวร</p>
+    </form>
   </div>
 
   <div id="hud" hidden>

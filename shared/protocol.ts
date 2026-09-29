@@ -1,4 +1,5 @@
 import type { Cell } from "./pathfind";
+import type { Look } from "./appearance";
 
 export type EntityKind = "player" | "mob";
 
@@ -13,6 +14,7 @@ export interface EntityState {
   moveMs: number;
   path: Cell[];
   mobType?: string;
+  look?: Look; // เฉพาะผู้เล่น
 }
 
 export interface PlayerStats {
@@ -51,6 +53,7 @@ export interface JoinCharacter {
   exp: number;
   x: number;
   y: number;
+  look: Look;
 }
 
 /** close code ที่ client ต้องรู้ */
