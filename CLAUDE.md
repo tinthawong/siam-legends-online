@@ -106,6 +106,7 @@ npm run typecheck       # tsc ทั้ง client และ server
 ## งานภาพ (ไฟล์และสถานะ)
 
 - ภาพต้นฉบับจาก PixelLab เก็บที่ `art/pixellab/<ชื่อภาษาอังกฤษ>/` (ตั้งชื่อโฟลเดอร์และไฟล์เป็นภาษาอังกฤษเสมอ) แต่ละชุดมี `metadata.json` บอกทิศและเฟรม ถ้า `animations` ว่าง แปลว่ามีแค่ภาพนิ่ง 8 ทิศ
+- ภาพมอนเก็บที่ `art/monsters/<ชื่อภาษาอังกฤษ>/`
 - รูปไอเท็ม/ของดรอปเก็บที่ `art/items/` เป็น pixel art ขนาด 32×32 (มีสำรอง 64×64 ได้) พื้นโปร่งใส
   - มีแล้ว: `crab-claw-32.png`, `crab-claw-64.png` (ก้ามปูนา)
 - สไตล์ท้าย prompt ที่ต้องใช้เหมือนกันทุกชิ้น:
@@ -116,8 +117,13 @@ npm run typecheck       # tsc ทั้ง client และ server
 - **ท่ายืน (idle) ผู้เล่น:** มีแล้วเฉพาะทิศใต้ ชาย/หญิง 9 เฟรม 200ms/เฟรม กรอบ 64×64 (ตัวเลื่อน +8px จาก base, เท้าบรรทัด 53) ต้นฉบับที่ `art/pixellab/base-<เพศ>-idle/` ไฟล์เกมที่ `client/public/sprites/base-<เพศ>/idle-south/0..8.png` รอ export ทิศ south-east, east, north-east, north ได้มาแล้ว: วางไฟล์ `idle-<ทิศ>/` แล้วเพิ่มทิศใน `IDLE_DIRS` (`client/src/sprites.ts` ใช้ร่วมกันทั้งเกมและหน้าสร้างตัวละคร) — ยืนนิ่ง/หมุนตัวอย่างมาทิศที่มี idle (หรือทิศกระจก) = เล่น animation นอกนั้นใช้ภาพนิ่ง
   - ปลายผมยาวที่ต่ำกว่าเส้นเอว (ข้างมือ) ไม่ถูกเปลี่ยนสี เป็นแบบนี้ทั้งภาพนิ่งและ idle
 - **ท่าเดิน:** ยังไม่มีไฟล์
-- **ปูนา:** มีภาพนิ่ง 8 ทิศแล้วที่ `art/pixellab/rice-field-crab/` (PixelLab, 48×48, ตัวกว้างเกือบเต็มกรอบ ใหญ่กว่าตัวละครผู้เล่น) ยังไม่มีท่าทาง ผู้ใช้ยังไม่ได้ตัดสินใจว่าจะสร้างใหม่ที่ 32px, ใช้ตัวนี้เป็นปูถ้ำยักษ์แทน หรือใช้ขนาดนี้ต่อ
-  - **ทดสอบในเกมแล้ว (ผู้ใช้สั่ง):** `mud_crab` ใน `shared/game.ts` เกิด 8 ตัวในแมพแรกคู่กับ Poring ค่าพลังอ่านจาก `monsters.json` (mob003) ภาพเกมอยู่ที่ `client/public/sprites/mud-crab/` (สำเนาจาก art) เท้าอยู่บรรทัด 43 ยังไม่มีของดรอป
+- **มอนสร้างด้วย ChatGPT** (ผู้ใช้ตัดสินใจ): ใช้ทิศเดียว (หันหน้าเข้ากล้อง) ไม่หันตามทิศที่เดิน ขั้นตอนคือ สร้างตัวมอนภาพเดียว → ใช้ภาพนั้นเป็นต้นแบบสร้าง sheet 4 คอลัมน์ × 3 แถว (walk, attack, death) → ตัดด้วย `tools/slice_sheet.py` (ต้องมี Pillow: `pip install pillow`)
+  - ตัวอย่าง: `python tools/slice_sheet.py art/monsters/rice-crab/sheet.png art/monsters/rice-crab --cols 4 --rows 3 --names walk,attack,death --width 32 --colors 40`
+  - ได้ไฟล์ `<ท่า>_<ลำดับ>.png`, `preview.png` และ `sheet.json` (ขนาดเฟรม, จุดยึดที่เท้า, ลำดับเฟรม, ms ต่อเฟรม, loop)
+  - ท่ายืนของมอนทำด้วยโค้ด (ขยับขึ้นลง) ใช้เฟรมแรกของ walk เป็นภาพยืน, โดนตีใช้กะพริบขาวด้วยโค้ด
+  - **ใส่เข้าเกม:** คัดลอก `<ท่า>_*.png` + `sheet.json` ไป `client/public/sprites/monsters/<ชื่อ>/` แล้วตั้ง `sheet: "<ชื่อ>"` ใน `MOBS` (`shared/game.ts`) — GameScene โหลด sheet.json สร้าง animation ตาม ms ต่อเฟรม วางจุดยึดเท้าระดับเดียวกับเท้าผู้เล่น เดิน = walk, ยืน = walk_0 + ขยับขึ้นลง, ตาย = เล่น death จนจบแล้วจางหาย (attack ยังไม่ได้ใช้ เพราะมอนยังไม่ตีกลับ)
+- **ปูนา (rice-crab):** ใช้ชุดจาก ChatGPT แทนตัวจาก PixelLab (ตัวเก่า 48px ใหญ่เกินไป เลิกใช้ — ต้นฉบับยังเก็บที่ `art/pixellab/rice-field-crab/`) ภาพต้นแบบ `art/monsters/rice-crab/source.png` และ sheet ต้นฉบับ 12 เฟรมที่ `art/monsters/rice-crab/sheet.png` ตัวกว้าง 32px ในเฟรม 35×32 จุดยึด (17,30)
+  - อยู่ในเกมแล้ว (ทดสอบ): `mud_crab` ใน `shared/game.ts` เกิด 8 ตัวในแมพแรกคู่กับ Poring ค่าพลังจาก `monsters.json` (mob003) ยังไม่มีของดรอป
 
 ## ไอเดียที่คุยไว้แล้ว
 

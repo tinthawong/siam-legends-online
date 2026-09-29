@@ -20,9 +20,19 @@ interface View {
   path: Cell[];
   moveMs: number;
   sprite: string | null; // มี = ภาพ 8 ทิศ (ผู้เล่น หรือมอนที่มีภาพ)
+  sheet: string | null;  // มี = มอนจาก sheet (ทิศเดียว มีท่า walk/attack/death)
+  bob: Phaser.Tweens.Tween | null; // ท่ายืนของมอนจาก sheet (ขยับขึ้นลงด้วยโค้ด)
   topY: number;          // ขอบบนของตัว (ใช้วางแถบ HP / ตัวเลขดาเมจ)
   dir: Dir;              // ทิศที่หันอยู่
   pose: string;          // texture/animation ที่แสดงอยู่ (กันตั้งซ้ำทุกเฟรม)
+}
+
+/** sheet.json ที่ได้จาก tools/slice_sheet.py */
+interface SheetMeta {
+  frameWidth: number;
+  frameHeight: number;
+  anchor: { x: number; y: number }; // จุดกึ่งกลางเท้า
+  animations: Record<string, { frames: string[]; frameMs: number; loop: boolean }>;
 }
 
 const center = (n: number) => n * TILE + TILE / 2;
@@ -40,6 +50,7 @@ function dirOf(dx: number, dy: number): Dir {
 // Poring, แมพ, วงเป้าหมาย ยังเป็นภาพ placeholder วาดด้วยโค้ดใน makeTextures() / drawMap()
 export class GameScene extends Phaser.Scene {
   private views = new Map<string, View>();
+  private sheets = new Map<string, SheetMeta & { name: string }>();
   private me: string | null = null;
   private targetId: string | null = null;
   private targetRing!: Phaser.GameObjects.Image;
@@ -58,13 +69,36 @@ export class GameScene extends Phaser.Scene {
     for (const g of Object.keys(GENDERS))
       for (const d of IDLE_DIRS)
         for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
-    // มอนที่มีภาพ 8 ทิศ (client/public/sprites/<sprite>/<ทิศ>.png)
-    for (const def of Object.values(MOBS))
-      if (def.sprite) for (const d of DIRS) this.load.image(`mob_${def.sprite}_${d}`, `sprites/${def.sprite}/${d}.png`);
+    // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น
+    for (const name of new Set(Object.values(MOBS).flatMap((d) => (d.sheet ? [d.sheet] : [])))) {
+      const dir = `sprites/monsters/${name}`;
+      this.load.once(`filecomplete-json-sheet_${name}`, (_key: string, _type: string, data: SheetMeta) => {
+        for (const a of Object.values(data.animations))
+          for (const f of a.frames) this.load.image(`${name}_${f.replace(/\.png$/, "")}`, `${dir}/${f}`);
+      });
+      this.load.json(`sheet_${name}`, `${dir}/sheet.json`);
+    }
+  }
+
+  /** สร้าง animation ของมอนจาก sheet (walk/attack/death) ตาม ms ต่อเฟรมใน sheet.json */
+  private makeSheetAnims() {
+    for (const name of new Set(Object.values(MOBS).flatMap((d) => (d.sheet ? [d.sheet] : [])))) {
+      const data = this.cache.json.get(`sheet_${name}`) as SheetMeta | undefined;
+      if (!data) continue;
+      this.sheets.set(name, { name, ...data });
+      for (const [anim, a] of Object.entries(data.animations))
+        this.anims.create({
+          key: `${name}_${anim}`,
+          frames: a.frames.map((f) => ({ key: `${name}_${f.replace(/\.png$/, "")}` })),
+          frameRate: 1000 / a.frameMs,
+          repeat: a.loop ? -1 : 0,
+        });
+    }
   }
 
   create() {
     this.makeTextures();
+    this.makeSheetAnims();
     this.drawMap();
 
     const cam = this.cameras.main;
@@ -150,7 +184,15 @@ export class GameScene extends Phaser.Scene {
         if (m.id === this.targetId) this.setTarget(null);
         if (v) {
           this.views.delete(m.id);
-          this.tweens.add({ targets: v.c, alpha: 0, scaleY: 0.2, duration: 300, onComplete: () => v.c.destroy() });
+          if (v.sheet && this.anims.exists(`${v.sheet}_death`)) {
+            // มอนจาก sheet: เล่นท่าตายจนจบ แล้วค่อยจางหาย
+            v.bob?.stop(); v.body.y = 8; v.hpBar?.clear();
+            v.body.play(`${v.sheet}_death`);
+            v.body.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () =>
+              this.tweens.add({ targets: v.c, alpha: 0, delay: 250, duration: 300, onComplete: () => v.c.destroy() }));
+          } else {
+            this.tweens.add({ targets: v.c, alpha: 0, scaleY: 0.2, duration: 300, onComplete: () => v.c.destroy() });
+          }
         }
         break;
       }
@@ -174,15 +216,23 @@ export class GameScene extends Phaser.Scene {
     this.removeView(e.id);
     const c = this.add.container(center(e.x), center(e.y));
     const isMob = e.kind === "mob";
-    const mobSprite = isMob && e.mobType ? MOBS[e.mobType]?.sprite : undefined;
-    const sprite = isMob ? (mobSprite ? `mob_${mobSprite}` : null) : this.lookSprite(e.look ?? DEFAULT_LOOK);
-    const tex = sprite ? `${sprite}_south` : "poring";
-    // sprite 48px: ตั้ง origin ให้เท้าตรงกลางช่อง (ผู้เล่นเท้าอยู่บรรทัด 45, ปูนาบรรทัด 43)
-    const feet = mobSprite ? 43 : 45;
-    const body = sprite
-      ? this.add.sprite(0, 8, tex).setOrigin(0.5, feet / 48)
-      : this.add.sprite(0, 4, tex).setOrigin(0.5, 1);
-    const topY = sprite ? 8 - feet + 2 : 4 - body.height;
+    const sheetName = isMob && e.mobType ? MOBS[e.mobType]?.sheet : undefined;
+    const sheet = sheetName ? this.sheets.get(sheetName) : undefined;
+    const sprite = isMob ? null : this.lookSprite(e.look ?? DEFAULT_LOOK);
+    const tex = sprite ? `${sprite}_south` : sheet ? `${sheet.name}_walk_0` : "poring";
+    let body: Phaser.GameObjects.Sprite, topY: number;
+    if (sprite) {
+      // ผู้เล่น 48px: เท้าอยู่บรรทัด 45 ตั้ง origin ให้เท้าตรงกลางช่อง
+      body = this.add.sprite(0, 8, tex).setOrigin(0.5, 45 / 48);
+      topY = 8 - 45 + 2;
+    } else if (sheet) {
+      // มอนจาก sheet: จุดยึดที่เท้าตาม sheet.json วางระดับเดียวกับเท้าผู้เล่น
+      body = this.add.sprite(0, 8, tex).setOrigin(sheet.anchor.x / sheet.frameWidth, sheet.anchor.y / sheet.frameHeight);
+      topY = 8 - sheet.anchor.y;
+    } else {
+      body = this.add.sprite(0, 4, tex).setOrigin(0.5, 1);
+      topY = 4 - body.height;
+    }
     const label = this.add.text(0, 7, e.name, {
       fontFamily: "Mitr, sans-serif", fontSize: "10px", color: isMob ? "#ffe0ec" : "#ffffff",
       stroke: "#10192a", strokeThickness: 3,
@@ -196,14 +246,20 @@ export class GameScene extends Phaser.Scene {
       // พื้นที่แตะใหญ่กว่าตัว เพื่อให้กดบนมือถือง่าย
       body.setInteractive(new Phaser.Geom.Circle(body.width / 2, body.height / 2, 22), Phaser.Geom.Circle.Contains);
       body.setData("mobId", e.id);
-      // เด้งดึ๋งเฉพาะ Poring (มอนที่มีภาพ 8 ทิศยังไม่มีท่าทาง ปล่อยนิ่งไว้)
-      if (!sprite) this.tweens.add({
+      // Poring เด้งดึ๋ง / มอนจาก sheet ใช้ท่ายืนเป็นการขยับขึ้นลงด้วยโค้ด (หยุดตอนเดิน ดู updatePose)
+      if (!sheet) this.tweens.add({
         targets: body, scaleY: 0.86, scaleX: 1.1, yoyo: true, repeat: -1,
         duration: 380 + Math.random() * 120, ease: "Sine.easeInOut",
       });
     }
+    const bob = sheet
+      ? this.tweens.add({ targets: body, y: 7, yoyo: true, repeat: -1, duration: 450 + Math.random() * 150, ease: "Sine.easeInOut", paused: true })
+      : null;
 
-    const v: View = { id: e.id, kind: e.kind, c, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs, sprite, topY, dir: "south", pose: tex };
+    const v: View = {
+      id: e.id, kind: e.kind, c, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
+      sprite, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
+    };
     this.views.set(e.id, v);
     this.updatePose(v);
     this.drawHp(v);
@@ -258,16 +314,30 @@ export class GameScene extends Phaser.Scene {
     return prefix;
   }
 
-  /** หันหน้า: ภาพ 8 ทิศเปลี่ยนภาพ, Poring พลิกซ้าย-ขวา */
+  /** หันหน้า: ผู้เล่นเปลี่ยนภาพตามทิศ, Poring พลิกซ้าย-ขวา, มอนจาก sheet หันเข้ากล้องตลอด */
   private face(v: View, dx: number, dy: number) {
     if (Math.abs(dx) < 0.5 && Math.abs(dy) < 0.5) return;
     v.dir = dirOf(dx, dy);
     if (v.sprite) this.updatePose(v);
-    else if (Math.abs(dx) > 0.5) v.body.setFlipX(dx < 0);
+    else if (!v.sheet && Math.abs(dx) > 0.5) v.body.setFlipX(dx < 0);
   }
 
-  /** ยืนนิ่งและมีท่ายืนของทิศนั้น (หรือทิศกระจก) = เล่น animation, นอกนั้นใช้ภาพนิ่งของทิศ */
+  /** ผู้เล่น: ยืนนิ่งและมีท่ายืนของทิศนั้น (หรือทิศกระจก) = เล่น animation นอกนั้นใช้ภาพนิ่งของทิศ
+   *  มอนจาก sheet: เดิน = ท่า walk, ยืน = เฟรมแรกของ walk + ขยับขึ้นลง */
   private updatePose(v: View) {
+    if (v.sheet) {
+      const pose = v.path.length ? "walk" : "stand";
+      if (pose === v.pose) return;
+      v.pose = pose;
+      if (pose === "walk") {
+        v.bob?.pause(); v.body.y = 8;
+        v.body.play(`${v.sheet}_walk`, true);
+      } else {
+        v.body.stop(); v.body.setTexture(`${v.sheet}_walk_0`);
+        v.bob?.resume();
+      }
+      return;
+    }
     if (!v.sprite) return;
     const src = v.kind === "player" && !v.path.length ? animSource(IDLE_DIRS, v.dir) : null;
     const idle = src && this.anims.exists(`${v.sprite}_idle_${src.dir}`) ? `${v.sprite}_idle_${src.dir}` : null;
@@ -278,7 +348,7 @@ export class GameScene extends Phaser.Scene {
       v.body.setFlipX(src!.flip).setOrigin(0.5, (45 + IDLE_OFFSET) / 64).play(idle, true);
     } else {
       v.body.stop();
-      v.body.setFlipX(false).setTexture(pose).setOrigin(0.5, (v.kind === "mob" ? 43 : 45) / 48);
+      v.body.setFlipX(false).setTexture(pose).setOrigin(0.5, 45 / 48);
     }
   }
 

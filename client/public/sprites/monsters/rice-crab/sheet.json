@@ -1,0 +1,41 @@
+{
+ "frameWidth": 35,
+ "frameHeight": 32,
+ "anchor": {
+  "x": 17,
+  "y": 30,
+  "note": "จุดกึ่งกลางเท้า วางตรงตำแหน่งมอนในเกม"
+ },
+ "animations": {
+  "walk": {
+   "frames": [
+    "walk_0.png",
+    "walk_1.png",
+    "walk_2.png",
+    "walk_3.png"
+   ],
+   "frameMs": 120,
+   "loop": true
+  },
+  "attack": {
+   "frames": [
+    "attack_0.png",
+    "attack_1.png",
+    "attack_2.png",
+    "attack_3.png"
+   ],
+   "frameMs": 90,
+   "loop": false
+  },
+  "death": {
+   "frames": [
+    "death_0.png",
+    "death_1.png",
+    "death_2.png",
+    "death_3.png"
+   ],
+   "frameMs": 140,
+   "loop": false
+  }
+ }
+}
