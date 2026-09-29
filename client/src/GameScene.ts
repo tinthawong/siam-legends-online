@@ -74,6 +74,9 @@ export class GameScene extends Phaser.Scene {
 
   /** กระเป๋าเปลี่ยน → main.ts วาดหน้ากระเป๋า (HTML) */
   onInventory: ((items: InvItem[]) => void) | null = null;
+  /** เราสลบ (cause = สาเหตุ) / กลับเมืองแล้ว → main.ts เปิด-ปิดหน้าต่างสลบ */
+  onKnockedOut: ((cause: string) => void) | null = null;
+  onRevived: (() => void) | null = null;
 
   constructor(private net: Net) {
     super("game");
@@ -263,14 +266,21 @@ export class GameScene extends Phaser.Scene {
         }
         break;
       }
+      case "dead": {
+        const v = this.views.get(m.id);
+        if (v) this.setDead(v, true);
+        if (m.id === this.me) this.onKnockedOut?.(m.cause);
+        break;
+      }
       case "respawn": {
         const v = this.views.get(m.id);
         if (!v) break;
+        this.setDead(v, false);
+        if (m.id === this.me) this.onRevived?.();
         v.path = [];
         v.c.setPosition(center(m.x), center(m.y));
         v.dir = "south";
         this.updatePose(v);
-        if (m.id === this.me) this.floatText(v.c.x, v.c.y + v.topY - 12, "เลือดหมด · ฟื้นที่จุดเกิด", "#ff9d8a", 1600);
         break;
       }
       case "exp":
@@ -360,6 +370,7 @@ export class GameScene extends Phaser.Scene {
       sprite, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
+    if (e.dead) this.setDead(v, true);
     this.updatePose(v);
     this.drawHp(v);
     c.setDepth(c.y);
@@ -406,6 +417,13 @@ export class GameScene extends Phaser.Scene {
         });
       },
     });
+  }
+
+  /** สลบ: ตัวเป็นสีเทาและโปร่งลง (ทุกคนเห็น) */
+  private setDead(v: View, dead: boolean) {
+    v.path = [];
+    if (dead) v.body.setTint(0x6b6b6b).setAlpha(0.7);
+    else v.body.clearTint().setAlpha(1);
   }
 
   private removeView(id: string) {

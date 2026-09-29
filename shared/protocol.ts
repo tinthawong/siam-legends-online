@@ -15,6 +15,7 @@ export interface EntityState {
   path: Cell[];
   mobType?: string;
   look?: Look; // เฉพาะผู้เล่น
+  dead?: boolean; // ผู้เล่นที่สลบอยู่ (รอกดกลับเมือง)
 }
 
 /** ของที่หล่นบนพื้น (item = key ใน shared/items.ts) */
@@ -45,7 +46,8 @@ export type ClientMsg =
   | { t: "move"; x: number; y: number }
   | { t: "attack"; target: string }
   | { t: "auto"; on: boolean }
-  | { t: "pickup"; id: string }; // เดินไปเก็บของบนพื้น
+  | { t: "pickup"; id: string } // เดินไปเก็บของบนพื้น
+  | { t: "revive" };            // สลบอยู่ → กลับเมือง (ฟื้นที่จุดเกิด)
 
 // server → client
 export type ServerMsg =
@@ -55,7 +57,8 @@ export type ServerMsg =
   | { t: "move"; id: string; from: Cell; path: Cell[]; moveMs: number }
   | { t: "hit"; src: string; dst: string; dmg: number; crit: boolean; hp: number }
   | { t: "die"; id: string }
-  | { t: "respawn"; id: string; x: number; y: number } // ผู้เล่นเลือดหมด → ฟื้นที่จุดเกิด
+  | { t: "dead"; id: string; cause: string }           // ผู้เล่นเลือดหมด สลบอยู่กับที่ (cause = สาเหตุ เช่น "ปูแดง Lv.3 โจมตี")
+  | { t: "respawn"; id: string; x: number; y: number } // กดกลับเมืองแล้ว → ฟื้นที่จุดเกิด
   | { t: "exp"; x: number; y: number; exp: number } // ส่งให้คนที่ตีมอนตาย: ได้ EXP เท่าไหร่ (x,y = ช่องที่มอนตาย)
   | { t: "drop"; g: GroundItem }          // ของหล่นบนพื้น
   | { t: "picked"; id: string; by: string } // ของบนพื้นถูกเก็บแล้ว (by = id ผู้เล่นที่เก็บ)

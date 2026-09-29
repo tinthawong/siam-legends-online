@@ -41,6 +41,7 @@ interface Player extends Ent {
   lastCombatAt: number;    // ตีหรือโดนตีล่าสุด (เลือดฟื้นเมื่อพ้น REGEN_DELAY_MS)
   nextRegenAt: number;
   pickup: string | null;   // ของบนพื้นที่กำลังเดินไปเก็บ
+  dead: boolean;           // เลือดหมด สลบอยู่กับที่ จนกว่าจะกดกลับเมือง
   inv: Map<string, number>; // กระเป๋า: item → จำนวน
 }
 
@@ -115,7 +116,7 @@ export class MapRoom extends DurableObject<Env> {
       ws: server, level: ch.level, exp: ch.exp,
       target: null, auto: false, nextAttackAt: 0, chaseKey: null,
       lastCombatAt: 0, nextRegenAt: 0,
-      pickup: null, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
+      pickup: null, dead: false, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
     };
     this.players.set(id, p);
 
@@ -139,6 +140,10 @@ export class MapRoom extends DurableObject<Env> {
     } catch { return; }
 
     const now = Date.now();
+    if (p.dead) {
+      if (msg.t === "revive") this.revivePlayer(p, now);
+      return; // สลบอยู่: ทำอะไรไม่ได้นอกจากกดกลับเมือง
+    }
     switch (msg.t) {
       case "move": {
         const x = Math.floor(Number(msg.x)), y = Math.floor(Number(msg.y));
@@ -196,6 +201,7 @@ export class MapRoom extends DurableObject<Env> {
     this.players.delete(p.id);
     this.broadcast({ t: "despawn", id: p.id });
     if (this.players.size === 0) this.stopLoop();
+    if (p.dead) { p.x = SPAWN.x; p.y = SPAWN.y; } // ออกเกมตอนสลบ = เข้าใหม่ที่จุดเกิด
     await this.save([p]);
   }
 
@@ -284,6 +290,7 @@ export class MapRoom extends DurableObject<Env> {
   // ---------- ผู้เล่น: ตีเป้าหมาย / auto ----------
 
   private updatePlayer(p: Player, now: number) {
+    if (p.dead) return;
     if (p.pickup) { this.updatePickup(p, now); return; }
     // auto: ไม่มีเป้าหมายที่ยังมีชีวิต → หามอนที่ใกล้ที่สุดในรัศมี
     if (p.auto && !this.aliveMob(p.target)) {
@@ -362,7 +369,7 @@ export class MapRoom extends DurableObject<Env> {
     const p = this.players.get(m.aggro!);
     const from = m.aggroFrom!;
     // เป้าหมายออกจากแมพ / ฟื้นที่จุดเกิดแล้ว / หนีไกลเกินระยะไล่ → เลิกไล่ กลับไปเดินเล่น
-    if (!p || cheb(p.x, p.y, from.x, from.y) > MOB_CHASE_RANGE || cheb(m.x, m.y, from.x, from.y) > MOB_CHASE_RANGE) {
+    if (!p || p.dead || cheb(p.x, p.y, from.x, from.y) > MOB_CHASE_RANGE || cheb(m.x, m.y, from.x, from.y) > MOB_CHASE_RANGE) {
       this.dropAggro(m, now);
       return;
     }
@@ -395,27 +402,37 @@ export class MapRoom extends DurableObject<Env> {
     const { dmg, crit } = rollDamage(MOBS[m.type].atk ?? 1, 0);
     p.hp = Math.max(0, p.hp - dmg);
     this.broadcast({ t: "hit", src: m.id, dst: p.id, dmg, crit, hp: p.hp });
-    if (p.hp === 0) this.respawnPlayer(p, now);
+    if (p.hp === 0) this.knockOut(p, `${MOBS[m.type].name}${MOBS[m.type].level ? ` Lv.${MOBS[m.type].level}` : ""} โจมตี`, now);
     else this.send(p, { t: "stats", self: this.stats(p) });
   }
 
-  /** เลือดหมด → ฟื้นที่จุดเกิด เลือดเต็ม ไม่เสีย EXP ยกเลิกเป้าหมายและ auto */
-  private respawnPlayer(p: Player, now: number) {
+  /** เลือดหมด → สลบอยู่กับที่ ยกเลิกเป้าหมาย/auto/เก็บของ มอนเลิกไล่ แล้วรอผู้เล่นกดกลับเมือง */
+  private knockOut(p: Player, cause: string, now: number) {
+    p.dead = true;
     for (const m of this.mobs.values()) if (m.aggro === p.id) this.dropAggro(m, now);
-    p.path = [];
-    p.x = SPAWN.x; p.y = SPAWN.y;
-    p.hp = p.maxHp;
+    if (p.path.length) this.setPath(p, [], now);
     p.chaseKey = null;
     p.pickup = null;
     if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
     if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
+    this.broadcast({ t: "dead", id: p.id, cause });
+    this.send(p, { t: "stats", self: this.stats(p) });
+  }
+
+  /** กดกลับเมือง → ฟื้นที่จุดเกิด (เมืองหลัก) เลือดเต็ม ไม่เสีย EXP */
+  private revivePlayer(p: Player, now: number) {
+    p.dead = false;
+    p.path = [];
+    p.x = SPAWN.x; p.y = SPAWN.y;
+    p.hp = p.maxHp;
+    p.lastCombatAt = now;
     this.broadcast({ t: "respawn", id: p.id, x: p.x, y: p.y });
     this.send(p, { t: "stats", self: this.stats(p) });
   }
 
   /** เลือดฟื้นเองตอนไม่ได้สู้ */
   private regen(p: Player, now: number) {
-    if (p.hp >= p.maxHp || now - p.lastCombatAt < REGEN_DELAY_MS || now < p.nextRegenAt) return;
+    if (p.dead || p.hp >= p.maxHp || now - p.lastCombatAt < REGEN_DELAY_MS || now < p.nextRegenAt) return;
     p.nextRegenAt = now + REGEN_EVERY_MS;
     p.hp = Math.min(p.maxHp, p.hp + Math.max(1, Math.ceil(p.maxHp * REGEN_PCT)));
     this.send(p, { t: "stats", self: this.stats(p) });
@@ -523,6 +540,7 @@ export class MapRoom extends DurableObject<Env> {
       moveMs: e.moveMs, path: e.path,
       mobType: e.kind === "mob" ? e.type : undefined,
       look: e.kind === "player" ? e.look : undefined,
+      dead: e.kind === "player" && e.dead ? true : undefined,
     };
   }
 

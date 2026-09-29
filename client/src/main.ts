@@ -124,6 +124,18 @@ function startGame(ch: Character, session: Session) {
 
   const scene = new GameScene(net);
   scene.onInventory = renderBag;
+  // สลบ: แสดงสาเหตุ กดกลับเมืองแล้ว server ฟื้นให้ที่จุดเกิด
+  scene.onKnockedOut = (cause) => {
+    $("ko-cause").textContent = cause;
+    $("ko").hidden = false;
+    $<HTMLButtonElement>("ko-town").disabled = false;
+    $("ko-town").focus();
+  };
+  scene.onRevived = () => { $("ko").hidden = true; };
+  $("ko-town").onclick = () => {
+    $<HTMLButtonElement>("ko-town").disabled = true;
+    net.send({ t: "revive" });
+  };
   bindBag();
 
   new Phaser.Game({

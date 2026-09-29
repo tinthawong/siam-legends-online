@@ -248,6 +248,21 @@
     .window { background: var(--window); border: 2px solid var(--window-edge); border-radius: 10px;
       box-shadow: inset 0 0 0 1px rgba(255,255,255,0.08); }
     #dc { z-index: 5; }
+    #ko { position: fixed; inset: 0; z-index: 4; display: grid; place-items: center; padding: 16px;
+      background: radial-gradient(ellipse at center, rgba(40, 6, 6, 0.55), rgba(8, 4, 4, 0.8)); animation: ko-in 400ms ease-out; }
+    @keyframes ko-in { from { opacity: 0; } }
+    .ko-card { position: relative; width: min(340px, 100%); padding: 34px 24px 22px; text-align: center; border-radius: 6px;
+      border: 2px solid var(--gold); outline: 1px solid var(--gold-deep); outline-offset: -8px;
+      background: radial-gradient(ellipse at 50% 0%, rgba(164, 40, 27, 0.35), transparent 60%), linear-gradient(180deg, var(--lacquer-2), var(--lacquer));
+      box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6); animation: ko-pop 420ms cubic-bezier(.2, 1.4, .4, 1); }
+    @keyframes ko-pop { from { transform: scale(0.85) translateY(10px); opacity: 0; } }
+    .ko-card .crest { top: -24px; }
+    .ko-card h2 { margin: 0; font-family: var(--font-title); font-weight: 400; font-size: 26px; color: #ff9d8a; }
+    .ko-sub { margin: 4px 0 16px; font-size: 14px; color: var(--ink-dim); line-height: 1.6; }
+    .ko-cause { margin-bottom: 18px; padding: 10px 12px; border-radius: 4px; border: 1px solid var(--gold-deep); background: rgba(0, 0, 0, 0.35); }
+    .ko-cause small { display: block; font-size: 12px; color: var(--ink-dim); }
+    .ko-cause b { display: block; margin-top: 2px; font-size: 17px; color: var(--gold-lite); font-weight: 600; }
+    @media (prefers-reduced-motion: reduce) { #ko, .ko-card { animation: none; } }
 
     #logout { background: none; border: 0; padding: 0; margin-top: 6px; color: var(--ink-dim); font-size: 12px; text-decoration: underline; }
 
@@ -453,6 +468,17 @@
 
   <!-- ฉากหลังหน้าเข้าเกม (ซ่อนเองเมื่อเข้าเกม) -->
   <div id="backdrop" aria-hidden="true">
+  </div>
+
+  <!-- สลบ: บอกสาเหตุ + ปุ่มกลับเมือง -->
+  <div id="ko" hidden role="dialog" aria-modal="true" aria-labelledby="ko-title">
+    <div class="ko-card">
+      <svg class="crest" aria-hidden="true"><use href="#chedi"/></svg>
+      <h2 id="ko-title">คุณหมดสติ</h2>
+      <p class="ko-sub">พักหายใจสักครู่ แล้วค่อยกลับไปผจญภัยต่อ</p>
+      <div class="ko-cause"><small>สาเหตุ</small><b id="ko-cause"></b></div>
+      <button type="button" class="btn btn-gold" id="ko-town">กลับเมือง</button>
+    </div>
   </div>
 
   <div id="dc" hidden>
