@@ -59,7 +59,7 @@ function dirOf(dx: number, dy: number): Dir {
 }
 
 // ผู้เล่นใช้ sprite 8 ทิศจาก PixelLab (client/public/sprites/)
-// Poring, แมพ, วงเป้าหมาย ยังเป็นภาพ placeholder วาดด้วยโค้ดใน makeTextures() / drawMap()
+// พื้นหญ้าใช้ภาพ sprites/tiles/grass.png / หิน ต้นไม้ วงเป้าหมาย ยังเป็นภาพ placeholder วาดด้วยโค้ดใน makeTextures() / drawMap()
 export class GameScene extends Phaser.Scene {
   private views = new Map<string, View>();
   private groundViews = new Map<string, Phaser.GameObjects.Image>(); // ของบนพื้น
@@ -91,6 +91,8 @@ export class GameScene extends Phaser.Scene {
     for (const g of Object.keys(GENDERS))
       for (const d of IDLE_DIRS)
         for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
+    // พื้นหญ้า 64×64 ปูซ้ำทั้งแมพ (ขนาดเดิม ไม่ย่อ/ขยาย)
+    this.load.image("tile_grass", "sprites/tiles/grass.png");
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
     // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น (ชุดหลัก + ชุดท่าเพิ่มแต่ละโฟลเดอร์)
@@ -355,8 +357,9 @@ export class GameScene extends Phaser.Scene {
       fontFamily: "Mitr, sans-serif", fontSize: "10px", color: isMob ? "#ffe0ec" : "#ffffff",
       stroke: "#10192a", strokeThickness: 3,
     }).setOrigin(0.5, 0).setResolution(2);
-    // มอนจาก sheet: เงาวงรีที่พื้นใต้เท้า (อยู่กับที่ ไม่ขยับตามตัวตอนเด้ง/เดิน)
+    // เงาวงรีที่พื้นใต้เท้า (อยู่กับที่ ไม่ขยับตามตัวตอนเด้ง/เดิน/ท่ายืน): มอนจาก sheet และผู้เล่น
     if (sheet) c.add(this.add.ellipse(0, 7, 26, 8, 0x000000, 0.3));
+    else if (sprite) c.add(this.add.ellipse(0, 7, 22, 7, 0x000000, 0.3));
     c.add([body, label]);
 
     let hpBar: Phaser.GameObjects.Graphics | null = null;
@@ -599,12 +602,12 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawMap() {
+    this.add.tileSprite(0, 0, MAP_W * TILE, MAP_H * TILE, "tile_grass").setOrigin(0, 0).setDepth(-2);
     const g = this.add.graphics().setDepth(-1);
     for (let y = 0; y < MAP_H; y++) {
       for (let x = 0; x < MAP_W; x++) {
         const t = TILES[y * MAP_W + x];
         const px = x * TILE, py = y * TILE;
-        g.fillStyle((x * 7 + y * 13) % 5 === 0 ? 0x4f8a42 : 0x55924a).fillRect(px, py, TILE, TILE);
         if (t === ROCK) {
           g.fillStyle(0x7d8590).fillRoundedRect(px + 3, py + 6, TILE - 6, TILE - 9, 6);
           g.fillStyle(0x9aa3ad).fillRoundedRect(px + 7, py + 8, 10, 6, 3);

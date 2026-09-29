@@ -9,7 +9,7 @@ export interface MobDef {
   moveMs: number;
   count: number; // จำนวนที่เกิดในแมพ
   // ชุดภาพจาก tools/slice_sheet.py ที่ client/public/sprites/monsters/<sheet>/ (sheet.json + เฟรม)
-  // หันหน้าเข้ากล้องทิศเดียว ไม่มี = วาดด้วยโค้ดแบบ Poring
+  // หันหน้าเข้ากล้องทิศเดียว ไม่มี = ใช้ภาพ placeholder วาดด้วยโค้ด ("poring" ใน GameScene.makeTextures)
   sheet?: string;
   // ชุดท่าเพิ่มที่ตัดแยกโฟลเดอร์ (sheet.json ของตัวเอง ขนาดเฟรม/จุดยึดต่างจากชุดหลักได้) เช่น ["hit"]
   sheetParts?: string[];
@@ -28,7 +28,6 @@ function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" |
 }
 
 export const MOBS: Record<string, MobDef> = {
-  poring: { name: "Poring", maxHp: 50, def: 1, exp: 12, moveMs: 420, count: 16 },
   // ปูนา (ทดสอบ)
   mud_crab: fromData("mob003", { moveMs: 420, count: 8, sheet: "rice-crab", sheetParts: ["hit", "idle"], retaliate: true,
     drop: { item: "crab_claw", chance: 1 } }),

@@ -558,7 +558,7 @@ export class MapRoom extends DurableObject<Env> {
     this.broadcast({ t: "spawn", e: this.view(m) });
   }
 
-  /** Poring เดินสุ่มระยะสั้น ๆ */
+  /** มอนเดินสุ่มระยะสั้น ๆ */
   private wander(m: Mob, now: number) {
     m.nextWanderAt = now + 2500 + Math.random() * 4000;
     for (let i = 0; i < 6; i++) {
