@@ -1,0 +1,162 @@
+{
+ "net-rack": {
+  "file": "net-rack.png",
+  "width": 40,
+  "height": 37,
+  "anchor": {
+   "x": 20,
+   "y": 36
+  },
+  "shadowWidth": 32
+ },
+ "net-pile": {
+  "file": "net-pile.png",
+  "width": 30,
+  "height": 21,
+  "anchor": {
+   "x": 15,
+   "y": 20
+  },
+  "shadowWidth": 24
+ },
+ "fish-trap": {
+  "file": "fish-trap.png",
+  "width": 20,
+  "height": 18,
+  "anchor": {
+   "x": 10,
+   "y": 17
+  },
+  "shadowWidth": 16
+ },
+ "rowboat-upturned": {
+  "file": "rowboat-upturned.png",
+  "width": 44,
+  "height": 33,
+  "anchor": {
+   "x": 22,
+   "y": 32
+  },
+  "shadowWidth": 35
+ },
+ "oars": {
+  "file": "oars.png",
+  "width": 20,
+  "height": 20,
+  "anchor": {
+   "x": 10,
+   "y": 19
+  },
+  "shadowWidth": 16
+ },
+ "rope-coil": {
+  "file": "rope-coil.png",
+  "width": 20,
+  "height": 14,
+  "anchor": {
+   "x": 10,
+   "y": 13
+  },
+  "shadowWidth": 16
+ },
+ "buoys": {
+  "file": "buoys.png",
+  "width": 26,
+  "height": 24,
+  "anchor": {
+   "x": 13,
+   "y": 23
+  },
+  "shadowWidth": 21
+ },
+ "anchor": {
+  "file": "anchor.png",
+  "width": 28,
+  "height": 27,
+  "anchor": {
+   "x": 14,
+   "y": 26
+  },
+  "shadowWidth": 22
+ },
+ "scarecrow": {
+  "file": "scarecrow.png",
+  "width": 30,
+  "height": 33,
+  "anchor": {
+   "x": 15,
+   "y": 32
+  },
+  "shadowWidth": 24
+ },
+ "ox-cart": {
+  "file": "ox-cart.png",
+  "width": 52,
+  "height": 38,
+  "anchor": {
+   "x": 26,
+   "y": 37
+  },
+  "shadowWidth": 42
+ },
+ "field-hut": {
+  "file": "field-hut.png",
+  "width": 48,
+  "height": 45,
+  "anchor": {
+   "x": 24,
+   "y": 44
+  },
+  "shadowWidth": 38
+ },
+ "water-wheel": {
+  "file": "water-wheel.png",
+  "width": 44,
+  "height": 43,
+  "anchor": {
+   "x": 22,
+   "y": 42
+  },
+  "shadowWidth": 35
+ },
+ "shore-rocks": {
+  "file": "shore-rocks.png",
+  "width": 40,
+  "height": 30,
+  "anchor": {
+   "x": 20,
+   "y": 29
+  },
+  "shadowWidth": 32
+ },
+ "tide-pool": {
+  "file": "tide-pool.png",
+  "width": 36,
+  "height": 25,
+  "anchor": {
+   "x": 18,
+   "y": 24
+  },
+  "shadowWidth": 29
+ },
+ "hammock": {
+  "file": "hammock.png",
+  "width": 40,
+  "height": 30,
+  "anchor": {
+   "x": 20,
+   "y": 29
+  },
+  "shadowWidth": 32
+ },
+ "morning-glory": {
+  "file": "morning-glory.png",
+  "width": 24,
+  "height": 20,
+  "anchor": {
+   "x": 12,
+   "y": 19
+  },
+  "shadowWidth": 19
+ }
+}

@@ -1,6 +1,6 @@
 export const TILE = 32;              // ขนาดช่องเป็นพิกเซล
 export const TICK_MS = 100;          // server tick 10 ครั้ง/วินาที
-export const MAP_ID = "prontera_field";
+export const MAP_ID = "ban_pak_ao"; // บ้านปากอ่าว (migration 0005 ย้ายตัวละครจาก prontera_field)
 export const NAME_RE = /^[\p{L}\p{M}\p{N}_]{2,16}$/u; // ชื่อตัวละคร: ไทย/อังกฤษ/ตัวเลข/_ ยาว 2–16
 
 export const PLAYER_MOVE_MS = 150;   // เวลาเดิน 1 ช่อง (แนวตรง)

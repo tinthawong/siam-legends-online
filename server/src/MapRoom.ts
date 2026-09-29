@@ -6,7 +6,7 @@ import {
   POTION_COOLDOWN_MS, MAX_BUY,
   stepMs, cheb,
 } from "../../shared/constants";
-import { MAP_W, MAP_H, SPAWN, isWalkable, inTown } from "../../shared/map";
+import { MAP_W, MAP_H, SPAWN, ZONES, isWalkable, inZone } from "../../shared/map";
 import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
 import { MOBS, expToNext, playerAtk, playerMaxHp, rollDamage } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
@@ -535,7 +535,7 @@ export class MapRoom extends DurableObject<Env> {
     let n = 0;
     for (const [type, def] of Object.entries(MOBS)) {
       for (let i = 0; i < def.count; i++) {
-        const c = this.randomCell();
+        const c = this.randomCell(def.zone);
         const id = "m" + ++n;
         this.mobs.set(id, {
           id, kind: "mob", type, name: def.name,
@@ -549,7 +549,7 @@ export class MapRoom extends DurableObject<Env> {
   }
 
   private respawnMob(m: Mob, now: number) {
-    const c = this.randomCell();
+    const c = this.randomCell(MOBS[m.type].zone);
     m.x = c.x; m.y = c.y;
     m.hp = m.maxHp;
     m.alive = true;
@@ -564,17 +564,19 @@ export class MapRoom extends DurableObject<Env> {
     for (let i = 0; i < 6; i++) {
       const x = m.x + Math.floor(Math.random() * 7) - 3;
       const y = m.y + Math.floor(Math.random() * 7) - 3;
-      if ((x === m.x && y === m.y) || !isWalkable(x, y) || inTown(x, y)) continue;
+      const zone = MOBS[m.type].zone;
+      if ((x === m.x && y === m.y) || !isWalkable(x, y) || (zone && !inZone(zone, x, y))) continue;
       const path = pathTo(m.x, m.y, x, y);
       if (path && path.length <= 8) { this.setPath(m, path, now); return; }
     }
   }
 
-  private randomCell(): Cell {
+  private randomCell(zone?: string): Cell {
+    const z = zone ? ZONES[zone] : undefined;
     for (;;) {
-      const x = Math.floor(Math.random() * MAP_W);
-      const y = Math.floor(Math.random() * MAP_H);
-      if (isWalkable(x, y) && !inTown(x, y) && cheb(x, y, SPAWN.x, SPAWN.y) > 4) return { x, y };
+      const x = z ? z.x0 + Math.floor(Math.random() * (z.x1 - z.x0 + 1)) : Math.floor(Math.random() * MAP_W);
+      const y = z ? z.y0 + Math.floor(Math.random() * (z.y1 - z.y0 + 1)) : Math.floor(Math.random() * MAP_H);
+      if (isWalkable(x, y) && cheb(x, y, SPAWN.x, SPAWN.y) > 4) return { x, y };
     }
   }
 

@@ -56,8 +56,18 @@ def main():
             xs = [c[0] for c in cells]; ys = [c[1] for c in cells]
             comps.append({"id": cid, "n": len(cells), "box": (min(xs), min(ys), max(xs) + 1, max(ys) + 1),
                           "cx": sum(xs) / len(xs), "cy": sum(ys) / len(ys)})
-    if len(comps) < n: raise SystemExit(f"เจอ {len(comps)} ก้อน แต่ต้องการ {n} ชิ้น")
     big = sorted(comps, key=lambda c: c["n"], reverse=True)[:n]
+    # ถ้าชิ้นในตารางติดกัน (เช่น ใบไม้ประดับฐานแตะชิ้นข้าง ๆ) ก้อนใหญ่จะน้อยกว่าจำนวนชิ้น
+    # หรือก้อนที่ n เล็กผิดปกติ → ใช้วิธีแบ่งตามตาราง
+    if len(comps) < n or big[-1]["n"] < 0.05 * big[0]["n"]:
+        # ชิ้นแตะกันบาง ๆ (เช่น ปลายใบไม้) → กัดขอบ mask ทีละชั้นจนแยกครบ แล้วขยายป้ายกลับ
+        res = split_by_erosion(sp, sw, sh, n)
+        if res is None:
+            print("ชิ้นในภาพติดกัน ใช้วิธีแบ่งตามตาราง")
+            return grid_mode(img, alpha, a, names, widths)
+        print("ชิ้นในภาพแตะกัน แยกด้วยการกัดขอบ")
+        lab, comps = res
+        big = sorted(comps, key=lambda c: c["n"], reverse=True)[:n]
     big.sort(key=lambda c: c["cy"])
     grid = []
     for r in range(a.rows): grid += sorted(big[r * a.cols:(r + 1) * a.cols], key=lambda c: c["cx"])
@@ -83,6 +93,62 @@ def main():
         crop = piece.crop(box); w = widths[k]; h = max(1, round(crop.height * w / crop.width))
         pieces.append((names[k], crop.resize((w, h), Image.BOX)))
 
+    finish(pieces, a)
+
+
+def label(mask, sw, sh):
+    lab = [[0] * sw for _ in range(sh)]; comps = []
+    for y in range(sh):
+        for x in range(sw):
+            if not mask[y][x] or lab[y][x]: continue
+            cid = len(comps) + 1; lab[y][x] = cid; st = [(x, y)]; cells = []
+            while st:
+                cx, cy = st.pop(); cells.append((cx, cy))
+                for dx in (-1, 0, 1):
+                    for dy in (-1, 0, 1):
+                        nx, ny = cx + dx, cy + dy
+                        if 0 <= nx < sw and 0 <= ny < sh and mask[ny][nx] and not lab[ny][nx]:
+                            lab[ny][nx] = cid; st.append((nx, ny))
+            xs = [c[0] for c in cells]; ys = [c[1] for c in cells]
+            comps.append({"id": cid, "n": len(cells), "box": (min(xs), min(ys), max(xs) + 1, max(ys) + 1),
+                          "cx": sum(xs) / len(xs), "cy": sum(ys) / len(ys)})
+    return lab, comps
+
+
+def split_by_erosion(sp, sw, sh, n, max_steps=6):
+    base = [[sp[x, y] > 0 for x in range(sw)] for y in range(sh)]
+    m = base
+    for _ in range(max_steps):
+        m = [[m[y][x] and all(0 <= x+dx < sw and 0 <= y+dy < sh and m[y+dy][x+dx]
+                              for dx in (-1, 0, 1) for dy in (-1, 0, 1)) for x in range(sw)] for y in range(sh)]
+        lab, comps = label(m, sw, sh)
+        big = sorted(comps, key=lambda c: c["n"], reverse=True)[:n]
+        if len(big) == n and big[-1]["n"] >= 0.05 * big[0]["n"]:
+            keep = {c["id"] for c in big}
+            # ขยายป้ายกลับไปทั่วพื้นที่เดิม (BFS หลายจุดเริ่ม)
+            out = [[lab[y][x] if lab[y][x] in keep else 0 for x in range(sw)] for y in range(sh)]
+            q = [(x, y) for y in range(sh) for x in range(sw) if out[y][x]]
+            i = 0
+            while i < len(q):
+                x, y = q[i]; i += 1
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    nx, ny = x + dx, y + dy
+                    if 0 <= nx < sw and 0 <= ny < sh and base[ny][nx] and not out[ny][nx]:
+                        out[ny][nx] = out[y][x]; q.append((nx, ny))
+            # คำนวณข้อมูลก้อนใหม่จากป้ายที่ขยายแล้ว
+            stats = {}
+            for y in range(sh):
+                for x in range(sw):
+                    c = out[y][x]
+                    if c:
+                        s = stats.setdefault(c, [0, sw, sh, 0, 0, 0, 0])
+                        s[0] += 1; s[1] = min(s[1], x); s[2] = min(s[2], y); s[3] = max(s[3], x + 1); s[4] = max(s[4], y + 1); s[5] += x; s[6] += y
+            comps2 = [{"id": c, "n": v[0], "box": (v[1], v[2], v[3], v[4]), "cx": v[5] / v[0], "cy": v[6] / v[0]} for c, v in stats.items()]
+            return out, comps2
+    return None
+
+
+def finish(pieces, a):
     strip = Image.new("RGB", (sum(s.width for _, s in pieces), max(s.height for _, s in pieces)))
     x = 0
     for _, s in pieces:
@@ -108,6 +174,55 @@ def main():
                              ((c * cw + (cw - f.width) // 2) * S, (r * ch + ch - 2 - f.height) * S))
     prev.save(out / "preview.png")
     print(f"ตัดแล้ว {len(finals)} ชิ้น -> {out}")
+
+
+
+def drop_specks(cell, keep=0.03):
+    """ลบก้อนเล็ก ๆ ที่หลงมาจากช่องข้าง ๆ (เล็กกว่า 3% ของก้อนใหญ่สุดในช่อง)"""
+    a = cell.getchannel("A"); W, H = cell.size; ap = a.load()
+    seen = [[False] * W for _ in range(H)]; comps = []
+    for y in range(0, H):
+        for x in range(0, W):
+            if seen[y][x] or ap[x, y] <= 40: continue
+            st = [(x, y)]; seen[y][x] = True; pts = []
+            while st:
+                cx, cy = st.pop(); pts.append((cx, cy))
+                for nx, ny in ((cx+1, cy), (cx-1, cy), (cx, cy+1), (cx, cy-1)):
+                    if 0 <= nx < W and 0 <= ny < H and not seen[ny][nx] and ap[nx, ny] > 40:
+                        seen[ny][nx] = True; st.append((nx, ny))
+            comps.append(pts)
+    if not comps: return cell
+    big = max(len(c) for c in comps); out = cell.copy(); op = out.load()
+    for c in comps:
+        if len(c) < keep * big:
+            for x, y in c: op[x, y] = (0, 0, 0, 0)
+    return out
+
+
+def grid_mode(img, alpha, a, names, widths):
+    """แบ่งตามตาราง โดยเลื่อนเส้นแบ่งไปตรงที่ตัดผ่านภาพน้อยที่สุด (±25% ของขนาดช่อง)"""
+    W, H = img.size; ap = alpha.load()
+    def best_cut(target, lo, hi, count):
+        span = (hi - lo) / (a.cols if hi == W else a.rows)
+        rng = range(max(lo, int(target - 0.25 * span)), min(hi, int(target + 0.25 * span)) + 1)
+        return min(rng, key=lambda v: (count(v), abs(v - target)))
+    rh = H / a.rows
+    ys = [0] + [best_cut(r * rh, 0, H, lambda y: sum(1 for x in range(0, W, 2) if ap[x, y] > 40))
+                for r in range(1, a.rows)] + [H]
+    pieces = []
+    for r in range(a.rows):
+        y0, y1 = ys[r], ys[r + 1]; cw = W / a.cols
+        xs = [0] + [best_cut(c * cw, 0, W, lambda x: sum(1 for y in range(y0, y1, 2) if ap[x, y] > 40))
+                    for c in range(1, a.cols)] + [W]
+        for c in range(a.cols):
+            cell = drop_specks(img.crop((xs[c], y0, xs[c + 1], y1)))
+            m = cell.getchannel("A").point(lambda v: 255 if v > 40 else 0)
+            box = m.getbbox()
+            if not box: raise SystemExit(f"แถว {r+1} ช่อง {c+1} ว่าง")
+            crop = cell.crop(box); k = r * a.cols + c; w = widths[k]
+            h = max(1, round(crop.height * w / crop.width))
+            pieces.append((names[k], crop.resize((w, h), Image.BOX)))
+    finish(pieces, a)
 
 
 if __name__ == "__main__":

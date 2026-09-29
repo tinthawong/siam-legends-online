@@ -3,7 +3,7 @@ import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
 import type { Cell } from "../../shared/pathfind";
 import { TILE } from "../../shared/constants";
-import { MAP_W, MAP_H, PROPS, BLOCKING_PROPS, TERRAIN_NAMES, PROP_SETS, PROP_SET_OF, isWalkable } from "../../shared/map";
+import { MAP_W, MAP_H, PROPS, BLOCKING_PROPS, FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, isWalkable, PROP_SET_OF } from "../../shared/map";
 import { renderGround, TILE_URLS } from "./mapRender";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
@@ -623,7 +623,7 @@ export class GameScene extends Phaser.Scene {
       if (!m) continue;
       const x = p.x * TILE + TILE / 2, y = p.y * TILE + TILE - 6;
       // ชิ้นใหญ่ (ต้นไม้/สิ่งก่อสร้าง/เรือ) และชิ้นที่ขวางทาง เรียงตามแกน y กับตัวละคร
-      const block = BLOCKING_PROPS.has(p.kind) || PROP_SET_OF[p.kind] !== "set1";
+      const block = !FLAT_PROPS.has(p.kind) && (BLOCKING_PROPS.has(p.kind) || PROP_SET_OF[p.kind] !== "set1");
       const depth = block ? y - 8 : -1;
       this.add.ellipse(x, y, m.shadowWidth, Math.max(3, Math.round(m.shadowWidth * 0.3)), 0x000000, 70 / 255).setDepth(block ? depth - 0.5 : -2);
       this.add.image(x, y, `prop_${p.kind}`).setOrigin(m.anchor.x / m.width, (m.anchor.y + 1) / m.height).setDepth(depth);

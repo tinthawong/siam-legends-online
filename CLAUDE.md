@@ -39,7 +39,7 @@ npm run typecheck       # tsc ทั้ง client และ server
 - `shared/` ใช้ร่วมกันทั้งสองฝั่ง
   - `constants.ts` ค่าตัวเลขเกม (TILE=32, tick 100ms, ความเร็วเดิน, ระยะตี, รัศมี auto) และ `NAME_RE` กติกาชื่อตัวละคร (client ตรวจก่อนส่ง server ตรวจซ้ำ)
   - `data/levels.json`, `data/monsters.json` ตัวเลขสมดุลที่ export จาก Excel (ดูหัวข้อ "ตัวเลขสมดุลเกม")
-  - `map.ts` แมพ "ทุ่งนาริมคลอง" สร้างจาก seed ตายตัว 48×36 ช่อง (ยังไม่ได้ใช้ Tiled): ชั้นพื้น `TERRAIN` (grass/water/sand/dirt/paddy — น้ำเดินไม่ได้) + ของประดับ `PROPS` (ชิ้นใน `BLOCKING_PROPS` ขวางทาง) คลองคดผ่านกลาง ทรายริมตลิ่ง ทางข้ามทราย 2 จุด นาข้าวเป็นแปลงมีคันนาดิน ถนนดินจากจุดเกิด ขอบแมพเป็นพุ่มไม้
+  - `map.ts` แมพ "บ้านปากอ่าว" 48×36 ช่อง จัดวางด้วยมือตามโซน (ดูหัวข้อ "หลักการจัดวางแมพ"): ชั้นพื้น `TERRAIN` (grass/water/sand/dirt/paddy — น้ำเดินไม่ได้ ยกเว้นสะพานปลา) + ของประดับ `PROPS` (`BLOCKING_PROPS` ขวางทาง, `foot` = ขวางหลายช่อง, `FLAT_PROPS` วาดใต้ตัวละคร) + โซนเกิดมอน `ZONES` จุดเกิด (24,16) กลางลาน รหัสแมพ `ban_pak_ao` (migration 0005 ย้ายตัวละครจาก `prontera_field`)
   - `pathfind.ts` A* 8 ทิศ ห้ามตัดมุม
   - `game.ts` ข้อมูลมอน, สูตร EXP/ดาเมจ
   - `protocol.ts` รูปแบบข้อความ client↔server
@@ -120,10 +120,13 @@ npm run typecheck       # tsc ทั้ง client และ server
   - ชุดแรก `art/props/set1/sheet.png` (ใช้ในแมพแล้ว ไฟล์เกมที่ `client/public/sprites/props/set1/`): `python tools/slice_props.py art/props/set1/sheet.png art/props/set1 --cols 4 --rows 4 --names flowers-yellow,flowers-pink,tall-grass,fern,bush,rock,rocks-3,mossy-boulder,seashell,starfish,driftwood,coconut,beach-grass,rice-straw,clay-jar,lotus --widths 14,14,14,18,24,14,18,28,8,9,18,10,14,14,14,18`
   - ชุดที่ 2 (ต้นไม้ใหญ่) `art/props/set2/sheet.png`: `python tools/slice_props.py art/props/set2/sheet.png art/props/set2 --cols 3 --rows 2 --names banyan,coconut-palm,sugar-palm,coconut-palm-leaning,bamboo,hibiscus-bush --widths 112,64,56,68,52,36` (ต้นมะพร้าวต้องสูงราว 2 เท่าของตัวละคร) ใช้ในแมพแล้ว: ไทรบนหญ้า, มะพร้าวบนทรายริมคลอง, ตาลริมนา, ไผ่/ชบาบนหญ้า ต้นไม้ขวางทางเฉพาะช่องฐาน วางห่างของอื่นตามระยะ (`space` ใน `scatter`)
   - ชุดที่ 3 (สิ่งก่อสร้างหมู่บ้าน) `art/props/set3/sheet.png`: `python tools/slice_props.py art/props/set3/sheet.png art/props/set3 --cols 3 --rows 3 --names stilt-house,stilt-hut,sala,market-stall,fish-rack,village-gate,pier,longtail-boat,dragon-jars --widths 104,80,80,52,56,72,40,88,40` (สะพานปลาเป็นชิ้นสั้น 40×40 วางต่อกันแนวตั้งหลายชิ้นเป็นสะพานยาว — ยังไม่ได้ใช้ เพราะคลองในแมพแรกเป็นแนวตั้ง)
-  - **หมู่บ้านรอบจุดเกิด** (= เมืองหลักชั่วคราว ที่กลับมาหลังสลบ) เขต `TOWN` ใน `shared/map.ts`: เรือนไทยใต้ถุนสูง, กระท่อม, ศาลา, แผงตลาด, ราวตากปลา, โอ่งมังกร, ประตูหมู่บ้านคร่อมถนนดิน (ขวางเฉพาะเสาสองข้าง เดินผ่านช่องกลางได้) และเรือหางยาวจอดในคลอง สิ่งก่อสร้างขวางทางกว้างตาม `foot` ของแต่ละชิ้น มอนไม่เกิดและไม่เดินเล่นเข้าเขตหมู่บ้าน (ไล่ตามผู้เล่นเข้ามาได้)
+  - ชิ้นในแมพบ้านปากอ่าววางด้วยมือทีละชิ้นใน `shared/map.ts` (ไม่สุ่ม) ตามภาพตัวอย่างของผู้ใช้ (ภาพตัวอย่าง 1536px ≈ 48 ช่อง จึงอ่านพิกัดจากภาพได้ตรง ๆ ÷32)
   - ชื่อและแถบ HP ของตัวละคร/มอนอยู่ชั้นบนสุด (`oc` ใน GameScene) ไม่โดนต้นไม้หรือหลังคาบัง ส่วนตัวละครเรียงลำดับตามแกน y กับของประดับ (เดินหลังบ้าน/ต้นไม้ถูกบังได้)
   - ชุดของประดับลงทะเบียนใน `PROP_SETS` (`shared/map.ts`) ไฟล์เกมที่ `client/public/sprites/props/<ชุด>/`
+  - ชุดที่ 4 (ย่านบ้านเรือน/ลานกลาง) `art/props/set4/sheet.png`: `python tools/slice_props.py art/props/set4/sheet.png art/props/set4 --cols 4 --rows 4 --names fence-wood,fence-bamboo,fence-corner,fence-gate,clothesline,firewood,well,potted-plant,bench,quest-board,lantern-post,baskets,barrel,crate,stepping-stone,signpost --widths 32,32,28,32,44,28,40,22,36,36,24,28,18,20,18,26`
+  - ชุดที่ 5 (ท่าเรือ/นาข้าว/ชายหาด) `art/props/set5/sheet.png`: `python tools/slice_props.py art/props/set5/sheet.png art/props/set5 --cols 4 --rows 4 --names net-rack,net-pile,fish-trap,rowboat-upturned,oars,rope-coil,buoys,anchor,scarecrow,ox-cart,field-hut,water-wheel,shore-rocks,tide-pool,hammock,morning-glory --widths 40,30,20,44,20,20,26,28,30,52,48,44,40,36,40,24`
   - `slice_props.py` แยกชิ้นตามก้อนภาพ (connected components) ไม่ใช่แถวว่าง จึงใช้ได้แม้วัตถุในแถวบนกับแถวล่างติดกัน ชิ้นเล็กที่หลุดออกมาติดไปกับก้อนที่ใกล้ที่สุด
+  - ถ้าชิ้นแตะกันบาง ๆ (ปลายใบไม้ประดับฐาน) จะกัดขอบ mask ทีละชั้นจนแยกครบแล้วขยายกลับ (erosion + BFS) ถ้ายังไม่ได้จึงใช้วิธีแบ่งตามตาราง (เลื่อนเส้นแบ่งไปจุดที่ตัดผ่านภาพน้อยที่สุด ±25% และลบจุดเล็กที่หลงมา) — ผลกับชุด 1–3 เหมือนเดิมทุกชิ้น
   - วาดเงาด้วยโค้ด: วงรีสีดำโปร่งแสง (alpha ~70/255) ใต้จุดยึดของวัตถุ ตัวละคร และมอนทุกตัว เรียงลำดับการวาดตามแกน y
 - ลายพื้นเก็บที่ `art/tiles/` (grass, sand, water, dirt, paddy ขนาด 64×64 ต่อกันไร้รอยต่อ ผู้ใช้เลือกสีสดตามต้นฉบับ ภาพต้นฉบับจาก ChatGPT ที่ `art/tiles/source/`) ขอบระหว่างพื้นทำให้โค้งด้วย noise, ทรายริมน้ำเข้มขึ้น, ฟองคลื่นสีขาวที่ขอบน้ำ, เส้นหญ้าเข้ม 1px ที่ขอบหญ้า
   - ในเกมใช้ครบทั้ง 5 แบบแล้ว (ไฟล์เกม `client/public/sprites/tiles/`) ผังพื้นอยู่ใน `shared/map.ts` วาดด้วย `client/src/mapRender.ts` (หิน/ต้นไม้ที่เคยวาดด้วยโค้ดเลิกใช้ ใช้ของประดับแทน)
@@ -157,6 +160,15 @@ npm run typecheck       # tsc ทั้ง client และ server
   - sheet หลัก 4×4 (walk, attack, hit, death) ตัดด้วย `--cols 4 --rows 4 --names walk,attack,hit,death --width 35 --colors 40 --ms walk=120,attack=90,hit=80,death=140` (ใช้ 35 เพราะก้ามใหญ่ ที่ 35 กระดองเท่าปูนา) ได้เฟรม 38×30 จุดยึด (19,29)
   - ท่ายืนประจำตัว (ฮึดฮัด หนีบก้าม มีไอพ่นเหนือหัวเฟรม 3–4) 6 เฟรมที่ `art/monsters/red-crab/idle-sheet.png` ตัดด้วย `--cols 6 --rows 1 --names idle --width 33 --colors 40 --ms idle=150` ออกไปที่ `art/monsters/red-crab/idle` ได้เฟรม 36×34 จุดยึด (18,33) (33 ตรงกับขนาดชุดท่าหลักที่ 35)
   - มอนใหม่ให้เพิ่มแถว**ท้าย**ชีต มอน เสมอ (id มอนนับจากลำดับแถว แทรกกลางจะทำให้ id ตัวอื่นเลื่อน)
+
+## หลักการจัดวางแมพ (ผู้ใช้ต้องการให้ทุกแมพเป็นธีมเดียวกัน ห้ามวางของกระจายมั่ว)
+
+- แบ่งแมพเป็นโซนตามหน้าที่ ของแต่ละชนิดอยู่ในโซนที่มีเหตุผล ไม่วางของกระจายสุ่มทั่วแมพ
+- ถนนดินเส้นหลักเชื่อมทุกโซน เริ่มจากทางเข้า/ทางออกของแมพ ผู้เล่นเดินตามถนนแล้วเจอทุกจุดสำคัญ
+- ของขึ้นเป็นกลุ่ม (บ้าน + โอ่ง + ดอกไม้, ต้นไม้ + พุ่มไม้ + ก้อนหิน) ไม่วางเดี่ยว ๆ ห่างกัน
+- ของชิ้นใหญ่ (ต้นไทร, ศาลา) เป็นจุดเด่นของแต่ละโซน ใช้ต้นไม้/ไผ่วางตามขอบแมพเป็นกรอบ
+- แมพบ้านปากอ่าว (ทำแล้ว): ทางเข้าหมู่บ้าน (เหนือ: ประตูไม้ + พุ่มไม้ข้างประตู), ย่านบ้านเรือน (ตะวันตก: เรือนใต้ถุนสูง, กระท่อม, โอ่งมังกร), ลานกลาง (ต้นไทร, ศาลา, แผงขายของ = จุดเกิด/เมืองหลัก), นาข้าว (ตะวันออกเฉียงเหนือ: ต้นตาลเรียงคันนา, ฟ่อนข้าว, ที่เกิดปูนา), ท่าเรือ (ตะวันตกเฉียงใต้: สะพานปลา, เรือหางยาว, ราวตากปลา), ชายหาด (ตะวันออกเฉียงใต้: มะพร้าว, เปลือกหอย, ขอนไม้, ที่เกิดปูแดง) ทะเลตลอดขอบใต้
+- มอนเกิดและเดินเล่นเฉพาะในโซนของตัวเอง (`zone` ใน `MOBS` + `ZONES` ใน `shared/map.ts`) ไล่ตามผู้เล่นออกนอกโซนได้
 
 ## ไอเดียที่คุยไว้แล้ว
 

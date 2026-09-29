@@ -16,12 +16,13 @@ export interface MobDef {
   level?: number;      // แสดงต่อท้ายชื่อ เช่น "ปูนา Lv.1"
   atk?: number;        // พลังโจมตี (ใช้ตอนตีกลับ)
   retaliate?: boolean; // โดนผู้เล่นตีแล้วตีกลับ + ไล่ตาม (ดู MOB_* ใน constants.ts)
+  zone?: string; // โซนที่เกิด/เดินเล่น (ZONES ใน shared/map.ts) ไม่มี = ทั้งแมพ
   drop?: { item: string; chance: number }; // ตายแล้วหล่นของ (key ใน shared/items.ts, โอกาส 0–1)
   money?: [number, number]; // ตายแล้วคนที่ฆ่าได้เบี้ย สุ่มระหว่าง [ต่ำสุด, สูงสุด]
 }
 
 /** ค่าพลังจาก shared/data/monsters.json (export จาก Excel) */
-function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" | "sheetParts" | "retaliate" | "drop">): MobDef {
+function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" | "sheetParts" | "retaliate" | "drop" | "zone">): MobDef {
   const m = MONSTERS.find((x) => x.id === id);
   if (!m) throw new Error(`ไม่พบมอน ${id} ใน monsters.json`);
   return { name: m.name, level: m.level, maxHp: m.hp, def: m.def, exp: m.exp, atk: m.atk, money: [m.moneyMin, m.moneyMax], ...extra };
@@ -30,10 +31,10 @@ function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" |
 export const MOBS: Record<string, MobDef> = {
   // ปูนา (ทดสอบ)
   mud_crab: fromData("mob003", { moveMs: 420, count: 8, sheet: "rice-crab", sheetParts: ["hit", "idle"], retaliate: true,
-    drop: { item: "crab_claw", chance: 1 } }),
+    zone: "paddy", drop: { item: "crab_claw", chance: 1 } }),
   // ปูแดง (mob039)
   red_crab: fromData("mob039", { moveMs: 420, count: 6, sheet: "red-crab", sheetParts: ["idle"], retaliate: true,
-    drop: { item: "red_crab_claw", chance: 1 } }),
+    zone: "beach", drop: { item: "red_crab_claw", chance: 1 } }),
 };
 
 export const expToNext = (level: number) => 20 + level * 15;
