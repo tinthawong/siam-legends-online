@@ -2,7 +2,7 @@
 // - ลายพื้น 64×64 ปูซ้ำตามพิกัดโลก (ไม่ย่อ/ขยาย)
 // - ขอบระหว่างพื้นต่างชนิดโค้งด้วย noise (เฉพาะภาพ ช่องเดินได้/ไม่ได้ยังเป็นตารางเดิม)
 // - ทรายริมน้ำเข้มขึ้น, ฟองคลื่นสีขาวที่ขอบน้ำ, เส้นหญ้าเข้ม 1px ที่ขอบหญ้า
-import { MAP_W, MAP_H, TERRAIN, GRASS, WATER, SAND, TERRAIN_NAMES } from "../../shared/map";
+import { MAP_W, MAP_H, TERRAIN, GRASS, WATER, SAND, FOREST, TERRAIN_NAMES } from "../../shared/map";
 import { TILE } from "../../shared/constants";
 
 const TEX = 64;       // ขนาดลายพื้น
@@ -76,7 +76,8 @@ export function renderGround(tiles: HTMLImageElement[]): HTMLCanvasElement {
       const oy = noise2(x / WARP_SCALE, y / WARP_SCALE, 2) * WARP;
       const tx = Math.min(MAP_W - 1, Math.max(0, Math.floor((x + ox) / TILE)));
       const ty = Math.min(MAP_H - 1, Math.max(0, Math.floor((y + oy) / TILE)));
-      kind[y * W + x] = TERRAIN[ty * MAP_W + tx];
+      const t = TERRAIN[ty * MAP_W + tx];
+      kind[y * W + x] = t === FOREST ? GRASS : t; // ใต้ป่าวาดเป็นหญ้า
     }
 
   const toWater = distance((i) => kind[i] === WATER, W, H); // ระยะถึงน้ำ (×3 ต่อพิกเซล)

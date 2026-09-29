@@ -3,7 +3,8 @@ import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
 import type { Cell } from "../../shared/pathfind";
 import { TILE } from "../../shared/constants";
-import { MAP_W, MAP_H, PROPS, BLOCKING_PROPS, FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, isWalkable, PROP_SET_OF } from "../../shared/map";
+import { MAP_W, MAP_H, PROPS, FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, EXITS, isWalkable, isSolidProp, PROP_SET_OF } from "../../shared/map";
+import { forestTrees, FOREST_KINDS } from "./forest";
 import { renderGround, TILE_URLS } from "./mapRender";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
@@ -64,6 +65,7 @@ function dirOf(dx: number, dy: number): Dir {
 // พื้นหญ้าใช้ภาพ sprites/tiles/grass.png / หิน ต้นไม้ วงเป้าหมาย ยังเป็นภาพ placeholder วาดด้วยโค้ดใน makeTextures() / drawMap()
 export class GameScene extends Phaser.Scene {
   private views = new Map<string, View>();
+  private exitLabels: { t: Phaser.GameObjects.Text; e: (typeof EXITS)[number] }[] = [];
   private groundViews = new Map<string, Phaser.GameObjects.Image>(); // ของบนพื้น
   private sheets = new Map<string, SheetMeta & { name: string }>();
   private animOrigin = new Map<string, [number, number]>(); // key animation → origin ของจุดยึดเท้า
@@ -97,7 +99,7 @@ export class GameScene extends Phaser.Scene {
     TILE_URLS.forEach((url, i) => this.load.image(`tile_${TERRAIN_NAMES[i]}`, url));
     // ของประดับในแมพ: props.json (ขนาด, จุดยึด, ความกว้างเงา) + รูปแต่ละชิ้น
     for (const set of Object.keys(PROP_SETS)) this.load.json(`props_${set}`, `sprites/props/${set}/props.json`);
-    for (const kind of new Set(PROPS.map((p) => p.kind))) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
+    for (const kind of new Set([...PROPS.map((p) => p.kind), ...FOREST_KINDS])) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
     // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น (ชุดหลัก + ชุดท่าเพิ่มแต่ละโฟลเดอร์)
@@ -291,6 +293,11 @@ export class GameScene extends Phaser.Scene {
         v.c.setPosition(center(m.x), center(m.y));
         v.dir = "south";
         this.updatePose(v);
+        break;
+      }
+      case "notice": {
+        const v = this.me ? this.views.get(this.me) : undefined;
+        if (v) this.floatText(v.c.x, v.c.y + v.topY - 12, m.text, "#ffe39a", 1600);
         break;
       }
       case "exp":
@@ -566,6 +573,11 @@ export class GameScene extends Phaser.Scene {
   // ---------- เดินตาม path ทุกเฟรม ----------
 
   update(_time: number, dt: number) {
+    const meV = this.me ? this.views.get(this.me) : undefined;
+    if (meV) for (const { t, e } of this.exitLabels) {
+      const cx = ((e.x0 + e.x1 + 1) / 2) * TILE, cy = ((e.y0 + e.y1 + 1) / 2) * TILE;
+      t.setVisible(Math.abs(meV.c.x - cx) < TILE * 7 && Math.abs(meV.c.y - cy) < TILE * 7);
+    }
     for (const v of this.views.values()) {
       if (v.path.length) {
         const n = v.path[0];
@@ -612,8 +624,40 @@ export class GameScene extends Phaser.Scene {
   private drawMap() {
     // พื้นทั้งแผ่น (ลายพื้น + ขอบโค้ง + ทรายเปียก + ฟองคลื่น + เส้นขอบหญ้า) วาดครั้งเดียว
     const tiles = TERRAIN_NAMES.map((n) => this.textures.get(`tile_${n}`).getSourceImage() as HTMLImageElement);
-    this.textures.addCanvas("map_ground", renderGround(tiles));
+    const meta0 = Object.assign({}, ...Object.keys(PROP_SETS).map((set) => this.cache.json.get(`props_${set}`) ?? {})) as Record<string, { width: number; height: number; anchor: { x: number; y: number }; shadowWidth: number }>;
+    const ground = renderGround(tiles);
+
+    // ป่า: ต้นไม้ด้านในวาดรวมกับพื้น (ประหยัดเครื่อง) ต้นริมป่าเป็น sprite เรียงความลึกตาม y
+    const gctx = ground.getContext("2d")!;
+    gctx.imageSmoothingEnabled = false;
+    for (const t of forestTrees()) {
+      const m = meta0[t.kind];
+      if (!m) continue;
+      const ox = m.anchor.x, oy = m.anchor.y + 1;
+      if (t.sprite) {
+        this.add.ellipse(t.x, t.y, m.shadowWidth * 0.8, 6, 0x000000, 70 / 255).setDepth(t.y - 8.5);
+        this.add.image(t.x, t.y, `prop_${t.kind}`).setOrigin(ox / m.width, oy / m.height).setFlipX(t.flip).setDepth(t.y - 8);
+        continue;
+      }
+      const img = this.textures.get(`prop_${t.kind}`).getSourceImage() as HTMLImageElement;
+      gctx.fillStyle = "rgba(0,0,0,0.27)";
+      gctx.beginPath(); gctx.ellipse(t.x, t.y, m.shadowWidth * 0.4, 3, 0, 0, Math.PI * 2); gctx.fill();
+      gctx.save();
+      gctx.translate(t.x, t.y);
+      if (t.flip) gctx.scale(-1, 1);
+      gctx.drawImage(img, -ox, -oy);
+      gctx.restore();
+    }
+    this.textures.addCanvas("map_ground", ground);
     this.add.image(0, 0, "map_ground").setOrigin(0, 0).setDepth(-3);
+
+    // ทางออก: ชื่อแมพปลายทางลอยเหนือทางออก เห็นเมื่อผู้เล่นเข้าใกล้ (ดู update)
+    for (const e of EXITS) {
+      const t = this.add.text(((e.x0 + e.x1 + 1) / 2) * TILE, e.y0 * TILE + ((e.y1 - e.y0 + 1) * TILE) / 2, `➜ ${e.label}`, {
+        fontFamily: "Mitr, sans-serif", fontSize: "11px", color: "#ffe39a", stroke: "#10192a", strokeThickness: 3,
+      }).setOrigin(0.5).setDepth(90001).setResolution(2).setVisible(false);
+      this.exitLabels.push({ t, e });
+    }
 
     // ของประดับ: จุดยึดกึ่งกลางฐานวางใกล้ขอบล่างของช่อง พร้อมเงาวงรี
     // ชิ้นที่ขวางทางเรียงลำดับตามแกน y กับตัวละคร/มอน ชิ้นเล็กเดินผ่านได้อยู่ระดับพื้น (ใต้ตัวละครเสมอ)
@@ -623,7 +667,7 @@ export class GameScene extends Phaser.Scene {
       if (!m) continue;
       const x = p.px, y = p.py; // จุดยึดกึ่งกลางฐานตาม layout (พิกเซล)
       // ชิ้นใหญ่ (ต้นไม้/สิ่งก่อสร้าง/เรือ) และชิ้นที่ขวางทาง เรียงตามแกน y กับตัวละคร ชิ้นแบนอยู่ใต้ตัวละครเสมอ
-      const block = !FLAT_PROPS.has(p.kind) && (BLOCKING_PROPS.has(p.kind) || PROP_SET_OF[p.kind] !== "set1");
+      const block = !FLAT_PROPS.has(p.kind) && (isSolidProp(p.kind) || PROP_SET_OF[p.kind] !== "set1");
       const depth = block ? y - 8 : -1;
       if (!FLAT_PROPS.has(p.kind))
         this.add.ellipse(x, y, m.shadowWidth, Math.max(3, Math.round(m.shadowWidth * 0.3)), 0x000000, 70 / 255).setDepth(block ? depth - 0.5 : -2);

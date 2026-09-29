@@ -64,6 +64,7 @@ export type ServerMsg =
   | { t: "dead"; id: string; cause: string }           // ผู้เล่นเลือดหมด สลบอยู่กับที่ (cause = สาเหตุ เช่น "ปูแดง Lv.3 โจมตี")
   | { t: "respawn"; id: string; x: number; y: number } // กดกลับเมืองแล้ว → ฟื้นที่จุดเกิด
   | { t: "exp"; x: number; y: number; exp: number; money: number } // ส่งให้คนที่ตีมอนตาย: ได้ EXP/เบี้ยเท่าไหร่ (x,y = ช่องที่มอนตาย)
+  | { t: "notice"; text: string } // ข้อความแจ้งผู้เล่น เช่น "เส้นทางนี้ยังไม่เปิด"
   | { t: "heal"; id: string; amount: number } // ผู้เล่นกินยา (ทุกคนเห็นตัวเลขเขียว)
   | { t: "drop"; g: GroundItem }          // ของหล่นบนพื้น
   | { t: "picked"; id: string; by: string } // ของบนพื้นถูกเก็บแล้ว (by = id ผู้เล่นที่เก็บ)

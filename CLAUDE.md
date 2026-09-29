@@ -39,7 +39,7 @@ npm run typecheck       # tsc ทั้ง client และ server
 - `shared/` ใช้ร่วมกันทั้งสองฝั่ง
   - `constants.ts` ค่าตัวเลขเกม (TILE=32, tick 100ms, ความเร็วเดิน, ระยะตี, รัศมี auto) และ `NAME_RE` กติกาชื่อตัวละคร (client ตรวจก่อนส่ง server ตรวจซ้ำ)
   - `data/levels.json`, `data/monsters.json` ตัวเลขสมดุลที่ export จาก Excel (ดูหัวข้อ "ตัวเลขสมดุลเกม")
-  - `map.ts` อ่านแมพจาก **layout ของผู้ใช้** `shared/data/maps/ban-pak-ao.json` (60×44 ช่อง): `terrain` ตัวอักษรต่อช่อง G/S/W/D/P, `props` พิกัดพิกเซล = จุดยึดกึ่งกลางฐาน, `start` จุดเกิด, `npcs` ตำแหน่ง NPC, `spawns` กรอบเกิดมอน+จำนวน **แก้แมพให้แก้ JSON ห้ามวางของในโค้ด** ชื่อใน layout ที่ต่างจากไฟล์ภาพแปลงใน `PROP_ALIAS` (lantern-pole, rattan-baskets, notice-board) ชื่อมอนแปลงใน `MOB_ID` (rice-crab→mud_crab ฯลฯ) ขวางทาง: `BLOCKING_PROPS` + ความกว้างฐาน `FOOT_PX` ประตูหมู่บ้านขวางเฉพาะเสา สะพานปลาเดินได้บนน้ำ รหัสแมพในเกม `ban_pak_ao`
+  - `map.ts` อ่านแมพจาก **layout ของผู้ใช้** `shared/data/maps/ban-pak-ao.json` (60×44 ช่อง): `terrain` ตัวอักษรต่อช่อง G/S/W/D/P/F (F = ป่า เดินไม่ได้), `props` พิกัดพิกเซล = จุดยึดกึ่งกลางฐาน, `start` จุดเกิด, `npcs` ตำแหน่ง NPC, `spawns` กรอบเกิดมอน+จำนวน, `exits` ทางออก **แก้แมพให้แก้ JSON ห้ามวางของในโค้ด** ชื่อใน layout ที่ต่างจากไฟล์ภาพแปลงใน `PROP_ALIAS` (lantern-pole, rattan-baskets, notice-board) ชื่อมอนแปลงใน `MOB_ID` (rice-crab→mud_crab ฯลฯ) ขวางทาง (`isSolidProp`) ตาม `docs/map-system.md`: ฐาน = แถบล่างกว้าง 70% ของภาพ สูง 1 ช่อง (ภาพกว้างเกิน 3 ช่อง ฐานสูง 2 ช่อง) ขนาดภาพอ่านจาก props.json ของทุกชุด ยกเว้นของเตี้ยในรายการ `NOT_SOLID` และของที่กว้างไม่ถึงครึ่งช่อง ประตูหมู่บ้านขวางเฉพาะเสา สะพานปลาเดินได้บนน้ำ รหัสแมพในเกม `ban_pak_ao`
   - `pathfind.ts` A* 8 ทิศ ห้ามตัดมุม
   - `game.ts` ข้อมูลมอน, สูตร EXP/ดาเมจ
   - `protocol.ts` รูปแบบข้อความ client↔server
@@ -53,6 +53,9 @@ npm run typecheck       # tsc ทั้ง client และ server
 - `client/src/creator.ts` หน้าสร้างตัวละคร (ตัวอย่างหมุนได้ 8 ทิศ)
 - `client/src/recolor.ts` เปลี่ยนสีผม/ตาของ sprite base ตอนโหลด
 - `client/src/GameScene.ts` ฉากเกม Phaser
+- `client/src/forest.ts` ต้นไม้ในช่องป่า: ช่องละ 2 ต้น สุ่มจากพิกัดช่อง พลิกซ้าย-ขวาครึ่งหนึ่ง ต้นดอก (หางนกยูง, ราชพฤกษ์) ~12% ต้นด้านในวาดรวมกับภาพพื้น ต้นริมป่าเป็น sprite เรียงตาม y ช่องป่าที่ด้านบนเดินได้ใช้พุ่มเตี้ย (ไม่บังตัวละครเกินครึ่งตัว)
+- ทางออก (`EXITS`): ยังไม่มีแมพอื่น เดินเข้าแล้ว server ส่ง `notice` "เส้นทางนี้ยังไม่เปิด" และหยุดก่อนถึงช่องทางออก ชื่อปลายทางลอยเหนือทางออกเมื่อเข้าใกล้ 7 ช่อง
+- `docs/map-system.md` สเปกระบบแมพจากผู้ใช้ (Tiled .tmj → `tools/build_map.py` → JSON) **ยังไม่ได้ทำส่วน Tiled/build_map** ตอนนี้แก้ `shared/data/maps/ban-pak-ao.json` ตรง ๆ
 - `client/src/mapRender.ts` วาดพื้นทั้งแผ่นเป็นภาพเดียวตอนเข้าเกม: ลายพื้น 64×64 ปูซ้ำตามพิกัดโลก, ขอบโค้งด้วย noise (`WARP`), ทรายเปียกริมน้ำ, ฟองคลื่น, เส้นขอบหญ้า 1px
 - `client/public/sprites/base-male/`, `base-female/` ภาพ base 8 ทิศ (ผมดำ)
 - `client/public/ui/` ภาพพื้นหลังหน้าล็อกอินและโลโก้
@@ -125,6 +128,7 @@ npm run typecheck       # tsc ทั้ง client และ server
   - ชุดของประดับลงทะเบียนใน `PROP_SETS` (`shared/map.ts`) ไฟล์เกมที่ `client/public/sprites/props/<ชุด>/`
   - ชุดที่ 4 (ย่านบ้านเรือน/ลานกลาง) `art/props/set4/sheet.png`: `python tools/slice_props.py art/props/set4/sheet.png art/props/set4 --cols 4 --rows 4 --names fence-wood,fence-bamboo,fence-corner,fence-gate,clothesline,firewood,well,potted-plant,bench,quest-board,lantern-post,baskets,barrel,crate,stepping-stone,signpost --widths 32,32,28,32,44,28,40,22,36,36,24,28,18,20,18,26`
   - ชุดที่ 5 (ท่าเรือ/นาข้าว/ชายหาด) `art/props/set5/sheet.png`: `python tools/slice_props.py art/props/set5/sheet.png art/props/set5 --cols 4 --rows 4 --names net-rack,net-pile,fish-trap,rowboat-upturned,oars,rope-coil,buoys,anchor,scarecrow,ox-cart,field-hut,water-wheel,shore-rocks,tide-pool,hammock,morning-glory --widths 40,30,20,44,20,20,26,28,30,52,48,44,40,36,40,24`
+  - ชุดที่ 6 (ต้นไม้/ป่า) `art/props/set6/sheet.png`: `python tools/slice_props.py art/props/set6/sheet.png art/props/set6 --cols 4 --rows 4 --names mango-tree,jackfruit-tree,tamarind-tree,rain-tree,golden-shower,flame-tree,frangipani,indian-almond,banana-tree,papaya-tree,areca-palm,round-tree,tall-forest-tree,young-tree,dense-shrub,shrub-cluster --widths 52,52,56,64,52,56,44,56,40,36,36,48,36,36,40,36` (ชื่อและความกว้าง Claude ตั้งเอง ปรับได้)
   - `slice_props.py` แยกชิ้นตามก้อนภาพ (connected components) ไม่ใช่แถวว่าง จึงใช้ได้แม้วัตถุในแถวบนกับแถวล่างติดกัน ชิ้นเล็กที่หลุดออกมาติดไปกับก้อนที่ใกล้ที่สุด
   - ถ้าชิ้นแตะกันบาง ๆ (ปลายใบไม้ประดับฐาน) จะกัดขอบ mask ทีละชั้นจนแยกครบแล้วขยายกลับ (erosion + BFS) ถ้ายังไม่ได้จึงใช้วิธีแบ่งตามตาราง (เลื่อนเส้นแบ่งไปจุดที่ตัดผ่านภาพน้อยที่สุด ±25% และลบจุดเล็กที่หลงมา) — ผลกับชุด 1–3 เหมือนเดิมทุกชิ้น
   - วาดเงาด้วยโค้ด: วงรีสีดำโปร่งแสง (alpha ~70/255) ใต้จุดยึดของวัตถุ ตัวละคร และมอนทุกตัว เรียงลำดับการวาดตามแกน y

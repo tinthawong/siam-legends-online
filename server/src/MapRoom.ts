@@ -6,7 +6,7 @@ import {
   POTION_COOLDOWN_MS, MAX_BUY,
   stepMs, cheb,
 } from "../../shared/constants";
-import { MAP_W, MAP_H, SPAWN, ZONES, isWalkable, inZone } from "../../shared/map";
+import { MAP_W, MAP_H, SPAWN, ZONES, isWalkable, inZone, exitAt } from "../../shared/map";
 import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
 import { MOBS, expToNext, playerAtk, playerMaxHp, rollDamage } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
@@ -296,6 +296,13 @@ export class MapRoom extends DurableObject<Env> {
   private advance(e: Entity, now: number) {
     while (e.path.length && now >= e.nextStepAt) {
       const c = e.path.shift()!;
+      // ผู้เล่นเดินเข้าทางออก: ยังไม่มีแมพอื่น → แจ้งแล้วดันถอยกลับช่องเดิม (ไม่เข้าช่องทางออก)
+      if (e.kind === "player" && exitAt(c.x, c.y)) {
+        e.path = [];
+        this.setPath(e, [], now);
+        this.send(e, { t: "notice", text: "เส้นทางนี้ยังไม่เปิด" });
+        return;
+      }
       e.x = c.x; e.y = c.y;
       if (e.path.length) {
         const n = e.path[0];

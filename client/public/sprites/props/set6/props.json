@@ -1,0 +1,162 @@
+{
+ "mango-tree": {
+  "file": "mango-tree.png",
+  "width": 52,
+  "height": 55,
+  "anchor": {
+   "x": 26,
+   "y": 54
+  },
+  "shadowWidth": 42
+ },
+ "jackfruit-tree": {
+  "file": "jackfruit-tree.png",
+  "width": 52,
+  "height": 57,
+  "anchor": {
+   "x": 26,
+   "y": 56
+  },
+  "shadowWidth": 42
+ },
+ "tamarind-tree": {
+  "file": "tamarind-tree.png",
+  "width": 56,
+  "height": 58,
+  "anchor": {
+   "x": 28,
+   "y": 57
+  },
+  "shadowWidth": 45
+ },
+ "rain-tree": {
+  "file": "rain-tree.png",
+  "width": 64,
+  "height": 51,
+  "anchor": {
+   "x": 32,
+   "y": 50
+  },
+  "shadowWidth": 51
+ },
+ "golden-shower": {
+  "file": "golden-shower.png",
+  "width": 52,
+  "height": 52,
+  "anchor": {
+   "x": 26,
+   "y": 51
+  },
+  "shadowWidth": 42
+ },
+ "flame-tree": {
+  "file": "flame-tree.png",
+  "width": 56,
+  "height": 55,
+  "anchor": {
+   "x": 28,
+   "y": 54
+  },
+  "shadowWidth": 45
+ },
+ "frangipani": {
+  "file": "frangipani.png",
+  "width": 44,
+  "height": 41,
+  "anchor": {
+   "x": 22,
+   "y": 40
+  },
+  "shadowWidth": 35
+ },
+ "indian-almond": {
+  "file": "indian-almond.png",
+  "width": 56,
+  "height": 53,
+  "anchor": {
+   "x": 28,
+   "y": 52
+  },
+  "shadowWidth": 45
+ },
+ "banana-tree": {
+  "file": "banana-tree.png",
+  "width": 40,
+  "height": 38,
+  "anchor": {
+   "x": 20,
+   "y": 37
+  },
+  "shadowWidth": 32
+ },
+ "papaya-tree": {
+  "file": "papaya-tree.png",
+  "width": 36,
+  "height": 47,
+  "anchor": {
+   "x": 18,
+   "y": 46
+  },
+  "shadowWidth": 29
+ },
+ "areca-palm": {
+  "file": "areca-palm.png",
+  "width": 36,
+  "height": 49,
+  "anchor": {
+   "x": 18,
+   "y": 48
+  },
+  "shadowWidth": 29
+ },
+ "round-tree": {
+  "file": "round-tree.png",
+  "width": 48,
+  "height": 54,
+  "anchor": {
+   "x": 24,
+   "y": 53
+  },
+  "shadowWidth": 38
+ },
+ "tall-forest-tree": {
+  "file": "tall-forest-tree.png",
+  "width": 36,
+  "height": 69,
+  "anchor": {
+   "x": 18,
+   "y": 68
+  },
+  "shadowWidth": 29
+ },
+ "young-tree": {
+  "file": "young-tree.png",
+  "width": 36,
+  "height": 52,
+  "anchor": {
+   "x": 18,
+   "y": 51
+  },
+  "shadowWidth": 29
+ },
+ "dense-shrub": {
+  "file": "dense-shrub.png",
+  "width": 40,
+  "height": 30,
+  "anchor": {
+   "x": 20,
+   "y": 29
+  },
+  "shadowWidth": 32
+ },
+ "shrub-cluster": {
+  "file": "shrub-cluster.png",
+  "width": 36,
+  "height": 26,
+  "anchor": {
+   "x": 18,
+   "y": 25
+  },
+  "shadowWidth": 29
+ }
+}
