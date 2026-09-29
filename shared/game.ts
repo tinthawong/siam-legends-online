@@ -13,18 +13,22 @@ export interface MobDef {
   sheet?: string;
   // ชุดท่าเพิ่มที่ตัดแยกโฟลเดอร์ (sheet.json ของตัวเอง ขนาดเฟรม/จุดยึดต่างจากชุดหลักได้) เช่น ["hit"]
   sheetParts?: string[];
+  level?: number;      // แสดงต่อท้ายชื่อ เช่น "ปูนา Lv.3"
+  atk?: number;        // พลังโจมตี (ใช้ตอนตีกลับ)
+  retaliate?: boolean; // โดนผู้เล่นตีแล้วตีกลับ + ไล่ตาม (ดู MOB_* ใน constants.ts)
 }
 
 /** ค่าพลังจาก shared/data/monsters.json (export จาก Excel) */
-function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" | "sheetParts">): MobDef {
+function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" | "sheetParts" | "retaliate">): MobDef {
   const m = MONSTERS.find((x) => x.id === id);
   if (!m) throw new Error(`ไม่พบมอน ${id} ใน monsters.json`);
-  return { name: m.name, maxHp: m.hp, def: m.def, exp: m.exp, ...extra };
+  return { name: m.name, level: m.level, maxHp: m.hp, def: m.def, exp: m.exp, atk: m.atk, ...extra };
 }
 
 export const MOBS: Record<string, MobDef> = {
   poring: { name: "Poring", maxHp: 50, def: 1, exp: 12, moveMs: 420, count: 16 },
-  mud_crab: fromData("mob003", { moveMs: 420, count: 8, sheet: "rice-crab", sheetParts: ["hit"] }), // ปูนา (ทดสอบ)
+  // ปูนา (ทดสอบ)
+  mud_crab: fromData("mob003", { moveMs: 420, count: 8, sheet: "rice-crab", sheetParts: ["hit", "idle"], retaliate: true }),
 };
 
 export const expToNext = (level: number) => 20 + level * 15;

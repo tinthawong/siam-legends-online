@@ -2,6 +2,7 @@ import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./index";
 import {
   TICK_MS, PLAYER_MOVE_MS, PLAYER_ASPD_MS, PLAYER_RANGE, AUTO_RADIUS, MOB_RESPAWN_MS,
+  MOB_ASPD_MS, MOB_RANGE, MOB_CHASE_RANGE, REGEN_DELAY_MS, REGEN_EVERY_MS, REGEN_PCT,
   stepMs, cheb,
 } from "../../shared/constants";
 import { MAP_W, MAP_H, SPAWN, isWalkable } from "../../shared/map";
@@ -36,6 +37,8 @@ interface Player extends Ent {
   auto: boolean;
   nextAttackAt: number;
   chaseKey: string | null; // ตำแหน่งมอนตอนคำนวณเส้นทางไล่ล่าสุด
+  lastCombatAt: number;    // ตีหรือโดนตีล่าสุด (เลือดฟื้นเมื่อพ้น REGEN_DELAY_MS)
+  nextRegenAt: number;
 }
 
 interface Mob extends Ent {
@@ -44,6 +47,11 @@ interface Mob extends Ent {
   alive: boolean;
   respawnAt: number;
   nextWanderAt: number;
+  // ตีกลับ: ผู้เล่นที่กำลังไล่ตี / จุดที่โดนตีครั้งแรก (ไล่ได้ไม่เกิน MOB_CHASE_RANGE จากจุดนี้)
+  aggro: string | null;
+  aggroFrom: Cell | null;
+  nextAttackAt: number;
+  chaseKey: string | null;
 }
 
 type Entity = Player | Mob;
@@ -100,6 +108,7 @@ export class MapRoom extends DurableObject<Env> {
       moveMs: PLAYER_MOVE_MS, path: [], nextStepAt: 0,
       ws: server, level: ch.level, exp: ch.exp,
       target: null, auto: false, nextAttackAt: 0, chaseKey: null,
+      lastCombatAt: 0, nextRegenAt: 0,
     };
     this.players.set(id, p);
 
@@ -206,9 +215,11 @@ export class MapRoom extends DurableObject<Env> {
     for (const m of this.mobs.values()) {
       if (!m.alive) { if (now >= m.respawnAt) this.respawnMob(m, now); continue; }
       this.advance(m, now);
-      if (m.path.length === 0 && now >= m.nextWanderAt) this.wander(m, now);
+      if (m.aggro) this.updateAggro(m, now);
+      else if (m.path.length === 0 && now >= m.nextWanderAt) this.wander(m, now);
     }
     for (const p of this.players.values()) this.updatePlayer(p, now);
+    for (const p of this.players.values()) this.regen(p, now);
 
     // autosave เผื่อ DO ถูกปิดกะทันหัน จะเสียข้อมูลไม่เกินรอบนี้
     if (now >= this.nextSaveAt) {
@@ -272,19 +283,94 @@ export class MapRoom extends DurableObject<Env> {
 
   private attack(p: Player, m: Mob, now: number) {
     p.nextAttackAt = now + PLAYER_ASPD_MS;
+    p.lastCombatAt = now;
     const { dmg, crit } = rollDamage(playerAtk(p.level), MOBS[m.type].def);
     m.hp = Math.max(0, m.hp - dmg);
     this.broadcast({ t: "hit", src: p.id, dst: m.id, dmg, crit, hp: m.hp });
-    if (m.hp === 0) this.killMob(m, p, now);
+    if (m.hp === 0) { this.killMob(m, p, now); return; }
+    // มอนที่ตีกลับ: จำคนที่ตีมันคนแรก และจุดที่โดนตี แล้วเริ่มไล่ (ตีกลับหลังโดนตีครู่หนึ่ง ไม่ใช่ทันที)
+    if (MOBS[m.type].retaliate && !m.aggro) {
+      m.aggro = p.id;
+      m.aggroFrom = { x: m.x, y: m.y };
+      m.chaseKey = null;
+      m.nextAttackAt = now + MOB_ASPD_MS / 2;
+      if (m.path.length) this.setPath(m, [], now);
+    }
+  }
+
+  // ---------- มอนตีกลับ ----------
+
+  private updateAggro(m: Mob, now: number) {
+    const p = this.players.get(m.aggro!);
+    const from = m.aggroFrom!;
+    // เป้าหมายออกจากแมพ / ฟื้นที่จุดเกิดแล้ว / หนีไกลเกินระยะไล่ → เลิกไล่ กลับไปเดินเล่น
+    if (!p || cheb(p.x, p.y, from.x, from.y) > MOB_CHASE_RANGE || cheb(m.x, m.y, from.x, from.y) > MOB_CHASE_RANGE) {
+      this.dropAggro(m, now);
+      return;
+    }
+    if (cheb(m.x, m.y, p.x, p.y) <= MOB_RANGE) {
+      if (m.path.length) this.setPath(m, [], now);
+      if (now >= m.nextAttackAt) this.mobAttack(m, p, now);
+      return;
+    }
+    // ไม่อยู่ในระยะ → เดินไล่ (คำนวณใหม่เมื่อผู้เล่นย้ายช่อง)
+    const key = `${p.x},${p.y}`;
+    if (m.chaseKey !== key || m.path.length === 0) {
+      m.chaseKey = key;
+      const path = pathNear(m.x, m.y, p.x, p.y, MOB_RANGE);
+      if (!path) { this.dropAggro(m, now); return; }
+      this.setPath(m, path, now);
+    }
+  }
+
+  private dropAggro(m: Mob, now: number) {
+    m.aggro = null;
+    m.aggroFrom = null;
+    m.chaseKey = null;
+    if (m.path.length) this.setPath(m, [], now);
+    m.nextWanderAt = now + 1500;
+  }
+
+  private mobAttack(m: Mob, p: Player, now: number) {
+    m.nextAttackAt = now + MOB_ASPD_MS;
+    p.lastCombatAt = now;
+    const { dmg, crit } = rollDamage(MOBS[m.type].atk ?? 1, 0);
+    p.hp = Math.max(0, p.hp - dmg);
+    this.broadcast({ t: "hit", src: m.id, dst: p.id, dmg, crit, hp: p.hp });
+    if (p.hp === 0) this.respawnPlayer(p, now);
+    else this.send(p, { t: "stats", self: this.stats(p) });
+  }
+
+  /** เลือดหมด → ฟื้นที่จุดเกิด เลือดเต็ม ไม่เสีย EXP ยกเลิกเป้าหมายและ auto */
+  private respawnPlayer(p: Player, now: number) {
+    for (const m of this.mobs.values()) if (m.aggro === p.id) this.dropAggro(m, now);
+    p.path = [];
+    p.x = SPAWN.x; p.y = SPAWN.y;
+    p.hp = p.maxHp;
+    p.chaseKey = null;
+    if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
+    if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
+    this.broadcast({ t: "respawn", id: p.id, x: p.x, y: p.y });
+    this.send(p, { t: "stats", self: this.stats(p) });
+  }
+
+  /** เลือดฟื้นเองตอนไม่ได้สู้ */
+  private regen(p: Player, now: number) {
+    if (p.hp >= p.maxHp || now - p.lastCombatAt < REGEN_DELAY_MS || now < p.nextRegenAt) return;
+    p.nextRegenAt = now + REGEN_EVERY_MS;
+    p.hp = Math.min(p.maxHp, p.hp + Math.max(1, Math.ceil(p.maxHp * REGEN_PCT)));
+    this.send(p, { t: "stats", self: this.stats(p) });
   }
 
   private killMob(m: Mob, killer: Player, now: number) {
     m.alive = false;
     m.path = [];
+    m.aggro = null; m.aggroFrom = null; m.chaseKey = null;
     m.respawnAt = now + MOB_RESPAWN_MS;
     this.broadcast({ t: "die", id: m.id });
 
     killer.exp += MOBS[m.type].exp;
+    this.send(killer, { t: "exp", x: m.x, y: m.y, exp: MOBS[m.type].exp });
     while (killer.exp >= expToNext(killer.level)) {
       killer.exp -= expToNext(killer.level);
       killer.level++;
@@ -324,6 +410,7 @@ export class MapRoom extends DurableObject<Env> {
           x: c.x, y: c.y, hp: def.maxHp, maxHp: def.maxHp,
           moveMs: def.moveMs, path: [], nextStepAt: 0,
           alive: true, respawnAt: 0, nextWanderAt: Date.now() + Math.random() * 3000,
+          aggro: null, aggroFrom: null, nextAttackAt: 0, chaseKey: null,
         });
       }
     }

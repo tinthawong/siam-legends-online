@@ -9,6 +9,16 @@ export const PLAYER_RANGE = 1;       // ระยะตี (ช่อง)
 export const AUTO_RADIUS = 12;       // รัศมีหามอนของระบบ auto (ช่อง)
 export const MOB_RESPAWN_MS = 8000;
 
+// มอนตีกลับ (เฉพาะมอนที่ตั้ง retaliate ใน MOBS)
+export const MOB_ASPD_MS = 1500;     // มอนตีได้ทุก ๆ กี่ ms
+export const MOB_RANGE = 1;          // ระยะตีของมอน (ช่อง)
+export const MOB_CHASE_RANGE = 8;    // ไล่ตามได้ไกลสุดกี่ช่องจากจุดที่โดนตีครั้งแรก เกินนี้เลิกไล่
+
+// เลือดผู้เล่นฟื้นเอง: ไม่ได้สู้ (ไม่ตี/ไม่โดนตี) ครบเวลานี้ แล้วฟื้นทีละ % ของเลือดสูงสุด
+export const REGEN_DELAY_MS = 5000;
+export const REGEN_EVERY_MS = 1000;
+export const REGEN_PCT = 0.02;
+
 export const DIAG = 1.4142;
 
 /** เวลาที่ใช้เดิน 1 ก้าว — แนวทแยงช้ากว่าแนวตรง */

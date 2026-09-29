@@ -210,8 +210,31 @@ export class GameScene extends Phaser.Scene {
         }
         const src = this.views.get(m.src);
         if (src && dst) this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
+        // มอนจาก sheet ตีผู้เล่น: เล่นท่า attack จนจบแล้วกลับท่าเดิม
+        if (src?.sheet && this.anims.exists(`${src.sheet}_attack`)) {
+          src.pose = "attack";
+          src.bob?.pause(); src.body.y = 8;
+          this.playSheet(src, "attack");
+          src.body.once(Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + `${src.sheet}_attack`, () => {
+            src.pose = "";
+            this.updatePose(src);
+          });
+        }
         break;
       }
+      case "respawn": {
+        const v = this.views.get(m.id);
+        if (!v) break;
+        v.path = [];
+        v.c.setPosition(center(m.x), center(m.y));
+        v.dir = "south";
+        this.updatePose(v);
+        if (m.id === this.me) this.floatText(v.c.x, v.c.y + v.topY - 12, "เลือดหมด · ฟื้นที่จุดเกิด", "#ff9d8a", 1600);
+        break;
+      }
+      case "exp":
+        this.floatText(center(m.x), center(m.y) - 26, `+${m.exp} EXP`, "#ffd84a", 1100);
+        break;
       case "die": {
         const v = this.views.get(m.id);
         if (m.id === this.targetId) this.setTarget(null);
@@ -267,7 +290,8 @@ export class GameScene extends Phaser.Scene {
       body = this.add.sprite(0, 4, tex).setOrigin(0.5, 1);
       topY = 4 - body.height;
     }
-    const label = this.add.text(0, 7, e.name, {
+    const lv = isMob && e.mobType ? MOBS[e.mobType]?.level : undefined;
+    const label = this.add.text(0, 7, lv ? `${e.name} Lv.${lv}` : e.name, {
       fontFamily: "Mitr, sans-serif", fontSize: "10px", color: isMob ? "#ffe0ec" : "#ffffff",
       stroke: "#10192a", strokeThickness: 3,
     }).setOrigin(0.5, 0).setResolution(2);
@@ -316,12 +340,21 @@ export class GameScene extends Phaser.Scene {
     g.fillStyle(0x6fe07a).fillRect(-12, y + 1, 24 * (v.hp / v.maxHp), 3);
   }
 
+  /** ตัวเลขดาเมจ: ตีมอน = ขาว (คริ = ทอง), ผู้เล่นโดนตี = แดง */
   private floatDamage(v: View, dmg: number, crit: boolean) {
     const t = this.add.text(v.c.x, v.c.y + v.topY - 9, String(dmg), {
       fontFamily: "Mitr, sans-serif", fontSize: crit ? "16px" : "12px",
-      color: crit ? "#ffd84a" : "#ffffff", stroke: "#10192a", strokeThickness: 3,
+      color: v.kind === "player" ? "#ff6b6b" : crit ? "#ffd84a" : "#ffffff", stroke: "#10192a", strokeThickness: 3,
     }).setOrigin(0.5).setDepth(100000).setResolution(2);
     this.tweens.add({ targets: t, y: t.y - 22, alpha: 0, duration: 750, ease: "Cubic.easeOut", onComplete: () => t.destroy() });
+  }
+
+  /** ข้อความลอยขึ้นแล้วจางหาย (+EXP, ฟื้นที่จุดเกิด) */
+  private floatText(x: number, y: number, text: string, color: string, ms: number) {
+    const t = this.add.text(x, y, text, {
+      fontFamily: "Mitr, sans-serif", fontSize: "12px", color, stroke: "#10192a", strokeThickness: 3,
+    }).setOrigin(0.5).setDepth(100001).setResolution(2);
+    this.tweens.add({ targets: t, y: y - 26, alpha: 0, delay: ms * 0.4, duration: ms * 0.6, ease: "Cubic.easeIn", onComplete: () => t.destroy() });
   }
 
   /** สร้าง texture ของรูปลักษณ์นี้ครบ 8 ทิศ (ครั้งแรกครั้งเดียว) แล้วคืนชื่อนำหน้า */
@@ -367,6 +400,10 @@ export class GameScene extends Phaser.Scene {
       if (pose === "walk") {
         v.bob?.pause(); v.body.y = 8;
         this.playSheet(v, "walk");
+      } else if (this.anims.exists(`${v.sheet}_idle`)) {
+        // มีท่ายืนจากภาพ → เล่นวน (ไม่ต้องขยับขึ้นลงด้วยโค้ด)
+        v.bob?.pause(); v.body.y = 8;
+        this.playSheet(v, "idle");
       } else {
         v.body.stop(); v.body.setTexture(`${v.sheet}_walk_0`);
         const o = this.animOrigin.get(`${v.sheet}_walk`);
@@ -396,6 +433,8 @@ export class GameScene extends Phaser.Scene {
 
   private updateStats(s: PlayerStats) {
     document.getElementById("hud-lv")!.textContent = `Lv ${s.level}`;
+    (document.getElementById("hud-hp") as HTMLElement).style.width = `${(s.hp / s.maxHp) * 100}%`;
+    document.getElementById("hud-hp-text")!.textContent = `HP ${s.hp} / ${s.maxHp}`;
     (document.getElementById("hud-exp") as HTMLElement).style.width = `${(s.exp / s.expNext) * 100}%`;
     document.getElementById("hud-exp-text")!.textContent = `EXP ${s.exp} / ${s.expNext}`;
   }

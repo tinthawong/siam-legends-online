@@ -40,6 +40,8 @@ export type ServerMsg =
   | { t: "move"; id: string; from: Cell; path: Cell[]; moveMs: number }
   | { t: "hit"; src: string; dst: string; dmg: number; crit: boolean; hp: number }
   | { t: "die"; id: string }
+  | { t: "respawn"; id: string; x: number; y: number } // ผู้เล่นเลือดหมด → ฟื้นที่จุดเกิด
+  | { t: "exp"; x: number; y: number; exp: number } // ส่งให้คนที่ตีมอนตาย: ได้ EXP เท่าไหร่ (x,y = ช่องที่มอนตาย)
   | { t: "stats"; self: PlayerStats }
   | { t: "target"; id: string | null }
   | { t: "auto"; on: boolean }
