@@ -31,6 +31,8 @@ export const MOBS: Record<string, MobDef> = {
   // ปูนา (ทดสอบ)
   mud_crab: fromData("mob003", { moveMs: 420, count: 8, sheet: "rice-crab", sheetParts: ["hit", "idle"], retaliate: true,
     drop: { item: "crab_claw", chance: 1 } }),
+  // ปูแดง (mob039) ยังไม่มีของดรอป — ผู้ใช้ให้รอรูปไอเท็มก่อน
+  red_crab: fromData("mob039", { moveMs: 420, count: 6, sheet: "red-crab", sheetParts: ["idle"], retaliate: true }),
 };
 
 export const expToNext = (level: number) => 20 + level * 15;

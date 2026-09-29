@@ -530,5 +530,19 @@
   "exp": 58250,
   "moneyMin": 18640,
   "moneyMax": 27960
+ },
+ {
+  "id": "mob039",
+  "name": "ปูแดง",
+  "map": "ทุ่งนาริมคลอง",
+  "level": 3,
+  "boss": false,
+  "aggressive": false,
+  "hp": 81,
+  "def": 1,
+  "atk": 10,
+  "exp": 43,
+  "moneyMin": 15,
+  "moneyMax": 22
  }
 ]
