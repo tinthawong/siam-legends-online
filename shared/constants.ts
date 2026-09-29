@@ -20,6 +20,10 @@ export const REGEN_DELAY_MS = 5000;
 export const REGEN_EVERY_MS = 1000;
 export const REGEN_PCT = 0.02;
 
+// ยา
+export const POTION_COOLDOWN_MS = 1000; // กินยาได้ทุก ๆ กี่ ms (ทั้งกดเองและกินอัตโนมัติ)
+export const MAX_BUY = 99;              // ซื้อได้ครั้งละไม่เกิน
+
 export const DIAG = 1.4142;
 
 /** เวลาที่ใช้เดิน 1 ก้าว — แนวทแยงช้ากว่าแนวตรง */

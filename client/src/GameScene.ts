@@ -77,6 +77,8 @@ export class GameScene extends Phaser.Scene {
   /** เราสลบ (cause = สาเหตุ) / กลับเมืองแล้ว → main.ts เปิด-ปิดหน้าต่างสลบ */
   onKnockedOut: ((cause: string) => void) | null = null;
   onRevived: (() => void) | null = null;
+  onStats: ((s: PlayerStats) => void) | null = null;
+  onJoined: (() => void) | null = null;
 
   constructor(private net: Net) {
     super("game");
@@ -192,6 +194,7 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.startFollow(this.views.get(m.you)!.c, true, 0.2, 0.2);
         this.updateStats(m.self);
         this.onInventory?.(m.inv);
+        this.onJoined?.();
         break;
       case "drop":
         this.addGround(m.g, true);
@@ -285,7 +288,13 @@ export class GameScene extends Phaser.Scene {
       }
       case "exp":
         this.floatText(center(m.x), center(m.y) - 26, `+${m.exp} EXP`, "#ffd84a", 1100);
+        if (m.money) this.floatText(center(m.x), center(m.y) - 12, `+${m.money} เบี้ย`, "#ffe39a", 1100);
         break;
+      case "heal": {
+        const v = this.views.get(m.id);
+        if (v) this.floatText(v.c.x, v.c.y + v.topY - 9, `+${m.amount}`, "#7ee08a", 900);
+        break;
+      }
       case "die": {
         const v = this.views.get(m.id);
         if (m.id === this.targetId) this.setTarget(null);
@@ -534,6 +543,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private updateStats(s: PlayerStats) {
+    this.onStats?.(s);
     document.getElementById("hud-lv")!.textContent = `Lv ${s.level}`;
     (document.getElementById("hud-hp") as HTMLElement).style.width = `${(s.hp / s.maxHp) * 100}%`;
     document.getElementById("hud-hp-text")!.textContent = `HP ${s.hp} / ${s.maxHp}`;

@@ -39,6 +39,7 @@ export interface PlayerStats {
   atk: number;
   hp: number;
   maxHp: number;
+  money: number; // เบี้ย
 }
 
 // client → server
@@ -47,7 +48,10 @@ export type ClientMsg =
   | { t: "attack"; target: string }
   | { t: "auto"; on: boolean }
   | { t: "pickup"; id: string } // เดินไปเก็บของบนพื้น
-  | { t: "revive" };            // สลบอยู่ → กลับเมือง (ฟื้นที่จุดเกิด)
+  | { t: "revive" }            // สลบอยู่ → กลับเมือง (ฟื้นที่จุดเกิด)
+  | { t: "use"; item: string }  // ใช้ไอเท็มในกระเป๋า (ยา)
+  | { t: "buy"; item: string; count: number } // ซื้อของด้วยเบี้ย
+  | { t: "bot"; potionAt: number }; // กินยาอัตโนมัติเมื่อเลือดต่ำกว่ากี่ % (0 = ปิด)
 
 // server → client
 export type ServerMsg =
@@ -59,7 +63,8 @@ export type ServerMsg =
   | { t: "die"; id: string }
   | { t: "dead"; id: string; cause: string }           // ผู้เล่นเลือดหมด สลบอยู่กับที่ (cause = สาเหตุ เช่น "ปูแดง Lv.3 โจมตี")
   | { t: "respawn"; id: string; x: number; y: number } // กดกลับเมืองแล้ว → ฟื้นที่จุดเกิด
-  | { t: "exp"; x: number; y: number; exp: number } // ส่งให้คนที่ตีมอนตาย: ได้ EXP เท่าไหร่ (x,y = ช่องที่มอนตาย)
+  | { t: "exp"; x: number; y: number; exp: number; money: number } // ส่งให้คนที่ตีมอนตาย: ได้ EXP/เบี้ยเท่าไหร่ (x,y = ช่องที่มอนตาย)
+  | { t: "heal"; id: string; amount: number } // ผู้เล่นกินยา (ทุกคนเห็นตัวเลขเขียว)
   | { t: "drop"; g: GroundItem }          // ของหล่นบนพื้น
   | { t: "picked"; id: string; by: string } // ของบนพื้นถูกเก็บแล้ว (by = id ผู้เล่นที่เก็บ)
   | { t: "inv"; items: InvItem[] }          // กระเป๋าของเราเปลี่ยน
@@ -79,6 +84,7 @@ export interface JoinCharacter {
   y: number;
   look: Look;
   inv: InvItem[];
+  money: number;
 }
 
 /** close code ที่ client ต้องรู้ */

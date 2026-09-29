@@ -280,15 +280,34 @@
     #auto-btn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom));
       width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--window-edge);
       background: var(--window); color: var(--ink); font-size: 17px; font-weight: 600; }
-    #bag-btn { position: fixed; right: calc(104px + env(safe-area-inset-right)); bottom: calc(26px + env(safe-area-inset-bottom));
-      width: 60px; height: 60px; border-radius: 50%; border: 3px solid var(--window-edge); background: var(--window); color: var(--ink);
-      display: grid; place-items: center; padding: 0; }
-    #bag-btn svg { width: 28px; height: 28px; }
-    #bag-btn[aria-expanded="true"] { border-color: var(--exp); color: var(--exp); }
-    #bag { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(110px + env(safe-area-inset-bottom));
-      width: min(320px, calc(100vw - 32px)); padding: 10px 12px 12px; }
+    #menu { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(12px + env(safe-area-inset-bottom));
+      display: flex; gap: 6px; padding: 6px; border-radius: 12px; background: var(--window); border: 2px solid var(--window-edge); }
+    #menu button { width: 58px; height: 56px; padding: 4px 0 2px; border: 0; border-radius: 8px; background: rgba(10, 18, 32, 0.55);
+      color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+    #menu button svg { width: 24px; height: 24px; }
+    #menu button span { font-size: 11px; line-height: 1; }
+    #menu button[aria-expanded="true"] { background: rgba(242, 193, 78, 0.18); color: var(--exp); box-shadow: inset 0 0 0 1px var(--exp); }
+    .panel-pop { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(92px + env(safe-area-inset-bottom));
+      width: min(320px, calc(100vw - 20px)); padding: 10px 12px 12px; }
+    .panel-close { background: none; border: 0; color: var(--ink-dim); font-size: 16px; padding: 2px 6px; }
+    .panel-hint { margin: 8px 0 0; font-size: 12px; color: var(--ink-dim); }
+    .stat-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
+    .stat-list dt { color: var(--ink-dim); }
+    .stat-list dd { margin: 0; text-align: right; font-weight: 600; }
+    .money-big { margin: 0 0 10px; font-size: 15px; display: flex; align-items: center; gap: 8px; }
+    .money-big b { font-size: 22px; color: var(--exp); }
+    .coin { width: 18px; height: 18px; border-radius: 50%; background: radial-gradient(circle at 35% 35%, #fff2b0, #f2c14e 45%, #a8741c); box-shadow: inset 0 0 0 1px #6b4410; }
+    .shop-item { display: flex; align-items: center; gap: 10px; padding: 6px; border-radius: 6px; background: rgba(10, 18, 32, 0.55); }
+    .shop-item img { width: 40px; height: 40px; image-rendering: pixelated; }
+    .shop-item .info { flex: 1; font-size: 13px; }
+    .shop-item .info small { display: block; color: var(--ink-dim); }
+    .shop-item button { padding: 6px 10px; border: 0; border-radius: 6px; background: var(--exp); color: #2b1d00; font-weight: 600; font-size: 13px; }
+    .shop-item button:disabled { opacity: 0.45; cursor: default; }
+    .bot-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 8px; cursor: pointer; }
+    #bot-pct { width: 100%; accent-color: var(--exp); }
+    #bag .slot.usable { cursor: pointer; }
+    #bag .slot.usable:hover { border-color: var(--exp); }
     .bag-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    #bag-close { background: none; border: 0; color: var(--ink-dim); font-size: 16px; padding: 2px 6px; }
     #bag-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
     .slot { position: relative; aspect-ratio: 1; border-radius: 6px; background: rgba(10, 18, 32, 0.7); border: 1px solid rgba(159, 192, 236, 0.35);
       display: grid; place-items: center; }
@@ -456,13 +475,53 @@
       <button id="logout">ออกจากระบบ</button><button id="link-google" hidden>ผูกบัญชี Google</button>
     </div>
     <button id="auto-btn" aria-pressed="false">AUTO</button>
-    <button id="bag-btn" aria-expanded="false" aria-controls="bag" title="กระเป๋า (I)">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8h12l1 12H5z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg>
-    </button>
-    <section id="bag" class="window" hidden aria-label="กระเป๋า">
-      <div class="bag-head"><b>กระเป๋า</b><button id="bag-close" aria-label="ปิด">✕</button></div>
+    <!-- แถบเมนูล่าง: กดปุ่มเปิด/ปิดหน้าต่างของปุ่มนั้น (เปิดได้ทีละหน้า) -->
+    <nav id="menu" aria-label="เมนู">
+      <button type="button" data-panel="stat-panel" aria-expanded="false" title="สถานะ (C)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><span>สถานะ</span>
+      </button>
+      <button type="button" data-panel="bag" aria-expanded="false" title="กระเป๋า (I)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8h12l1 12H5z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span>กระเป๋า</span>
+      </button>
+      <button type="button" data-panel="gold-panel" aria-expanded="false" title="เบี้ย (G)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v10M9 9.5c0-1 1.3-1.5 3-1.5s3 .7 3 1.8c0 2.7-6 1.5-6 4.4 0 1.1 1.3 1.8 3 1.8s3-.5 3-1.5"/></svg><span>เบี้ย</span>
+      </button>
+      <button type="button" data-panel="bot-panel" aria-expanded="false" title="บอท (B)">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/></svg><span>บอท</span>
+      </button>
+    </nav>
+
+    <section id="stat-panel" class="window panel-pop" hidden aria-label="สถานะ">
+      <div class="bag-head"><b>สถานะ</b><button class="panel-close" aria-label="ปิด">✕</button></div>
+      <dl class="stat-list">
+        <dt>เลเวล</dt><dd id="st-lv"></dd>
+        <dt>พลังชีวิต</dt><dd id="st-hp"></dd>
+        <dt>พลังโจมตี</dt><dd id="st-atk"></dd>
+        <dt>EXP</dt><dd id="st-exp"></dd>
+        <dt>เบี้ย</dt><dd id="st-money"></dd>
+      </dl>
+    </section>
+
+    <section id="bag" class="window panel-pop" hidden aria-label="กระเป๋า">
+      <div class="bag-head"><b>กระเป๋า</b><button class="panel-close" aria-label="ปิด">✕</button></div>
       <div id="bag-grid"></div>
       <p id="bag-empty">ยังไม่มีของ</p>
+      <p class="panel-hint">กดที่ยาเพื่อกิน</p>
+    </section>
+
+    <section id="gold-panel" class="window panel-pop" hidden aria-label="เบี้ย">
+      <div class="bag-head"><b>เบี้ย</b><button class="panel-close" aria-label="ปิด">✕</button></div>
+      <p class="money-big"><span class="coin" aria-hidden="true"></span><b id="gold-amount">0</b> เบี้ย</p>
+      <div id="shop"></div>
+      <p class="msg" id="shop-msg" role="status"></p>
+    </section>
+
+    <section id="bot-panel" class="window panel-pop" hidden aria-label="บอท">
+      <div class="bag-head"><b>บอท</b><button class="panel-close" aria-label="ปิด">✕</button></div>
+      <label class="bot-row"><input type="checkbox" id="bot-potion" /> กินยาอัตโนมัติ</label>
+      <label class="bot-row">เมื่อเลือดต่ำกว่า <b id="bot-pct-text">40%</b></label>
+      <input type="range" id="bot-pct" min="10" max="90" step="5" value="40" />
+      <p class="panel-hint">ยาในกระเป๋า: <b id="bot-potions">0</b> ขวด · ทำงานตอนเล่นอยู่เท่านั้น</p>
     </section>
   </div>
 

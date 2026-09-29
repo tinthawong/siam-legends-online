@@ -7,7 +7,7 @@ import type { Look } from "../../shared/appearance";
 import { Creator } from "./creator";
 import { NAME_RE } from "../../shared/constants";
 import { ITEMS } from "../../shared/items";
-import type { InvItem } from "../../shared/protocol";
+import type { InvItem, PlayerStats } from "../../shared/protocol";
 
 interface Character { name: string; level: number; exp: number; look: Look }
 
@@ -123,7 +123,10 @@ function startGame(ch: Character, session: Session) {
   };
 
   const scene = new GameScene(net);
-  scene.onInventory = renderBag;
+  const hud = bindHud(net);
+  scene.onInventory = hud.inventory;
+  scene.onStats = hud.stats;
+  scene.onJoined = hud.joined;
   // สลบ: แสดงสาเหตุ กดกลับเมืองแล้ว server ฟื้นให้ที่จุดเกิด
   scene.onKnockedOut = (cause) => {
     $("ko-cause").textContent = cause;
@@ -136,7 +139,6 @@ function startGame(ch: Character, session: Session) {
     $<HTMLButtonElement>("ko-town").disabled = true;
     net.send({ t: "revive" });
   };
-  bindBag();
 
   new Phaser.Game({
     type: Phaser.AUTO,
@@ -221,39 +223,104 @@ function bindForms() {
   });
 }
 
-/** หน้ากระเป๋า: ไอเท็ม 64px + จำนวน */
-function renderBag(items: InvItem[]) {
-  const grid = $("bag-grid");
-  grid.innerHTML = "";
-  for (const it of items) {
-    const def = ITEMS[it.item];
-    if (!def) continue;
-    const slot = document.createElement("div");
-    slot.className = "slot";
-    slot.title = `${def.name} ×${it.count}`;
-    const img = document.createElement("img");
-    img.src = `/sprites/items/${def.icon}-64.png`;
-    img.alt = def.name;
-    const n = document.createElement("span");
-    n.className = "n";
-    n.textContent = String(it.count);
-    slot.append(img, n);
-    grid.appendChild(slot);
-  }
-  $("bag-empty").hidden = grid.children.length > 0;
-}
-
-function bindBag() {
-  const btn = $("bag-btn"), bag = $("bag");
-  const toggle = (open = bag.hidden) => {
-    bag.hidden = !open;
-    btn.setAttribute("aria-expanded", String(open));
+/** แถบเมนูล่าง + หน้าต่าง สถานะ / กระเป๋า / เบี้ย / บอท */
+function bindHud(net: Net) {
+  const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>("#menu button[data-panel]"));
+  const panels = buttons.map((b) => $(b.dataset.panel!));
+  // เปิดได้ทีละหน้า: กดปุ่มเดิมซ้ำ = ปิด
+  const toggle = (id: string, open?: boolean) => {
+    for (const b of buttons) {
+      const p = $(b.dataset.panel!);
+      const show = b.dataset.panel === id ? open ?? p.hidden : false;
+      p.hidden = !show;
+      b.setAttribute("aria-expanded", String(show));
+    }
   };
-  btn.onclick = () => toggle();
-  $("bag-close").onclick = () => toggle(false);
+  for (const b of buttons) b.onclick = () => toggle(b.dataset.panel!);
+  for (const p of panels) p.querySelector<HTMLButtonElement>(".panel-close")!.onclick = () => toggle(p.id, false);
+  // คีย์ลัดบนคอม (รองรับแป้นไทยตำแหน่งเดียวกัน)
+  const keys: Record<string, string> = { c: "stat-panel", "แ": "stat-panel", i: "bag", "ไ": "bag", g: "gold-panel", "เ": "gold-panel", b: "bot-panel", "ิ": "bot-panel" };
   window.addEventListener("keydown", (e) => {
-    if (e.key === "i" || e.key === "I" || e.key === "ไ") toggle(); // ไ = ปุ่ม I บนแป้นไทย
+    if ((e.target as HTMLElement).tagName === "INPUT") return;
+    const id = keys[e.key.toLowerCase()];
+    if (id) toggle(id);
   });
+
+  let money = 0;
+  let inv: InvItem[] = [];
+
+  // ร้าน (อยู่ในหน้าเบี้ย): ของที่มีราคาใน shared/items.ts
+  const shop = $("shop");
+  const shopItems = Object.entries(ITEMS).filter(([, d]) => d.price);
+  const buyButtons: { btn: HTMLButtonElement; cost: number }[] = [];
+  for (const [key, d] of shopItems) {
+    const row = document.createElement("div");
+    row.className = "shop-item";
+    row.innerHTML = `<img src="/sprites/items/${d.icon}-64.png" alt="" /><div class="info">${d.name}<small>${d.heal ? `เติมเลือด ${d.heal} · ` : ""}${d.price} เบี้ย</small></div>`;
+    for (const n of [1, 10]) {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = `ซื้อ ×${n}`;
+      btn.onclick = () => { net.send({ t: "buy", item: key, count: n }); say("shop-msg", `ซื้อ${d.name} ×${n}`, true); };
+      row.appendChild(btn);
+      buyButtons.push({ btn, cost: d.price! * n });
+    }
+    shop.appendChild(row);
+  }
+
+  // บอท: ตั้งค่าเก็บในเครื่อง ส่งให้ server ทุกครั้งที่เปลี่ยนและตอนเข้าเกม
+  const chk = $<HTMLInputElement>("bot-potion"), pct = $<HTMLInputElement>("bot-pct");
+  try {
+    const saved = JSON.parse(localStorage.getItem("bot") ?? "null");
+    if (saved) { chk.checked = !!saved.on; pct.value = String(saved.pct ?? 40); }
+  } catch {}
+  const sendBot = () => {
+    $("bot-pct-text").textContent = `${pct.value}%`;
+    net.send({ t: "bot", potionAt: chk.checked ? Number(pct.value) : 0 });
+    try { localStorage.setItem("bot", JSON.stringify({ on: chk.checked, pct: Number(pct.value) })); } catch {}
+  };
+  chk.onchange = sendBot;
+  pct.oninput = () => { $("bot-pct-text").textContent = `${pct.value}%`; };
+  pct.onchange = sendBot;
+  $("bot-pct-text").textContent = `${pct.value}%`;
+
+  const renderBag = () => {
+    const grid = $("bag-grid");
+    grid.innerHTML = "";
+    for (const it of inv) {
+      const def = ITEMS[it.item];
+      if (!def) continue;
+      const slot = document.createElement("div");
+      slot.className = "slot" + (def.heal ? " usable" : "");
+      slot.title = `${def.name} ×${it.count}${def.heal ? ` · กดเพื่อกิน (เติมเลือด ${def.heal})` : ""}`;
+      const img = document.createElement("img");
+      img.src = `/sprites/items/${def.icon}-64.png`;
+      img.alt = def.name;
+      const n = document.createElement("span");
+      n.className = "n";
+      n.textContent = String(it.count);
+      slot.append(img, n);
+      if (def.heal) slot.onclick = () => net.send({ t: "use", item: it.item });
+      grid.appendChild(slot);
+    }
+    $("bag-empty").hidden = grid.children.length > 0;
+    $("bot-potions").textContent = String(inv.filter((i) => ITEMS[i.item]?.heal).reduce((a, i) => a + i.count, 0));
+  };
+
+  return {
+    inventory: (items: InvItem[]) => { inv = items; renderBag(); },
+    stats: (s: PlayerStats) => {
+      money = s.money;
+      $("gold-amount").textContent = money.toLocaleString("th-TH");
+      for (const { btn, cost } of buyButtons) btn.disabled = money < cost;
+      $("st-lv").textContent = String(s.level);
+      $("st-hp").textContent = `${s.hp} / ${s.maxHp}`;
+      $("st-atk").textContent = String(s.atk);
+      $("st-exp").textContent = `${s.exp} / ${s.expNext}`;
+      $("st-money").textContent = money.toLocaleString("th-TH");
+    },
+    joined: sendBot, // ส่งค่าบอทให้ server ตอนเข้าแมพ (server ไม่ได้เก็บค่านี้)
+  };
 }
 
 async function main() {

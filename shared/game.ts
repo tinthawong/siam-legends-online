@@ -17,13 +17,14 @@ export interface MobDef {
   atk?: number;        // พลังโจมตี (ใช้ตอนตีกลับ)
   retaliate?: boolean; // โดนผู้เล่นตีแล้วตีกลับ + ไล่ตาม (ดู MOB_* ใน constants.ts)
   drop?: { item: string; chance: number }; // ตายแล้วหล่นของ (key ใน shared/items.ts, โอกาส 0–1)
+  money?: [number, number]; // ตายแล้วคนที่ฆ่าได้เบี้ย สุ่มระหว่าง [ต่ำสุด, สูงสุด]
 }
 
 /** ค่าพลังจาก shared/data/monsters.json (export จาก Excel) */
 function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" | "sheetParts" | "retaliate" | "drop">): MobDef {
   const m = MONSTERS.find((x) => x.id === id);
   if (!m) throw new Error(`ไม่พบมอน ${id} ใน monsters.json`);
-  return { name: m.name, level: m.level, maxHp: m.hp, def: m.def, exp: m.exp, atk: m.atk, ...extra };
+  return { name: m.name, level: m.level, maxHp: m.hp, def: m.def, exp: m.exp, atk: m.atk, money: [m.moneyMin, m.moneyMax], ...extra };
 }
 
 export const MOBS: Record<string, MobDef> = {
