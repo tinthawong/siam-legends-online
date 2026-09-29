@@ -1,0 +1,36 @@
+{
+  "group_id": "99e9c704-5eeb-4510-bff2-bf32ec237b4b",
+  "states": [
+    {
+      "character": {
+        "id": "3460ed2e-9700-4f62-b3a3-d9a6a5ac5325",
+        "name": "Idle",
+        "prompt": "A cute rice-field crab monster for a game, small round dark brown shell\nwith a lighter tan belly, two pincers with one slightly bigger than the\nother raised in a playful threatening pose, big round eyes on short\nstalks, a few mud splashes and a tiny green rice sprout stuck on top of\nits shell, six short legs, cute chibi monster, big expressive eyes with\nbright highlights, smooth soft shading, colored darker outlines instead\nof pure black, vivid saturated colors",
+        "size": {
+          "width": 48,
+          "height": 48
+        },
+        "template_id": "custom",
+        "directions": 8,
+        "view": "low top-down",
+        "created_at": "2026-09-29T11:48:50.740872+00:00"
+      },
+      "folder": "Idle",
+      "frames": {
+        "rotations": {
+          "south": "Idle/rotations/south.png",
+          "south-east": "Idle/rotations/south-east.png",
+          "east": "Idle/rotations/east.png",
+          "north-east": "Idle/rotations/north-east.png",
+          "north": "Idle/rotations/north.png",
+          "north-west": "Idle/rotations/north-west.png",
+          "west": "Idle/rotations/west.png",
+          "south-west": "Idle/rotations/south-west.png"
+        },
+        "animations": {}
+      }
+    }
+  ],
+  "export_version": "3.1",
+  "export_date": "2026-09-29T11:56:02.509433"
+}
