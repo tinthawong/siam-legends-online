@@ -1,5 +1,6 @@
 // ข้อมูลเกมและสูตรคำนวณ — อยู่ใน shared เพื่อให้ client/server ใช้ค่าเดียวกัน
 import MONSTERS from "./data/monsters.json";
+import { NO_GEAR, type Gear } from "./equipment";
 import { ZONES } from "./map";
 
 export interface MobDef {
@@ -66,19 +67,23 @@ export const statCost = (x: number) => Math.floor((x - 1) / 10) + 2;
 export const statCostN = (x: number, n: number) => { let c = 0; for (let i = 0; i < n; i++) c += statCost(x + i); return c; };
 
 export interface Derived {
+  defPct: number; mdefPct: number; // DEF / MDEF เกราะ (% จากอุปกรณ์)
   atk: number; ratk: number; matkMin: number; matkMax: number;
   hit: number; flee: number; perfectDodge: number; crit: number; // % ทั้งสองค่าหลัง
   maxHp: number; maxSp: number; defBonus: number; mdefBonus: number;
   aspdMs: number; castMul: number; hpRegen: number; spRegen: number; weight: number;
 }
 const f = Math.floor;
-/** ค่าที่คำนวณจากค่าหลัก (ยังไม่มีอุปกรณ์ = ATK อาวุธ 0) */
-export function derive(level: number, s: Stats): Derived {
+/** ค่าที่คำนวณจากค่าหลัก + อุปกรณ์ (โบนัสค่าพลังบวกเข้าค่าหลัก, ATK อาวุธบวกเข้า ATK) */
+export function derive(level: number, base: Stats, gear: Gear = NO_GEAR): Derived {
+  const s = { ...base };
+  for (const k of STAT_KEYS) s[k] += gear.bonus[k];
   const maxHp = f((40 + level * 12) * (1 + s.vit / 100));
   const maxSp = f((10 + level * 2) * (1 + s.int / 100));
   return {
-    atk: s.str + f(s.str / 10) ** 2 + f(s.dex / 5) + f(s.luk / 5),
-    ratk: s.dex + f(s.dex / 10) ** 2 + f(s.str / 5) + f(s.luk / 5),
+    defPct: gear.defPct, mdefPct: gear.mdefPct,
+    atk: s.str + f(s.str / 10) ** 2 + f(s.dex / 5) + f(s.luk / 5) + gear.atk,
+    ratk: s.dex + f(s.dex / 10) ** 2 + f(s.str / 5) + f(s.luk / 5) + gear.atk,
     matkMin: s.int + f(s.int / 7) ** 2,
     matkMax: s.int + f(s.int / 5) ** 2,
     hit: level + s.dex,

@@ -1,5 +1,6 @@
 import LAYOUT from "../../shared/data/inventory-layout.json";
 import { ITEMS, type ItemKind } from "../../shared/items";
+import { EQUIP } from "../../shared/equipment";
 import type { InvItem } from "../../shared/protocol";
 
 // หน้ากระเป๋าจากภาพ ui/inventory-panel.webp (docs/ui-controls.md)
@@ -34,9 +35,9 @@ export interface Inventory {
 
 /**
  * root = <section id="bag"> (ว่างเปล่า) — เปิด/ปิดโดย main.ts
- * onUse: แตะไอเท็มที่ใช้ได้ · onClose: กดปุ่มกระเป๋าในกรอบ · onQuest: กดปุ่มเควส (เปิดรายการเควส)
+ * onUse: แตะไอเท็มที่ใช้ได้ · onEquip: แตะอุปกรณ์ (ใส่) · onClose: กดปุ่มกระเป๋าในกรอบ · onQuest: กดปุ่มเควส (เปิดรายการเควส)
  */
-export function createInventory(root: HTMLElement, onUse: (item: string) => void, onClose: () => void, onQuest: () => void): Inventory {
+export function createInventory(root: HTMLElement, onUse: (item: string) => void, onEquip: (item: string) => void, onClose: () => void, onQuest: () => void): Inventory {
   let items: InvItem[] = [];
   let tab = 0;
   let page = 0;
@@ -131,7 +132,8 @@ export function createInventory(root: HTMLElement, onUse: (item: string) => void
       s.removeAttribute("title");
       if (!it) return;
       const def = ITEMS[it.item];
-      s.title = `${def.name} ×${it.count}${def.heal ? ` · กดเพื่อกิน (เติมเลือด ${def.heal})` : ""}`;
+      const eq = EQUIP[it.item];
+      s.title = `${def.name} ×${it.count}${def.heal ? ` · กดเพื่อกิน (เติมเลือด ${def.heal})` : eq ? " · กดเพื่อใส่" : ""}`;
       if (def.icon) {
         const icon = document.createElement("img");
         icon.src = `/sprites/items/${def.icon}-64.png`;
@@ -153,6 +155,9 @@ export function createInventory(root: HTMLElement, onUse: (item: string) => void
       if (def.heal) {
         s.classList.add("usable");
         s.onclick = () => onUse(it.item);
+      } else if (eq) {
+        s.classList.add("usable");
+        s.onclick = () => onEquip(it.item);
       }
     });
 

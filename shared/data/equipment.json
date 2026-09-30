@@ -1,0 +1,66 @@
+[
+ {
+  "item": "straw_hat",
+  "slot": "head_top",
+  "level": 8,
+  "atk": 0,
+  "defPct": 1,
+  "mdefPct": 1,
+  "bonus": {
+   "str": 0,
+   "agi": 0,
+   "vit": 0,
+   "int": 0,
+   "dex": 0,
+   "luk": 0
+  }
+ },
+ {
+  "item": "sickle",
+  "slot": "weapon",
+  "level": 10,
+  "atk": 3,
+  "defPct": 0,
+  "mdefPct": 0,
+  "bonus": {
+   "str": 0,
+   "agi": 0,
+   "vit": 0,
+   "int": 0,
+   "dex": 0,
+   "luk": 0
+  }
+ },
+ {
+  "item": "iron_helmet",
+  "slot": "head_top",
+  "level": 12,
+  "atk": 0,
+  "defPct": 1,
+  "mdefPct": 1,
+  "bonus": {
+   "str": 0,
+   "agi": 0,
+   "vit": 0,
+   "int": 0,
+   "dex": 0,
+   "luk": 0
+  }
+ },
+ {
+  "item": "sai_sin",
+  "slot": "accessory",
+  "level": 1,
+  "atk": 0,
+  "defPct": 0,
+  "mdefPct": 1,
+  "bonus": {
+   "str": 0,
+   "agi": 0,
+   "vit": 0,
+   "int": 0,
+   "dex": 0,
+   "luk": 0
+  }
+ }
+]

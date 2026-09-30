@@ -57,6 +57,8 @@ npm run typecheck       # tsc ทั้ง client และ server
 - `client/src/inventory.ts` หน้ากระเป๋าจากภาพ `ui/inventory-panel.webp` + พิกัด `shared/data/inventory-layout.json` (Alt+E)
 - `client/src/quests.ts` หน้าคุยกับ NPC + รายการเควส (เปิดจากปุ่มเควสในกระเป๋า)
 - `shared/quests.ts` NPC/เควสจาก `shared/data/npcs.json` + `quests.json` (ตำแหน่ง NPC จาก layout แมพ) server ตัดสิน รับ/นับ/ส่งเควส สถานะเก็บใน D1 คอลัมน์ `quests` (JSON)
+- `shared/equipment.ts` ช่องใส่ 10 ช่องแบบ Ragnarok + ค่ารวมจากอุปกรณ์ (ATK อาวุธ, DEF/MDEF %, โบนัสค่าพลัง) ค่าจาก `shared/data/equipment.json` เก็บใน D1 คอลัมน์ `equip` (JSON) ของที่ใส่อยู่ไม่อยู่ในกระเป๋า
+- `client/src/worldmap.ts` แผนที่โลก (ปุ่มแผนที่ / คีย์ M) จุด "คุณอยู่ที่นี่" ตามพิกัดพิกเซลของภาพ เพิ่มแมพใหม่ต้องเพิ่มพิกัด
 - `client/src/controls.ts` จอยสติ๊ก + ปุ่มโจมตี แสดงทั้งมือถือและคอม (สเปก `docs/ui-controls.md`, ต้นฉบับภาพ `art/ui/`)
 - `client/src/forest.ts` ต้นไม้ในช่องป่า: ช่องละ 2 ต้น สุ่มจากพิกัดช่อง พลิกซ้าย-ขวาครึ่งหนึ่ง ต้นดอก (หางนกยูง, ราชพฤกษ์) ~12% ต้นด้านในวาดรวมกับภาพพื้น ต้นริมป่าเป็น sprite เรียงตาม y ช่องป่าที่ด้านบนเดินได้ใช้พุ่มเตี้ย (ไม่บังตัวละครเกินครึ่งตัว)
 - ทางออก (`EXITS`): ยังไม่มีแมพอื่น เดินเข้าแล้ว server ส่ง `notice` "เส้นทางนี้ยังไม่เปิด" และหยุดก่อนถึงช่องทางออก ชื่อปลายทางลอยเหนือทางออกเมื่อเข้าใกล้ 7 ช่อง
@@ -115,7 +117,7 @@ npm run typecheck       # tsc ทั้ง client และ server
 ## ตัวเลขสมดุลเกม (มอน / เลเวล / EXP)
 
 - แหล่งข้อมูลหลักคือ `balance/siam-legends-balance.xlsx` (ชีต ตั้งค่า / เลเวล / มอน / สายเลี้ยงตัว) ทุกค่าเป็นสูตร แก้ที่ชีต "ตั้งค่า"
-- เกมอ่านจาก `shared/data/levels.json` และ `shared/data/monsters.json` ซึ่งสร้างด้วย `python tools/export_balance.py` (ห้ามแก้ JSON ด้วยมือ ให้แก้ Excel แล้ว export ใหม่)
+- เกมอ่านจาก `shared/data/levels.json`, `shared/data/monsters.json` และ `shared/data/equipment.json` (ชีต "อุปกรณ์") ซึ่งสร้างด้วย `python tools/export_balance.py` (ห้ามแก้ JSON ด้วยมือ ให้แก้ Excel แล้ว export ใหม่)
 - ชีต "สายเลี้ยงตัว" มี 3 สาย (สายตี STR/DEX, สายหลบ AGI/STR, สายอึด VIT/STR) คำนวณค่าพลังตามเลเวล ชีต มอน มีคอลัมน์ AGI/DEX/HIT/FLEE/DEF%/DEF เสริม/MDEF% (P–V), "ตีกี่ทีตาย" (N) คิดจากสายตี และ "มอนตีกี่ทีผู้เล่นตาย" (W) — สร้างครั้งเดียวด้วย `tools/add_stat_sheets.py` (รันแล้ว ไม่ต้องรันซ้ำ)
 - ค่าเริ่มต้น: เลเวลสูงสุด 100, 400 ชั่วโมงถึงเลเวลสูงสุด, มอนเลเวลเท่ากันตี 4 ทีตาย, EXP ขึ้นเลเวล = 15 × L^3
 - ผู้ใช้ตัดสินใจ**ไม่ใช้ข้อมูลจาก MapleStory** (เรื่องสิทธิ์ และระบบตีทีละตัวของเราต่างจากเขา) ตัวเลขทั้งหมดคำนวณเอง

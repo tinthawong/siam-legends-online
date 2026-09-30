@@ -11,6 +11,8 @@ import type { InvItem, PlayerStats } from "../../shared/protocol";
 import { statCost, STAT_MAX, type StatKey } from "../../shared/game";
 import { createInventory } from "./inventory";
 import { bindQuests } from "./quests";
+import { EQUIP, SLOTS } from "../../shared/equipment";
+import { bindWorldMap } from "./worldmap";
 import { bindAttackButton, bindJoystick } from "./controls";
 
 interface Character { name: string; level: number; exp: number; look: Look }
@@ -130,6 +132,7 @@ function startGame(ch: Character, session: Session) {
   let invCount = new Map<string, number>();
   const quests = bindQuests(net, (i) => invCount.get(i) ?? 0);
   const hud = bindHud(net, () => quests.openList());
+  bindWorldMap();
   // จอยสติ๊กมุมซ้ายล่าง + ปุ่มโจมตีมุมขวาล่าง แสดงทั้งมือถือและคอม (คอมลากด้วยเมาส์ได้)
   $("joystick").hidden = false;
   $("attack-btn").hidden = false;
@@ -265,7 +268,7 @@ function bindHud(net: Net, openQuests: () => void) {
     if (!bagEl.hidden && !bagEl.contains(t) && !t.closest('#menu button[data-panel="bag"]')) toggle("bag", false);
   }, true);
   // คีย์ลัดบนคอม (รองรับแป้นไทยตำแหน่งเดียวกัน)
-  const keys: Record<string, string> = { c: "stat-panel", "แ": "stat-panel", i: "bag", "ไ": "bag", g: "gold-panel", "เ": "gold-panel", b: "bot-panel", "ิ": "bot-panel" };
+  const keys: Record<string, string> = { c: "stat-panel", "แ": "stat-panel", i: "bag", "ไ": "bag", g: "gold-panel", "เ": "gold-panel", b: "bot-panel", "ิ": "bot-panel", m: "map-panel", "ท": "map-panel" };
   window.addEventListener("keydown", (e) => {
     if ((e.target as HTMLElement).tagName === "INPUT") return;
     const id = keys[e.key.toLowerCase()];
@@ -310,7 +313,7 @@ function bindHud(net: Net, openQuests: () => void) {
   pct.onchange = sendBot;
   $("bot-pct-text").textContent = `${pct.value}%`;
 
-  const bag = createInventory(bagEl, (item) => net.send({ t: "use", item }), () => toggle("bag", false),
+  const bag = createInventory(bagEl, (item) => net.send({ t: "use", item }), (item) => net.send({ t: "equip", item }), () => toggle("bag", false),
     () => { toggle("bag", false); openQuests(); });
   const renderBag = () => {
     bag.setItems(inv);
@@ -352,6 +355,39 @@ function bindHud(net: Net, openQuests: () => void) {
     bindTip(dd, t);
     bindTip(dd.previousElementSibling as HTMLElement, t);
   }
+  // หน้าต่างอุปกรณ์: 10 ช่อง แตะช่องที่มีของ = ถอดกลับเข้ากระเป๋า
+  const slotEls = new Map<string, HTMLButtonElement>();
+  for (const sl of SLOTS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.className = "eq-slot";
+    b.onclick = () => { if (b.dataset.item) net.send({ t: "unequip", slot: sl.key }); };
+    $(sl.key.startsWith("acc") || ["weapon", "shield", "garment", "shoes"].includes(sl.key) ? "eq-right" : "eq-left").appendChild(b);
+    slotEls.set(sl.key, b);
+  }
+  const renderEquip = (s: PlayerStats) => {
+    for (const sl of SLOTS) {
+      const b = slotEls.get(sl.key)!, item = s.equip[sl.key], def = item ? ITEMS[item] : undefined;
+      b.replaceChildren();
+      b.dataset.item = item ?? "";
+      const icon = document.createElement("span");
+      icon.className = "eq-icon";
+      if (def?.icon) { const img = document.createElement("img"); img.src = `/sprites/items/${def.icon}-64.png`; img.alt = ""; icon.appendChild(img); }
+      const txt = document.createElement("span");
+      txt.className = "eq-text";
+      txt.innerHTML = `<small>${sl.name}</small>`;
+      const name = document.createElement("b");
+      name.textContent = def?.name ?? "—";
+      txt.appendChild(name);
+      b.append(icon, txt);
+      b.classList.toggle("empty", !item);
+      const d = item ? EQUIP[item] : undefined;
+      b.title = d ? `${def?.name} · ${[d.atk && `ATK +${d.atk}`, d.defPct && `DEF ${d.defPct}%`, d.mdefPct && `MDEF ${d.mdefPct}%`].filter(Boolean).join(" · ")} · กดเพื่อถอด` : sl.name;
+    }
+    const dv = s.derived;
+    $("eq-sum").textContent = `ATK ${dv.atk} · DEF ${dv.defPct}% + ${dv.defBonus} · MDEF ${dv.mdefPct}% + ${dv.mdefBonus}`;
+  };
+
   let last: PlayerStats | null = null;
   const statRow: Record<string, { v: HTMLElement; bonus: HTMLElement; cost: HTMLElement; btn: HTMLButtonElement }> = {};
   for (const st of STATS) {
@@ -380,6 +416,8 @@ function bindHud(net: Net, openQuests: () => void) {
   // Alt+A เปิด/ปิดหน้าต่างค่าพลัง แบบ Ragnarok
   window.addEventListener("keydown", (e) => {
     if (e.altKey && (e.key === "a" || e.key === "A" || e.key === "ฟ")) { e.preventDefault(); toggle("stat-panel"); }
+    // Alt+Q เปิด/ปิดหน้าต่างอุปกรณ์ แบบ Ragnarok
+    if (e.altKey && (e.key === "q" || e.key === "Q" || e.key === "ๆ")) { e.preventDefault(); toggle("equip-panel"); }
     // Alt+E เปิด/ปิดกระเป๋า แบบ Ragnarok
     if (e.altKey && (e.key === "e" || e.key === "E" || e.key === "ำ")) { e.preventDefault(); toggle("bag"); }
   });
@@ -405,19 +443,20 @@ function bindHud(net: Net, openQuests: () => void) {
       put("dv-crit", `${dv.crit.toFixed(1)}%`);
       put("dv-maxhp", String(s.maxHp));
       put("dv-maxsp", String(s.maxSp));
-      put("dv-def", `0 + ${dv.defBonus}`);
-      put("dv-mdef", `0 + ${dv.mdefBonus}`);
+      put("dv-def", `${dv.defPct} + ${dv.defBonus}`);
+      put("dv-mdef", `${dv.mdefPct} + ${dv.mdefBonus}`);
       put("dv-aspd", (200 - dv.aspdMs / 20).toFixed(1)); // แบบ Ragnarok
       put("st-points", String(s.points));
       for (const st of STATS) {
         const r = statRow[st.key], x = s.stats[st.key];
         const cost = statCost(x);
         r.v.textContent = String(x);
-        r.bonus.textContent = ""; // โบนัสจากอุปกรณ์ (ยังไม่มีอุปกรณ์)
+        r.bonus.textContent = s.bonus[st.key] ? `${s.bonus[st.key] > 0 ? "+" : ""}${s.bonus[st.key]}` : ""; // โบนัสจากอุปกรณ์
         r.cost.textContent = x >= STAT_MAX ? "สูงสุด" : String(cost);
         r.btn.disabled = x >= STAT_MAX || s.points < cost;
       }
       $("stat-badge").hidden = s.points <= 0; // จุดแดงเตือนเมื่อมีแต้มว่าง
+      renderEquip(s);
     },
     joined: sendBot, // ส่งค่าบอทให้ server ตอนเข้าแมพ (server ไม่ได้เก็บค่านี้)
   };

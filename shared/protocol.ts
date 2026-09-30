@@ -2,6 +2,7 @@ import type { Cell } from "./pathfind";
 import type { Look } from "./appearance";
 import type { Stats, StatKey, Derived } from "./game";
 import type { QuestLog } from "./quests";
+import type { Equipped, SlotKey } from "./equipment";
 
 export type EntityKind = "player" | "mob";
 
@@ -47,6 +48,8 @@ export interface PlayerStats {
   stats: Stats;       // ค่าหลัก 6 ค่า
   points: number;     // แต้มว่าง
   derived: Derived;   // ค่าที่คำนวณทั้งหมด (docs/stat-system.md)
+  bonus: Stats;       // โบนัสค่าพลังจากอุปกรณ์
+  equip: Equipped;    // ของที่ใส่อยู่
 }
 
 // client → server
@@ -62,7 +65,9 @@ export type ClientMsg =
   | { t: "stat_add"; stat: StatKey; amount: number } // ใช้แต้มค่าพลัง
   | { t: "talk"; npc: string }         // กดที่ NPC: เดินไปหาแล้วคุย
   | { t: "quest_accept"; id: string }  // รับเควส (ต้องอยู่ใกล้ NPC)
-  | { t: "quest_done"; id: string };   // ส่งเควส รับรางวัล (ต้องอยู่ใกล้ NPC ที่ส่ง)
+  | { t: "quest_done"; id: string }    // ส่งเควส รับรางวัล (ต้องอยู่ใกล้ NPC ที่ส่ง)
+  | { t: "equip"; item: string }       // ใส่อุปกรณ์จากกระเป๋า (ช่องว่างช่องแรกที่ใส่ได้ เต็มแล้วสลับกับช่องแรก)
+  | { t: "unequip"; slot: SlotKey };   // ถอดอุปกรณ์กลับเข้ากระเป๋า
 
 // server → client
 export type ServerMsg =
@@ -103,6 +108,7 @@ export interface JoinCharacter {
   stats: Stats;
   points: number;
   quests: QuestLog;
+  equip: Equipped;
 }
 
 /** close code ที่ client ต้องรู้ */

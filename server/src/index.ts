@@ -4,6 +4,7 @@ import { SPAWN } from "../../shared/map";
 import type { JoinCharacter } from "../../shared/protocol";
 import { parseLook, DEFAULT_LOOK, type Look } from "../../shared/appearance";
 import { parseLog } from "../../shared/quests";
+import { parseEquip } from "../../shared/equipment";
 export { MapRoom };
 
 export interface Env {
@@ -33,6 +34,7 @@ interface CharacterRow {
   luk: number;
   stat_points: number;
   quests: string;
+  equip: string;
 }
 
 const lookOf = (r: { gender: string; hair: string; eyes: string }): Look =>
@@ -119,6 +121,7 @@ export default {
         stats: { str: row.str, agi: row.agi, vit: row.vit, int: row.int, dex: row.dex, luk: row.luk },
         points: row.stat_points,
         quests: parseLog(row.quests),
+        equip: parseEquip(row.equip),
       };
       // สร้าง request ใหม่ทั้งก้อน client จึงปลอม X-Character มาเองไม่ได้
       const headers = new Headers(req.headers);

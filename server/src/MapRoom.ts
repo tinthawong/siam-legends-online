@@ -11,6 +11,7 @@ import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
 import { MOBS, expToNext, STAT_KEYS, STAT_MAX, statCostN, statPointsForLevel, derive, physicalAttack, type Stats, type Derived } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import { NPCS, QUESTS, canAccept, isComplete, talkTo, type QuestLog } from "../../shared/quests";
+import { SLOTS, gearOf, slotsFor, type Equipped, type Gear } from "../../shared/equipment";
 import { CLOSE_KICKED } from "../../shared/protocol";
 import type { ClientMsg, ServerMsg, EntityState, PlayerStats, JoinCharacter, GroundItem, InvItem } from "../../shared/protocol";
 import type { Look } from "../../shared/appearance";
@@ -56,6 +57,8 @@ interface Player extends Ent {
   inv: Map<string, number>; // กระเป๋า: item → จำนวน
   quests: QuestLog;         // เควสที่รับอยู่ / ทำเสร็จแล้ว
   talk: string | null;      // NPC ที่กำลังเดินไปคุย
+  equip: Equipped;          // ของที่ใส่อยู่ (ไม่อยู่ในกระเป๋า)
+  gear: Gear;               // ค่ารวมจากของที่ใส่อยู่
 }
 
 interface Mob extends Ent {
@@ -106,7 +109,7 @@ export class MapRoom extends DurableObject<Env> {
     // บัญชีเดียวกันเข้าซ้ำ → เตะตัวเก่า และใช้ค่าล่าสุดในหน่วยความจำ (ใหม่กว่าใน D1)
     for (const old of this.players.values()) {
       if (old.userId !== ch.userId) continue;
-      ch = { ...ch, level: old.level, exp: old.exp, x: old.x, y: old.y, inv: invList(old.inv), money: old.money, stats: { ...old.st }, points: old.points, quests: old.quests };
+      ch = { ...ch, level: old.level, exp: old.exp, x: old.x, y: old.y, inv: invList(old.inv), money: old.money, stats: { ...old.st }, points: old.points, quests: old.quests, equip: old.equip };
       this.players.delete(old.id);
       this.broadcast({ t: "despawn", id: old.id });
       this.send(old, { t: "kicked" }); // แจ้งก่อน เพราะ close event อาจมาช้า
@@ -121,17 +124,19 @@ export class MapRoom extends DurableObject<Env> {
     const id = "p" + crypto.randomUUID().slice(0, 8);
     server.serializeAttachment({ id });
 
+    const gear = gearOf(ch.equip ?? {});
+    const der0 = derive(ch.level, ch.stats, gear);
     const p: Player = {
       id, kind: "player", name: ch.name, userId: ch.userId, look: ch.look,
       x: pos.x, y: pos.y,
-      hp: derive(ch.level, ch.stats).maxHp, maxHp: derive(ch.level, ch.stats).maxHp,
-      sp: derive(ch.level, ch.stats).maxSp, maxSp: derive(ch.level, ch.stats).maxSp,
+      hp: der0.maxHp, maxHp: der0.maxHp,
+      sp: der0.maxSp, maxSp: der0.maxSp,
       moveMs: PLAYER_MOVE_MS, path: [], nextStepAt: 0,
       ws: server, level: ch.level, exp: ch.exp,
       target: null, auto: false, nextAttackAt: 0, chaseKey: null,
       nextHpRegenAt: 0, nextSpRegenAt: 0,
-      pickup: null, dead: false, money: ch.money ?? 0, st: { ...ch.stats }, points: ch.points, der: derive(ch.level, ch.stats), potionAt: 0, nextPotionAt: 0, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
-      quests: ch.quests ?? { active: {}, done: [] }, talk: null,
+      pickup: null, dead: false, money: ch.money ?? 0, st: { ...ch.stats }, points: ch.points, der: der0, potionAt: 0, nextPotionAt: 0, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
+      quests: ch.quests ?? { active: {}, done: [] }, talk: null, equip: { ...(ch.equip ?? {}) }, gear,
     };
     this.players.set(id, p);
 
@@ -252,6 +257,28 @@ export class MapRoom extends DurableObject<Env> {
         this.openDialog(p, q.turnIn); // มีเควสต่อจากนี้ → เสนอต่อเลย
         break;
       }
+      case "equip": {
+        // ใส่ของจากกระเป๋า: ช่องว่างช่องแรกที่ใส่ได้ ถ้าเต็มทุกช่องสลับกับช่องแรก (ของเดิมกลับเข้ากระเป๋า)
+        const item = String(msg.item);
+        const slots = slotsFor(item);
+        if (!slots.length || (p.inv.get(item) ?? 0) < 1) return;
+        const slot = slots.find((s) => !p.equip[s]) ?? slots[0];
+        const old = p.equip[slot];
+        p.inv.set(item, (p.inv.get(item) ?? 0) - 1);
+        if (old) p.inv.set(old, (p.inv.get(old) ?? 0) + 1);
+        p.equip[slot] = item;
+        this.gearChanged(p);
+        break;
+      }
+      case "unequip": {
+        const slot = SLOTS.find((s) => s.key === msg.slot)?.key;
+        const item = slot ? p.equip[slot] : undefined;
+        if (!slot || !item) return;
+        delete p.equip[slot];
+        p.inv.set(item, (p.inv.get(item) ?? 0) + 1);
+        this.gearChanged(p);
+        break;
+      }
       case "auto": {
         p.auto = !!msg.on;
         this.send(p, { t: "auto", on: p.auto });
@@ -286,14 +313,14 @@ export class MapRoom extends DurableObject<Env> {
     if (!list.length) return;
     const now = Date.now();
     const stmt = this.env.DB.prepare(
-      "UPDATE characters SET level = ?, exp = ?, x = ?, y = ?, money = ?, str = ?, agi = ?, vit = ?, int = ?, dex = ?, luk = ?, stat_points = ?, quests = ?, updated_at = ? WHERE user_id = ?",
+      "UPDATE characters SET level = ?, exp = ?, x = ?, y = ?, money = ?, str = ?, agi = ?, vit = ?, int = ?, dex = ?, luk = ?, stat_points = ?, quests = ?, equip = ?, updated_at = ? WHERE user_id = ?",
     );
     const invStmt = this.env.DB.prepare(
       "INSERT INTO inventory (user_id, item, count) VALUES (?, ?, ?) ON CONFLICT (user_id, item) DO UPDATE SET count = excluded.count",
     );
     try {
       await this.env.DB.batch(list.flatMap((p) => [
-        stmt.bind(p.level, p.exp, p.x, p.y, p.money, p.st.str, p.st.agi, p.st.vit, p.st.int, p.st.dex, p.st.luk, p.points, JSON.stringify(p.quests), now, p.userId),
+        stmt.bind(p.level, p.exp, p.x, p.y, p.money, p.st.str, p.st.agi, p.st.vit, p.st.int, p.st.dex, p.st.luk, p.points, JSON.stringify(p.quests), JSON.stringify(p.equip), now, p.userId),
         ...[...p.inv].map(([item, count]) => invStmt.bind(p.userId, item, count)),
       ]));
     } catch (e) {
@@ -543,10 +570,10 @@ export class MapRoom extends DurableObject<Env> {
   private mobAttack(m: Mob, p: Player, now: number) {
     m.nextAttackAt = now + MOB_ASPD_MS;
     const def = MOBS[m.type];
-    // มอนไม่มีคริ ผู้เล่นหลบสมบูรณ์ได้ ยังไม่มีเกราะ (DEF % = 0) หักแค่ DEF เสริมจาก VIT
+    // มอนไม่มีคริ ผู้เล่นหลบสมบูรณ์ได้ หัก DEF % จากอุปกรณ์ และ DEF เสริมจาก VIT
     const { dmg, crit, miss } = physicalAttack(
       { atk: def.atk ?? 1, hit: def.hit ?? 0, crit: 0 },
-      { flee: p.der.flee, defPct: 0, defBonus: p.der.defBonus, perfectDodge: p.der.perfectDodge },
+      { flee: p.der.flee, defPct: p.der.defPct, defBonus: p.der.defBonus, perfectDodge: p.der.perfectDodge },
     );
     p.hp = Math.max(0, p.hp - dmg);
     this.broadcast({ t: "hit", src: m.id, dst: p.id, dmg, crit, hp: p.hp, miss });
@@ -614,11 +641,19 @@ export class MapRoom extends DurableObject<Env> {
     if (changed) this.send(p, { t: "stats", self: this.stats(p) });
   }
 
-  /** คิดค่าที่คำนวณใหม่ (หลังเพิ่มค่าหลักหรือเลเวลขึ้น) HP/SP สูงสุดที่เพิ่มขึ้นเติมให้ทันที */
+  /** คิดค่าที่คำนวณใหม่ (หลังเพิ่มค่าหลัก เลเวลขึ้น หรือเปลี่ยนอุปกรณ์) HP/SP สูงสุดที่เพิ่มขึ้นเติมให้ทันที ลดลงไม่ต่ำกว่า 1 */
   private recalc(p: Player) {
-    p.der = derive(p.level, p.st);
-    p.hp = Math.max(0, p.hp + p.der.maxHp - p.maxHp); p.maxHp = p.der.maxHp;
-    p.sp = Math.max(0, p.sp + p.der.maxSp - p.maxSp); p.maxSp = p.der.maxSp;
+    p.der = derive(p.level, p.st, p.gear);
+    p.hp = Math.min(p.der.maxHp, Math.max(p.hp > 0 ? 1 : 0, p.hp + p.der.maxHp - p.maxHp)); p.maxHp = p.der.maxHp;
+    p.sp = Math.min(p.der.maxSp, Math.max(0, p.sp + p.der.maxSp - p.maxSp)); p.maxSp = p.der.maxSp;
+  }
+
+  /** ใส่/ถอดอุปกรณ์แล้ว: คิดค่าใหม่ ส่งกระเป๋าและค่าพลังให้ผู้เล่น */
+  private gearChanged(p: Player) {
+    p.gear = gearOf(p.equip);
+    this.recalc(p);
+    this.send(p, { t: "inv", items: invList(p.inv) });
+    this.send(p, { t: "stats", self: this.stats(p) });
   }
 
   private killMob(m: Mob, killer: Player, now: number) {
@@ -752,6 +787,7 @@ export class MapRoom extends DurableObject<Env> {
       level: p.level, exp: p.exp, expNext: expToNext(p.level),
       atk: p.der.atk, hp: p.hp, maxHp: p.maxHp, sp: p.sp, maxSp: p.maxSp, money: p.money,
       stats: { ...p.st }, points: p.points, derived: p.der,
+      bonus: { ...p.gear.bonus }, equip: { ...p.equip },
     };
   }
 

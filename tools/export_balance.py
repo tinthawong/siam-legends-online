@@ -51,8 +51,30 @@ while mo[f"A{r}"].value:
     })
     r += 1
 
+# อุปกรณ์ (ชีต "อุปกรณ์"): ช่องใส่ใช้ key ของตารางช่อง, ค่าพลังโบนัสว่าง = 0
+eq = wb["อุปกรณ์"]
+slot_key = {}
+r = 9
+while eq[f"A{r}"].value and eq[f"B{r}"].value:
+    slot_key[eq[f"A{r}"].value] = eq[f"B{r}"].value
+    r += 1
+equipment = []
+r = 23
+while eq[f"A{r}"].value:
+    equipment.append({
+        "item": eq[f"A{r}"].value,
+        "slot": slot_key[eq[f"C{r}"].value],
+        "level": int(eq[f"E{r}"].value),
+        "atk": int(eq[f"F{r}"].value or 0),
+        "defPct": int(eq[f"G{r}"].value or 0),
+        "mdefPct": int(eq[f"H{r}"].value or 0),
+        "bonus": {k: int(eq[f"{c}{r}"].value or 0) for k, c in zip(["str", "agi", "vit", "int", "dex", "luk"], "IJKLMN")},
+    })
+    r += 1
+
 out = root / "shared" / "data"
 out.mkdir(parents=True, exist_ok=True)
 (out / "levels.json").write_text(json.dumps(levels, ensure_ascii=False, indent=1), encoding="utf-8")
 (out / "monsters.json").write_text(json.dumps(monsters, ensure_ascii=False, indent=1), encoding="utf-8")
-print(f"เขียน levels.json ({max_level} เลเวล) และ monsters.json ({len(monsters)} ตัว) แล้ว")
+(out / "equipment.json").write_text(json.dumps(equipment, ensure_ascii=False, indent=1), encoding="utf-8")
+print(f"เขียน levels.json ({max_level} เลเวล), monsters.json ({len(monsters)} ตัว) และ equipment.json ({len(equipment)} ชิ้น) แล้ว")
