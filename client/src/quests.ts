@@ -50,13 +50,13 @@ export function bindQuests(net: Net, invCount: (item: string) => number) {
     $("quest-empty").hidden = active.length > 0;
     $("quest-done-count").textContent = String(log.done.length);
   };
-  $("quest-close").onclick = () => { panel.hidden = true; };
+  // ปุ่มปิด: ใช้ .panel-close ของเมนู (main.ts)
 
   return {
     setLog(next: QuestLog) { log = next; renderList(); },
     /** กระเป๋าเปลี่ยน → เควสเก็บของนับใหม่ */
     refresh: renderList,
-    openList() { renderList(); panel.hidden = false; },
+    openList() { renderList(); },
     dialog(m: Extract<ServerMsg, { t: "dialog" }>) {
       const after = justDone;
       justDone = false;

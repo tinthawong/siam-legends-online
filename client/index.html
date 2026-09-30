@@ -278,7 +278,7 @@
     .bar.hp i { background: #e0525a; }
 
     /* AUTO อยู่เหนือปุ่มโจมตี */
-    #auto-btn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(min(22vmin, 170px) + 26px + env(safe-area-inset-bottom));
+    #auto-btn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(min(22vmin, 170px) + var(--xh) + 22px + env(safe-area-inset-bottom));
       width: 60px; height: 60px; border-radius: 50%; border: 3px solid var(--window-edge);
       background: var(--window); color: var(--ink); font-size: 14px; font-weight: 600; }
     #menu { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(12px + env(safe-area-inset-bottom));
@@ -288,8 +288,11 @@
     #menu button svg { width: 24px; height: 24px; }
     #menu button span { font-size: 11px; line-height: 1; }
     #menu button[aria-expanded="true"] { background: rgba(242, 193, 78, 0.18); color: var(--exp); box-shadow: inset 0 0 0 1px var(--exp); }
-    .panel-pop { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(92px + env(safe-area-inset-bottom));
-      width: min(320px, calc(100vw - 20px)); padding: 10px 12px 12px; max-height: calc(100vh - 110px); overflow-y: auto; }
+    .panel-pop { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(var(--xh, 22px) + var(--hs-w, 320px) * 187 / 653 + 20px + env(safe-area-inset-bottom));
+      width: min(320px, calc(100vw - 20px)); padding: 10px 12px 12px; max-height: calc(100vh - var(--hs-w, 320px) * 187 / 653 - 60px); overflow-y: auto; z-index: 4; }
+    @media (max-width: 900px) and (pointer: coarse), (max-width: 560px) {
+      .panel-pop { top: calc(10px + var(--hs-w) * 187 / 653 + var(--mb) + 16px + env(safe-area-inset-top)); bottom: auto; max-height: calc(100vh - 200px); }
+    }
     .panel-close { background: none; border: 0; color: var(--ink-dim); font-size: 16px; padding: 2px 6px; }
     .panel-hint { margin: 8px 0 0; font-size: 12px; color: var(--ink-dim); }
     .stat-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
@@ -425,7 +428,7 @@
     @keyframes lvup-in { from { transform: scale(0.4); opacity: 0; } }
     @keyframes lvup-bounce { 50% { transform: translateY(-3px) scale(1.08); } }
     @media (prefers-reduced-motion: reduce) { #lvup, #lvup i { animation: none; } }
-    @media (max-width: 560px) { #lvup { top: calc(152px + env(safe-area-inset-top)); } } /* จอแคบ: อยู่ใต้กล่องสถานะ */
+    @media (max-width: 560px) { #lvup { top: calc(10px + var(--hs-w) * 187 / 653 + var(--mb) + 14px + env(safe-area-inset-top)); } } /* จอแคบ: ใต้กรอบสถานะ + ปุ่ม */
     /* ป้ายเควสสำเร็จ: ใต้ป้ายเลเวลอัพ สีเขียว ลูกศรขยับไปมา */
     #quest-guide { position: fixed; left: 0; right: 0; margin-inline: auto; width: fit-content; top: calc(66px + env(safe-area-inset-top)); z-index: 5;
       display: flex; align-items: center; gap: 10px; max-width: calc(100vw - 24px); padding: 6px 16px 6px 6px; border-radius: 30px;
@@ -439,7 +442,74 @@
     #quest-guide small { font-size: 12px; color: var(--ink-dim); }
     @keyframes guide-nudge { 50% { transform: translateX(4px); } }
     @media (prefers-reduced-motion: reduce) { #quest-guide, #quest-guide i { animation: none; } }
-    @media (max-width: 560px) { #quest-guide { top: calc(206px + env(safe-area-inset-top)); } }
+    @media (max-width: 560px) { #quest-guide { top: calc(10px + var(--hs-w) * 187 / 653 + var(--mb) + 68px + env(safe-area-inset-top)); } }
+
+
+    /* ===== แถบสถานะ + แถบ EXP + ปุ่มเมนู (docs/hud-status.md) ภาพความละเอียดสูง ไม่ใช้ pixelated ===== */
+    :root { --xh: 22px; --hs-w: 320px; --mb: 44px; }
+    @media (max-width: 560px), (max-height: 500px) { :root { --xh: 18px; --hs-w: 260px; --mb: 38px; } }
+    #hud-status { position: fixed; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--xh) + 8px + env(safe-area-inset-bottom));
+      width: var(--hs-w); aspect-ratio: 653 / 187; z-index: 3; user-select: none; -webkit-user-select: none; container-type: inline-size; }
+    .hs-frame { display: block; width: 100%; height: 100%; pointer-events: none; }
+    #hud-status > div { position: absolute; }
+    #hs-plate { display: flex; align-items: center; gap: 4%; padding-left: 5%; font-size: 5.2cqw; white-space: nowrap; overflow: visible; } /* ชื่อยาวเกินป้ายได้ (แบบ preview) */
+    #hs-lv { color: #ffd84a; font-weight: 700; text-shadow: 0 0 2px #000, 0 1px 2px #000; display: inline-block; }
+    #hs-lv.bump { animation: lv-bump 500ms cubic-bezier(0.3, 1.8, 0.5, 1); }
+    @keyframes lv-bump { 40% { transform: scale(1.45); } }
+    #hs-name { color: #fff; text-shadow: 0 0 2px #000, 0 1px 2px #000; }
+    .hs-bar { overflow: hidden; border-radius: 1cqw; }
+    .hs-bar i { position: absolute; left: 0; top: 0; bottom: 0; width: 0; }
+    .hs-bar .ghost { background: rgba(255, 255, 255, 0.85); transition: width 500ms ease-in; }
+    .hs-bar .fill { transition: width 200ms ease-out; }
+    .hs-bar.hp .fill { background: linear-gradient(180deg, #ff8a8a, #e0384a 55%, #9e1c2c); }
+    .hs-bar.sp .fill { background: linear-gradient(180deg, #8fd0ff, #2f8ee8 55%, #1a5aa8); }
+    .hs-bar.low .fill { animation: hp-low 1.2s ease-in-out infinite; }
+    @keyframes hp-low { 50% { opacity: 0.45; } }
+    .hs-bar .txt { position: absolute; right: 3%; top: 50%; transform: translateY(-50%); font-size: 4.6cqw; font-weight: 700; color: #fff;
+      text-shadow: 0 0 2px #000, 0 0 2px #000, 0 1px 2px #000; white-space: nowrap; }
+    #hud-exp { position: fixed; left: 0; right: 0; bottom: env(safe-area-inset-bottom); height: var(--xh); z-index: 3; cursor: help; }
+    #hud-exp > i { position: absolute; top: 0; height: 100%; background-size: 100% 100%; background-repeat: no-repeat; }
+    #hud-exp .xp-l { left: 0; width: calc(var(--xh) * var(--cap)); background-image: url(/ui/hud/exp-left.png); }
+    #hud-exp .xp-r { right: 0; width: calc(var(--xh) * var(--cap)); background-image: url(/ui/hud/exp-right.png); }
+    #hud-exp .xp-m { left: calc(var(--xh) * var(--cap)); right: calc(var(--xh) * var(--cap)); background-image: url(/ui/hud/exp-mid.png); }
+    .xp-track { position: absolute; left: calc(var(--xh) * var(--xl)); right: calc(var(--xh) * var(--xr));
+      top: calc(var(--xh) * var(--xy)); height: calc(var(--xh) * var(--xbh)); overflow: hidden; }
+    #xp-fill { display: block; height: 100%; width: 0; background: linear-gradient(180deg, #fff2b0, #f2c14e 50%, #b8841c); transition: width 300ms ease-out; }
+    #hud-exp.flash .xp-track { animation: xp-flash 260ms ease-out; }
+    @keyframes xp-flash { 30% { filter: brightness(2.2); box-shadow: 0 0 12px #fff2b0; } }
+    #xp-text { position: absolute; inset: 0; display: grid; place-items: center; font-size: calc(var(--xh) * 0.5); font-weight: 700; color: #fff;
+      text-shadow: 0 0 2px #000, 0 0 2px #000; pointer-events: none; white-space: nowrap; }
+    #xp-tip { position: fixed; left: 50%; bottom: calc(var(--xh) + 6px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 6;
+      padding: 4px 10px; border-radius: 4px; border: 1px solid var(--gold); background: rgba(10, 18, 32, 0.92); color: var(--ink); font-size: 13px; white-space: nowrap; }
+    #xp-tip[hidden] { display: none; }
+    #levelup-banner { position: fixed; left: 0; right: 0; top: 30%; z-index: 7; display: grid; justify-items: center; pointer-events: none; }
+    #levelup-banner[hidden] { display: none; }
+    #levelup-banner b { font-family: var(--font-title); font-weight: 400; font-size: clamp(40px, 9vw, 76px); letter-spacing: 2px; color: #ffe27a;
+      background: linear-gradient(180deg, #fff6c8, #ffd84a 45%, #c98f2a); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent;
+      filter: drop-shadow(0 3px 0 #6b3208) drop-shadow(0 0 14px rgba(255, 216, 74, 0.8)); }
+    #levelup-banner span { margin-top: -4px; font-size: 20px; font-weight: 700; color: #fff2b0; text-shadow: 0 0 3px #000, 0 2px 3px #000; }
+    #levelup-banner.show { animation: lvup-banner 2s ease-out forwards; }
+    @keyframes lvup-banner { 0% { transform: scale(0.3); opacity: 0; } 12% { transform: scale(1.15); opacity: 1; } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
+    #menu { position: fixed; left: calc(12px + var(--hs-w) + 8px + env(safe-area-inset-left)); bottom: calc(var(--xh) + 8px + env(safe-area-inset-bottom));
+      display: flex; gap: 4px; padding: 0; border: 0; background: none; border-radius: 0; z-index: 3; }
+    #menu button { position: relative; width: var(--mb); height: var(--mb); padding: 0; border: 0; background: none; transition: transform 80ms, filter 80ms; -webkit-tap-highlight-color: transparent; }
+    #menu button img { width: 100%; height: 100%; pointer-events: none; }
+    #menu button:active { transform: scale(0.92); filter: brightness(1.2); }
+    #menu button[aria-expanded="true"] { filter: brightness(1.2) drop-shadow(0 0 6px rgba(242, 193, 78, 0.9)); }
+    #menu .dot { top: 2px; right: 2px; }
+    /* มือถือ: กรอบสถานะมุมซ้ายบน ปุ่มแถวเดียวมุมขวาบน (จอแคบ: ใต้กรอบสถานะ) */
+    @media (max-width: 900px) and (pointer: coarse), (max-width: 560px) {
+      #hud-status { top: calc(10px + env(safe-area-inset-top)); bottom: auto; }
+      #menu { left: auto; right: calc(10px + env(safe-area-inset-right)); top: calc(10px + env(safe-area-inset-top)); bottom: auto; }
+    }
+    @media (max-width: 620px) { #menu { top: calc(10px + var(--hs-w) * 187 / 653 + 6px + env(safe-area-inset-top)); } }
+    .set-head { margin: 10px 0 6px; font-size: 13px; color: var(--ink-dim); border-top: 1px solid rgba(159, 192, 236, 0.25); padding-top: 8px; }
+    .set-head:first-of-type { border-top: 0; padding-top: 0; margin-top: 4px; }
+    .set-account { display: flex; gap: 8px; flex-wrap: wrap; }
+    .set-account button { padding: 6px 12px; border-radius: 6px; border: 1px solid var(--gold-deep); background: rgba(0, 0, 0, 0.3); color: var(--ink); font-size: 13px; }
+    .set-account button[hidden] { display: none; }
+    @media (prefers-reduced-motion: reduce) { #levelup-banner.show, #hs-lv.bump, .hs-bar.low .fill, #hud-exp.flash .xp-track { animation: none; } }
+    @media (max-width: 900px) and (pointer: coarse), (max-width: 560px) { #joystick { bottom: calc(var(--xh) + 14px + env(safe-area-inset-bottom)); } }
 
     /* คุยกับ NPC: กล่องข้อความกลางล่างจอ */
     #dialog { position: fixed; left: 50%; bottom: calc(min(22vmin, 170px) + 40px + env(safe-area-inset-bottom)); transform: translateX(-50%);
@@ -462,13 +532,13 @@
     #quest-empty[hidden] { display: none; }
 
     /* จอยสติ๊ก / ปุ่มโจมตี: ขนาดเทียบด้านสั้นของจอ ภาพความละเอียดสูง ไม่ใช้ pixelated */
-    #joystick { position: fixed; left: calc(12px + env(safe-area-inset-left)); bottom: calc(96px + env(safe-area-inset-bottom));
+    #joystick { position: fixed; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--xh) + var(--hs-w) * 187 / 653 + 20px + env(safe-area-inset-bottom));
       width: min(28vmin, 220px); aspect-ratio: 512 / 529; touch-action: none; user-select: none; -webkit-user-select: none; }
     #joystick img { position: absolute; pointer-events: none; -webkit-user-drag: none; }
     .joy-base { inset: 0; width: 100%; height: 100%; opacity: 0.9; }
     .joy-knob { left: 50%; top: 50%; width: 42%; transform: translate(-50%, -50%); transition: transform 140ms cubic-bezier(0.3, 1.6, 0.5, 1); }
     #joystick.held .joy-knob { transition: none; }
-    #attack-btn { position: fixed; right: calc(12px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom));
+    #attack-btn { position: fixed; right: calc(12px + env(safe-area-inset-right)); bottom: calc(var(--xh) + 10px + env(safe-area-inset-bottom));
       width: min(22vmin, 170px); aspect-ratio: 400 / 445; padding: 0; border: 0; background: none; touch-action: none; user-select: none;
       -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
     #attack-btn img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
@@ -625,14 +695,20 @@
   </div>
 
   <div id="hud" hidden>
-    <div id="status" class="window">
-      <div class="row"><span id="hud-name"></span><span id="hud-lv"></span></div>
-      <div class="bar hp"><i id="hud-hp"></i></div>
-      <div id="hud-hp-text" class="bar-text"></div>
-      <div class="bar"><i id="hud-exp"></i></div>
-      <div id="hud-exp-text" class="bar-text"></div>
-      <button id="logout">ออกจากระบบ</button><button id="link-google" hidden>ผูกบัญชี Google</button>
+    <!-- แถบสถานะ + แถบ EXP (docs/hud-status.md, hud.ts) -->
+    <div id="hud-status">
+      <img class="hs-frame" src="/ui/hud/status-frame.webp" alt="" draggable="false" />
+      <div id="hs-plate"><b id="hs-lv">Lv. 1</b><span id="hs-name"></span></div>
+      <div id="hs-hp" class="hs-bar hp"><i class="ghost"></i><i class="fill"></i><span class="txt"></span></div>
+      <div id="hs-sp" class="hs-bar sp"><i class="ghost"></i><i class="fill"></i><span class="txt"></span></div>
     </div>
+    <div id="hud-exp" role="progressbar" aria-label="EXP">
+      <i class="xp-l"></i><i class="xp-m"></i><i class="xp-r"></i>
+      <div class="xp-track"><i id="xp-fill"></i></div>
+      <span id="xp-text"></span>
+    </div>
+    <div id="xp-tip" hidden></div>
+    <div id="levelup-banner" hidden aria-live="polite"><b>LEVEL UP!</b><span id="levelup-lv"></span></div>
     <button id="auto-btn" aria-pressed="false">AUTO</button>
     <!-- เลเวลอัพ: ชวนอัพค่าพลัง หายเมื่อใช้แต้มหมด (main.ts) -->
     <button type="button" id="lvup" hidden><i>!</i><span><b>เลเวลอัพ!</b><small>แตะเพื่ออัพค่าพลัง</small></span></button>
@@ -644,27 +720,14 @@
       <img class="joy-knob" src="/ui/joystick-knob.webp" alt="" draggable="false" />
     </div>
     <button type="button" id="attack-btn" hidden aria-label="โจมตี"><img src="/ui/attack-button.webp" alt="" draggable="false" /></button>
-    <!-- แถบเมนูล่าง: กดปุ่มเปิด/ปิดหน้าต่างของปุ่มนั้น (เปิดได้ทีละหน้า) -->
+    <!-- ปุ่มเมนู 6 ปุ่ม (docs/hud-status.md): กดปุ่มเปิด/ปิดหน้าต่างของปุ่มนั้น เปิดได้ทีละหน้า -->
     <nav id="menu" aria-label="เมนู">
-      <button type="button" data-panel="stat-panel" aria-expanded="false" title="สถานะ (C)">
-        <i class="dot" id="stat-badge" hidden></i>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><span>สถานะ</span>
-      </button>
-      <button type="button" class="img-btn" data-panel="bag" aria-expanded="false" aria-label="กระเป๋า" title="กระเป๋า (Alt+E)">
-        <img src="/ui/bag-button.webp" alt="" draggable="false" />
-      </button>
-      <button type="button" data-panel="equip-panel" aria-expanded="false" title="อุปกรณ์ (Alt+Q)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M12 3l7 3v5c0 5-3 8.5-7 10-4-1.5-7-5-7-10V6z"/><path d="M12 8v8M9 12h6"/></svg><span>อุปกรณ์</span>
-      </button>
-      <button type="button" data-panel="gold-panel" aria-expanded="false" title="เบี้ย (G)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v10M9 9.5c0-1 1.3-1.5 3-1.5s3 .7 3 1.8c0 2.7-6 1.5-6 4.4 0 1.1 1.3 1.8 3 1.8s3-.5 3-1.5"/></svg><span>เบี้ย</span>
-      </button>
-      <button type="button" data-panel="map-panel" aria-expanded="false" title="แผนที่โลก (M)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4z M8 2v16 M16 6v16"/></svg><span>แผนที่</span>
-      </button>
-      <button type="button" data-panel="bot-panel" aria-expanded="false" title="บอท (B)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/></svg><span>บอท</span>
-      </button>
+      <button type="button" data-panel="bag" aria-expanded="false" aria-label="กระเป๋า (Alt+E)" title="กระเป๋า (Alt+E)"><img src="/ui/hud/btn-inventory.webp" alt="" draggable="false" /></button>
+      <button type="button" data-panel="equip-panel" aria-expanded="false" aria-label="อุปกรณ์ (Alt+Q)" title="อุปกรณ์ (Alt+Q)"><img src="/ui/hud/btn-equipment.webp" alt="" draggable="false" /></button>
+      <button type="button" data-panel="quest-panel" aria-expanded="false" aria-label="เควส (Alt+U)" title="เควส (Alt+U)"><img src="/ui/hud/btn-quest.webp" alt="" draggable="false" /></button>
+      <button type="button" data-panel="stat-panel" aria-expanded="false" aria-label="ค่าพลัง (Alt+A)" title="ค่าพลัง (Alt+A)"><i class="dot" id="stat-badge" hidden></i><img src="/ui/hud/btn-stats.webp" alt="" draggable="false" /></button>
+      <button type="button" data-panel="map-panel" aria-expanded="false" aria-label="แผนที่โลก (M)" title="แผนที่โลก (M)"><img src="/ui/hud/btn-map.webp" alt="" draggable="false" /></button>
+      <button type="button" data-panel="settings-panel" aria-expanded="false" aria-label="ตั้งค่า (Esc)" title="ตั้งค่า (Esc)"><img src="/ui/hud/btn-settings.webp" alt="" draggable="false" /></button>
     </nav>
 
     <section id="stat-panel" class="panel-pop gold-panel-theme" hidden aria-label="ค่าพลัง">
@@ -722,7 +785,7 @@
 
     <!-- รายการเควส: เปิดจากปุ่มเควสในกระเป๋า -->
     <section id="quest-panel" class="panel-pop gold-panel-theme" hidden aria-label="เควส">
-      <div class="bag-head"><b>เควส</b><button class="panel-close" id="quest-close" aria-label="ปิด">✕</button></div>
+      <div class="bag-head"><b>เควส</b><button class="panel-close" aria-label="ปิด">✕</button></div>
       <ul id="quest-list"></ul>
       <p id="quest-empty" class="panel-hint">ยังไม่ได้รับเควส ลองคุยกับ NPC ที่มีเครื่องหมาย ! เหนือหัว</p>
       <p class="panel-hint">ทำเสร็จแล้ว <b id="quest-done-count">0</b> เควส</p>
@@ -738,12 +801,15 @@
       <p class="msg" id="shop-msg" role="status"></p>
     </section>
 
-    <section id="bot-panel" class="window panel-pop" hidden aria-label="บอท">
-      <div class="bag-head"><b>บอท</b><button class="panel-close" aria-label="ปิด">✕</button></div>
+    <section id="settings-panel" class="window panel-pop" hidden aria-label="ตั้งค่า">
+      <div class="bag-head"><b>ตั้งค่า</b><button class="panel-close" aria-label="ปิด">✕</button></div>
+      <p class="set-head">บอท</p>
       <label class="bot-row"><input type="checkbox" id="bot-potion" /> กินยาอัตโนมัติ</label>
       <label class="bot-row">เมื่อเลือดต่ำกว่า <b id="bot-pct-text">40%</b></label>
       <input type="range" id="bot-pct" min="10" max="90" step="5" value="40" />
       <p class="panel-hint">ยาในกระเป๋า: <b id="bot-potions">0</b> ขวด · ทำงานตอนเล่นอยู่เท่านั้น</p>
+      <p class="set-head">บัญชี</p>
+      <div class="set-account"><button id="logout">ออกจากระบบ</button><button id="link-google" hidden>ผูกบัญชี Google</button></div>
     </section>
   </div>
 

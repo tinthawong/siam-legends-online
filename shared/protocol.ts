@@ -92,6 +92,8 @@ export type ServerMsg =
   | { t: "quests"; log: QuestLog }                    // สถานะเควสของเราเปลี่ยน
   | { t: "dialog"; npc: string; stage: "offer" | "progress" | "done" | "idle"; quest: string | null } // เปิดหน้าคุยกับ NPC
   | { t: "quest_reward"; id: string; exp: number; money: number; items: InvItem[] } // ส่งเควสสำเร็จ
+  | { t: "exp_gain"; amount: number; exp: number; expNext: number; level: number } // ได้ EXP (ค่าหลังได้แล้ว) ส่งให้เจ้าตัว
+  | { t: "level_up"; id: string; level: number }    // เลเวลขึ้น ส่งทุกคนในแมพ (เห็นแสงรอบตัว)
   | { t: "kicked" };
 
 /** ข้อมูลตัวละครที่ Worker โหลดจาก D1 แล้วส่งต่อให้ MapRoom */

@@ -37,7 +37,8 @@ export interface Inventory {
  * root = <section id="bag"> (ว่างเปล่า) — เปิด/ปิดโดย main.ts
  * onUse: แตะไอเท็มที่ใช้ได้ · onEquip: แตะอุปกรณ์ (ใส่) · onClose: กดปุ่มกระเป๋าในกรอบ · onQuest: กดปุ่มเควส (เปิดรายการเควส)
  */
-export function createInventory(root: HTMLElement, onUse: (item: string) => void, onEquip: (item: string) => void, onClose: () => void, onQuest: () => void): Inventory {
+export function createInventory(root: HTMLElement, onUse: (item: string) => void, onEquip: (item: string) => void, onClose: () => void, onQuest: () => void,
+  onMoney: () => void, onSettings: () => void): Inventory {
   let items: InvItem[] = [];
   let tab = 0;
   let page = 0;
@@ -93,6 +94,8 @@ export function createInventory(root: HTMLElement, onUse: (item: string) => void
   const money = document.createElement("div");
   money.className = "inv-money";
   place(money, LAYOUT.moneyBar.x, LAYOUT.moneyBar.y, LAYOUT.moneyBar.w, LAYOUT.moneyBar.h);
+  money.title = "แตะเพื่อเปิดร้าน";
+  money.onclick = onMoney;
   root.appendChild(money);
   // gemBar: ยังไม่ใช้ ปล่อยว่าง
 
@@ -101,7 +104,7 @@ export function createInventory(root: HTMLElement, onUse: (item: string) => void
     bag: ["กระเป๋า", onClose],
     consumables: ["ของใช้ได้", () => { tab = 1; page = 0; render(); }],
     quest: ["เควส", onQuest],
-    settings: ["ตั้งค่า", null],
+    settings: ["ตั้งค่า", onSettings],
     menu: ["เมนู", null],
   };
   for (const n of LAYOUT.navButtons) {

@@ -685,8 +685,9 @@ export class MapRoom extends DurableObject<Env> {
 
   /** ได้ EXP แล้วเลเวลขึ้นกี่ขั้นก็ได้ (เลือด/SP เต็มเมื่อขึ้นเลเวล) เลเวลสูงสุดแล้ว EXP ไม่เกินหลอด */
   private gainExp(p: Player, exp: number) {
+    const before = p.level;
     p.exp += exp;
-    if (p.level >= MAX_LEVEL) { p.exp = Math.min(p.exp, expToNext(p.level)); return; }
+    if (p.level >= MAX_LEVEL) p.exp = Math.min(p.exp, expToNext(p.level));
     while (p.level < MAX_LEVEL && p.exp >= expToNext(p.level)) {
       p.exp -= expToNext(p.level);
       p.level++;
@@ -695,6 +696,9 @@ export class MapRoom extends DurableObject<Env> {
       p.hp = p.maxHp;
       p.sp = p.maxSp;
     }
+    // แถบ EXP (docs/hud-status.md): เจ้าตัวได้ค่าหลังได้ EXP, เลเวลขึ้น = ทุกคนในแมพเห็นแสง
+    this.send(p, { t: "exp_gain", amount: exp, exp: p.exp, expNext: expToNext(p.level), level: p.level });
+    if (p.level > before) this.broadcast({ t: "level_up", id: p.id, level: p.level });
   }
 
   private aliveMob(id: string | null): Mob | undefined {

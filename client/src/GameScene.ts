@@ -105,6 +105,8 @@ export class GameScene extends Phaser.Scene {
   onQuestReward: ((m: Extract<ServerMsg, { t: "quest_reward" }>) => void) | null = null;
   /** เควสที่ทำครบแล้ว รอส่ง (null = ไม่มี) → main.ts แสดงป้าย "เควสสำเร็จ! แตะเพื่อไปรับของ" */
   onQuestGuide: ((g: { quest: string; npc: string; npcName: string } | null) => void) | null = null;
+  /** ได้ EXP → main.ts เลื่อนแถบ EXP (docs/hud-status.md) */
+  onExpGain: ((m: Extract<ServerMsg, { t: "exp_gain" }>) => void) | null = null;
   private guideNpc: string | null = null;
   private guideArrow!: Phaser.GameObjects.Graphics;
 
@@ -334,7 +336,6 @@ export class GameScene extends Phaser.Scene {
         const v = this.me ? this.views.get(this.me) : undefined;
         if (v) {
           this.floatText(v.c.x, v.c.y - v.lift + v.topY - 26, "เควสสำเร็จ!", "#ffd84a", 1500);
-          if (m.exp) this.floatText(v.c.x, v.c.y - v.lift + v.topY - 12, `+${m.exp} EXP`, "#ffd84a", 1300);
         }
         this.onQuestReward?.(m);
         break;
@@ -449,9 +450,20 @@ export class GameScene extends Phaser.Scene {
         break;
       }
       case "exp":
-        this.floatText(center(m.x), center(m.y) - 26, `+${m.exp} EXP`, "#ffd84a", 1100);
+        // EXP ลอยเหนือหัวเรา (exp_gain) ที่ตัวมอนเหลือแค่เบี้ย
         if (m.money) this.floatText(center(m.x), center(m.y) - 12, `+${m.money} เบี้ย`, "#ffe39a", 1100);
         break;
+      case "exp_gain": {
+        const v = this.me ? this.views.get(this.me) : undefined;
+        if (v && m.amount > 0) this.floatText(v.c.x, v.c.y - v.lift + v.topY - 14, `+${m.amount.toLocaleString("th-TH")} EXP`, "#ffd84a", 1200);
+        this.onExpGain?.(m);
+        break;
+      }
+      case "level_up": {
+        const v = this.views.get(m.id);
+        if (v) this.levelUpFx(v);
+        break;
+      }
       case "heal": {
         const v = this.views.get(m.id);
         if (v) this.floatText(v.c.x, v.c.y - v.lift + v.topY - 9, `+${m.amount}`, "#7ee08a", 900);
@@ -813,6 +825,22 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.shake(crit ? 180 : onMe ? 140 : 90, crit ? 0.01 : onMe ? 0.007 : 0.004);
   }
 
+  /** เลเวลขึ้น (ทุกคนในแมพเห็น): เสาแสงทองพุ่งขึ้นรอบตัว + ประกายลอยขึ้น + วงแสงที่เท้า */
+  private levelUpFx(v: View) {
+    const x = v.c.x, y = v.c.y - v.lift, depth = v.c.y + 2, ADD = Phaser.BlendModes.ADD;
+    const ring = this.add.ellipse(x, y + 6, 20, 8).setStrokeStyle(3, 0xffd84a).setBlendMode(ADD).setDepth(v.c.y - 1);
+    this.tweens.add({ targets: ring, scaleX: 2.6, scaleY: 2.6, alpha: 0, duration: 700, ease: "Cubic.easeOut", onComplete: () => ring.destroy() });
+    const beam = this.add.rectangle(x, y + 6, 26, 10, 0xffe27a, 0.55).setOrigin(0.5, 1).setBlendMode(ADD).setDepth(depth);
+    this.tweens.add({ targets: beam, height: 90, alpha: 0, duration: 900, ease: "Cubic.easeOut", onComplete: () => beam.destroy() });
+    for (let i = 0; i < 22; i++) {
+      const a = Math.random() * Math.PI * 2, r = 8 + Math.random() * 14;
+      const sx = x + Math.cos(a) * r, sy = y + 4 + Math.sin(a) * r * 0.4;
+      const star = this.add.star(sx, sy, 4, 1.2, 3 + Math.random() * 2, i % 3 ? 0xffd84a : 0xfff6c0).setBlendMode(ADD).setDepth(depth).setAlpha(0);
+      this.tweens.add({ targets: star, y: sy - 50 - Math.random() * 40, alpha: { from: 1, to: 0 }, angle: 180,
+        delay: Math.random() * 500, duration: 800 + Math.random() * 400, ease: "Quad.easeOut", onComplete: () => star.destroy() });
+    }
+  }
+
   /** ข้อความลอยขึ้นแล้วจางหาย (+EXP, ฟื้นที่จุดเกิด) */
   private floatText(x: number, y: number, text: string, color: string, ms: number) {
     const t = this.add.text(x, y, text, {
@@ -999,11 +1027,6 @@ export class GameScene extends Phaser.Scene {
     this.onStats?.(s);
     if (s.level !== this.level) { this.level = s.level; this.updateMarks(); }
     this.myWeapon = !!s.equip.weapon;
-    document.getElementById("hud-lv")!.textContent = `Lv ${s.level}`;
-    (document.getElementById("hud-hp") as HTMLElement).style.width = `${(s.hp / s.maxHp) * 100}%`;
-    document.getElementById("hud-hp-text")!.textContent = `HP ${s.hp} / ${s.maxHp}`;
-    (document.getElementById("hud-exp") as HTMLElement).style.width = `${(s.exp / s.expNext) * 100}%`;
-    document.getElementById("hud-exp-text")!.textContent = `EXP ${s.exp} / ${s.expNext}`;
   }
 
   // ---------- เดินตาม path ทุกเฟรม ----------

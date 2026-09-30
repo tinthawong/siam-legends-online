@@ -13,6 +13,7 @@ import { createInventory } from "./inventory";
 import { bindQuests } from "./quests";
 import { EQUIP, SLOTS } from "../../shared/equipment";
 import { bindWorldMap } from "./worldmap";
+import { createHud } from "./hud";
 import { bindAttackButton, bindJoystick } from "./controls";
 
 interface Character { name: string; level: number; exp: number; look: Look }
@@ -104,7 +105,7 @@ function startGame(ch: Character, session: Session) {
   if (started) return;
   started = true;
   show("hud");
-  $("hud-name").textContent = ch.name;
+  const bars = createHud(ch.name);
 
   const net = new Net(session.access_token);
   net.onClose = (code) => {
@@ -155,7 +156,8 @@ function startGame(ch: Character, session: Session) {
       $("quest-guide-sub").textContent = `แตะเพื่อไปรับของที่${g.npcName}`;
     }
   };
-  scene.onStats = hud.stats;
+  scene.onStats = (s) => { hud.stats(s); bars.stats(s); };
+  scene.onExpGain = bars.expGain;
   scene.onJoined = hud.joined;
   // สลบ: แสดงสาเหตุ กดกลับเมืองแล้ว server ฟื้นให้ที่จุดเกิด
   scene.onKnockedOut = (cause) => {
@@ -256,17 +258,18 @@ function bindForms() {
 /** แถบเมนูล่าง + หน้าต่าง สถานะ / กระเป๋า / เบี้ย / บอท */
 function bindHud(net: Net, openQuests: () => void) {
   const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>("#menu button[data-panel]"));
-  const panels = buttons.map((b) => $(b.dataset.panel!));
+  // หน้าต่างทั้งหมด: ของปุ่มเมนู + ร้านเบี้ย (เปิดจากแถบเงินในกระเป๋า / คีย์ G)
+  const panelIds = [...buttons.map((b) => b.dataset.panel!), "gold-panel"];
+  const panels = panelIds.map((id) => $(id));
   // เปิดได้ทีละหน้า: กดปุ่มเดิมซ้ำ = ปิด
   const toggle = (id: string, open?: boolean) => {
-    for (const b of buttons) {
-      const p = $(b.dataset.panel!);
-      const show = b.dataset.panel === id ? open ?? p.hidden : false;
+    for (const p of panels) {
+      const show = p.id === id ? open ?? p.hidden : false;
       p.hidden = !show;
-      b.setAttribute("aria-expanded", String(show));
     }
+    for (const b of buttons) b.setAttribute("aria-expanded", String(!$(b.dataset.panel!).hidden));
   };
-  for (const b of buttons) b.onclick = () => toggle(b.dataset.panel!);
+  for (const b of buttons) b.onclick = () => { if (b.dataset.panel === "quest-panel") openQuests(); toggle(b.dataset.panel!); };
   for (const p of panels) {
     const close = p.querySelector<HTMLButtonElement>(".panel-close");
     if (close) close.onclick = () => toggle(p.id, false);
@@ -278,9 +281,11 @@ function bindHud(net: Net, openQuests: () => void) {
     if (!bagEl.hidden && !bagEl.contains(t) && !t.closest('#menu button[data-panel="bag"]')) toggle("bag", false);
   }, true);
   // คีย์ลัดบนคอม (รองรับแป้นไทยตำแหน่งเดียวกัน)
-  const keys: Record<string, string> = { c: "stat-panel", "แ": "stat-panel", i: "bag", "ไ": "bag", g: "gold-panel", "เ": "gold-panel", b: "bot-panel", "ิ": "bot-panel", m: "map-panel", "ท": "map-panel" };
+  const keys: Record<string, string> = { c: "stat-panel", "แ": "stat-panel", i: "bag", "ไ": "bag", g: "gold-panel", "เ": "gold-panel", b: "settings-panel", "ิ": "settings-panel", m: "map-panel", "ท": "map-panel" };
   window.addEventListener("keydown", (e) => {
     if ((e.target as HTMLElement).tagName === "INPUT") return;
+    if (e.key === "Escape") { toggle("settings-panel"); return; } // Esc = ตั้งค่า (docs/hud-status.md)
+    if (e.altKey) return; // Alt+… จัดการแยก (ค่าพลัง/กระเป๋า/อุปกรณ์/เควส)
     const id = keys[e.key.toLowerCase()];
     if (id) toggle(id);
   });
@@ -324,7 +329,7 @@ function bindHud(net: Net, openQuests: () => void) {
   $("bot-pct-text").textContent = `${pct.value}%`;
 
   const bag = createInventory(bagEl, (item) => net.send({ t: "use", item }), (item) => net.send({ t: "equip", item }), () => toggle("bag", false),
-    () => { toggle("bag", false); openQuests(); });
+    () => { openQuests(); toggle("quest-panel", true); }, () => toggle("gold-panel", true), () => toggle("settings-panel", true));
   const renderBag = () => {
     bag.setItems(inv);
     $("bot-potions").textContent = String(inv.filter((i) => ITEMS[i.item]?.heal).reduce((a, i) => a + i.count, 0));
@@ -433,6 +438,8 @@ function bindHud(net: Net, openQuests: () => void) {
     if (e.altKey && (e.key === "a" || e.key === "A" || e.key === "ฟ")) { e.preventDefault(); toggle("stat-panel"); }
     // Alt+Q เปิด/ปิดหน้าต่างอุปกรณ์ แบบ Ragnarok
     if (e.altKey && (e.key === "q" || e.key === "Q" || e.key === "ๆ")) { e.preventDefault(); toggle("equip-panel"); }
+    // Alt+U เปิด/ปิดรายการเควส
+    if (e.altKey && (e.key === "u" || e.key === "U" || e.key === "ี")) { e.preventDefault(); openQuests(); toggle("quest-panel"); }
     // Alt+E เปิด/ปิดกระเป๋า แบบ Ragnarok
     if (e.altKey && (e.key === "e" || e.key === "E" || e.key === "ำ")) { e.preventDefault(); toggle("bag"); }
   });
