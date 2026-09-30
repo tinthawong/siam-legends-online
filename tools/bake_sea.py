@@ -14,6 +14,7 @@ import argparse
 ap=argparse.ArgumentParser(description='วาดพื้นแมพทั้งแผ่น: ทะเลไล่เฉดตื้น-ลึก ฟองคลื่น แนวปะการัง หาดทราย')
 ap.add_argument('layout'); ap.add_argument('out'); ap.add_argument('--tiles',default='art/tiles')
 ap.add_argument('--seed',type=int,default=4)
+ap.add_argument('--tint',type=float,default=0.1,help='น้ำหนักสีไล่เฉดทับลายน้ำ (0 = ใช้สีลายเต็มที่) เดิม 0.4')
 A=ap.parse_args(); random.seed(A.seed); np.random.seed(A.seed)
 L=json.load(open(A.layout,encoding='utf-8'))
 T=L['tile']; G=L['terrain']; W,H=L['width']*T,L['height']*T
@@ -30,7 +31,7 @@ d=ndimage.distance_transform_edt(water)
 dl=ndimage.distance_transform_edt(~water)      # ระยะจากน้ำ ฝั่งแผ่นดิน
 def tex(name):
     t=np.array(Image.open(f'{A.tiles}/{name}.png').convert('RGB')).astype(float)
-    return np.tile(t,(H//64+1,W//64+1,1))[:H,:W]
+    return np.tile(t,(H//t.shape[0]+1,W//t.shape[1]+1,1))[:H,:W]  # ลายขนาดใดก็ได้ (น้ำใช้ 384 px)
 shallow,mid,deep=tex('water-shallow'),tex('water'),tex('water-deep')
 sand,grass,dirt=tex('sand'),tex('grass'),tex('dirt')
 # ไล่ระดับความลึก: 0-70px ตื้น, 70-220 กลาง, >220 ลึก (มี noise ให้ขอบเฉดเป็นคลื่น)
@@ -41,7 +42,7 @@ w2=np.clip(1-w1-w3,0,1)
 sea=shallow*w1[...,None]+mid*w2[...,None]+deep*w3[...,None]
 # ปรับสีตามความลึกให้ไล่นุ่มขึ้น (ตื้นสว่างอมเขียว, ลึกเข้ม)
 tint=np.stack([np.interp(dd,[0,60,200,420],[90,30,10,5]),np.interp(dd,[0,60,200,420],[230,180,110,70]),np.interp(dd,[0,60,200,420],[220,220,190,150])],-1)
-sea=sea*0.6+tint*0.4
+sea=sea*(1-A.tint)+tint*A.tint
 # แนวปะการัง/โขดหินใต้น้ำ: หย่อมมืดในเขตน้ำตื้น-กลาง
 reef=np.zeros((H,W))
 for _ in range(90):
