@@ -1,5 +1,6 @@
 import { MapRoom } from "./MapRoom";
 import { MAP_ID, NAME_RE } from "../../shared/constants";
+import { STAT_START } from "../../shared/game";
 import { SPAWN } from "../../shared/map";
 import type { JoinCharacter } from "../../shared/protocol";
 import { parseLook, DEFAULT_LOOK, type Look } from "../../shared/appearance";
@@ -88,8 +89,10 @@ export default {
         const now = Date.now();
         try {
           await env.DB.prepare(
-            "INSERT INTO characters (user_id, name, level, exp, map, x, y, gender, hair, eyes, created_at, updated_at) VALUES (?, ?, 1, 0, ?, ?, ?, ?, ?, ?, ?, ?)",
-          ).bind(uid, name, MAP_ID, SPAWN.x, SPAWN.y, look.gender, look.hair, look.eyes, now, now).run();
+            // ค่าพลังทุกค่าเริ่มที่ STAT_START (5) — ต้องใส่เอง เพราะคอลัมน์ str/agi/vit/luk (migration 0007) ค่าเริ่มต้นเป็น 0
+            "INSERT INTO characters (user_id, name, level, exp, map, x, y, gender, hair, eyes, str, agi, vit, int, dex, luk, stat_points, created_at, updated_at) VALUES (?, ?, 1, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
+          ).bind(uid, name, MAP_ID, SPAWN.x, SPAWN.y, look.gender, look.hair, look.eyes,
+            STAT_START, STAT_START, STAT_START, STAT_START, STAT_START, STAT_START, now, now).run();
         } catch (e) {
           const msg = String(e);
           if (msg.includes("characters.name")) return json({ error: "ชื่อนี้มีคนใช้แล้ว" }, 409);
@@ -118,7 +121,11 @@ export default {
       const join: JoinCharacter = {
         userId: row.user_id, name: row.name, level: row.level, exp: row.exp, x: row.x, y: row.y,
         look: lookOf(row), inv: inv.results, money: row.money ?? 0,
-        stats: { str: row.str, agi: row.agi, vit: row.vit, int: row.int, dex: row.dex, luk: row.luk },
+        // ค่าพลังต่ำสุด STAT_START (กันข้อมูลเก่าที่เคยได้ 0 จากบั๊กตอนสร้างตัวละคร ดู migration 0011)
+        stats: {
+          str: Math.max(row.str, STAT_START), agi: Math.max(row.agi, STAT_START), vit: Math.max(row.vit, STAT_START),
+          int: Math.max(row.int, STAT_START), dex: Math.max(row.dex, STAT_START), luk: Math.max(row.luk, STAT_START),
+        },
         points: row.stat_points,
         quests: parseLog(row.quests),
         equip: parseEquip(row.equip),
