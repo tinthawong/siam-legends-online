@@ -28,3 +28,16 @@ export const IDLE_FPS = 5; // 200ms ต่อเฟรม ตามไฟล์�
 export const IDLE_OFFSET = 8;
 
 export const idleFrameUrl = (gender: string, dir: string, i: number) => `sprites/base-${gender}/idle-${dir}/${i}.png`;
+
+// ท่าเดิน (walk): เฟรม 64×64 จาก PixelLab ตัวละครเลื่อน +3px จากภาพ base (เท้าบรรทัด 48 วางให้เท้าติดพื้น)
+// ได้ทิศใหม่มา: วางไฟล์ที่ sprites/base-<เพศ>/walk-<ทิศ>/0..5.png แล้วเพิ่มทิศในลิสต์ของเพศนั้น
+// ทิศที่ยังไม่มีท่าเดิน ใช้ภาพนิ่ง + เด้งตามก้าวด้วยโค้ด (GameScene.setMotion)
+export const WALK_DIRS: Record<string, readonly string[]> = {
+  male: ["south"],
+  female: [],
+};
+export const walkDirs = (gender: string) => WALK_DIRS[gender] ?? [];
+export const WALK_FRAMES = 6;
+export const WALK_FPS = 10; // ไฟล์ต้นฉบับ 200ms ต่อเฟรม เร่งให้ก้าวทันความเร็วเดินในเกม (150ms ต่อช่อง)
+export const WALK_OFFSET = 3;
+export const walkFrameUrl = (gender: string, dir: string, i: number) => `sprites/base-${gender}/walk-${dir}/${i}.png`;

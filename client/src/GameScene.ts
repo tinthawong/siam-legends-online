@@ -12,7 +12,7 @@ import { MOBS } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, emptyLog, npcMark, type QuestLog } from "../../shared/quests";
-import { IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, animSource, idleDirs, idleFrameUrl } from "./sprites";
+import { IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, WALK_FRAMES, WALK_FPS, WALK_OFFSET, animSource, idleDirs, idleFrameUrl, walkDirs, walkFrameUrl } from "./sprites";
 
 interface View {
   id: string;
@@ -115,6 +115,9 @@ export class GameScene extends Phaser.Scene {
     // ตัว base ของแต่ละเพศ (client/public/sprites/base-<เพศ>/<ทิศ>.png)
     for (const g of Object.keys(GENDERS))
       for (const d of DIRS) this.load.image(`base_${g}_${d}`, `sprites/base-${g}/${d}.png`);
+    for (const g of Object.keys(GENDERS))
+      for (const d of walkDirs(g))
+        for (let i = 0; i < WALK_FRAMES; i++) this.load.image(`base_${g}_walk_${d}_${i}`, walkFrameUrl(g, d, i));
     for (const g of Object.keys(GENDERS))
       for (const d of idleDirs(g))
         for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
@@ -681,6 +684,18 @@ export class GameScene extends Phaser.Scene {
         }
         if (frames.length === IDLE_FRAMES) this.anims.create({ key: `${prefix}_idle_${d}`, frames, frameRate: IDLE_FPS, repeat: -1 });
       }
+      // ท่าเดิน: เหมือนท่ายืน
+      for (const d of walkDirs(look.gender)) {
+        const frames: Phaser.Types.Animations.AnimationFrame[] = [];
+        for (let i = 0; i < WALK_FRAMES; i++) {
+          const key = `base_${look.gender}_walk_${d}_${i}`;
+          if (!this.textures.exists(key)) break;
+          const src = this.textures.get(key).getSourceImage() as HTMLImageElement;
+          this.textures.addCanvas(`${prefix}_walk_${d}_${i}`, recolorSprite(src, look));
+          frames.push({ key: `${prefix}_walk_${d}_${i}` });
+        }
+        if (frames.length === WALK_FRAMES) this.anims.create({ key: `${prefix}_walk_${d}`, frames, frameRate: WALK_FPS, repeat: -1 });
+      }
     }
     return prefix;
   }
@@ -717,8 +732,11 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (!v.sprite) return;
-    const src = v.kind === "player" && !v.path.length && v.look ? animSource(idleDirs(v.look.gender), v.dir) : null;
-    const idle = src && this.anims.exists(`${v.sprite}_idle_${src.dir}`) ? `${v.sprite}_idle_${src.dir}` : null;
+    // ผู้เล่น: ยืน = ท่ายืน, เดิน = ท่าเดิน (ทิศที่ไม่มีใช้ของฝั่งตรงข้ามกลับภาพ)
+    const walking = v.path.length > 0;
+    const kind = walking ? "walk" : "idle";
+    const src = v.kind === "player" && !v.dead && v.look ? animSource((walking ? walkDirs : idleDirs)(v.look.gender), v.dir) : null;
+    const idle = src && this.anims.exists(`${v.sprite}_${kind}_${src.dir}`) ? `${v.sprite}_${kind}_${src.dir}` : null;
     // ไม่มีภาพท่าของทิศนี้: ภาพนิ่ง + ขยับด้วยโค้ด (ยืน = หายใจ, เดิน = เด้งตามก้าว, สลบ = นิ่ง)
     const motion = v.kind !== "player" || v.dead ? null : v.path.length ? "step" : "breath";
     const pose = idle ? `${idle}${src!.flip ? ":flip" : ""}` : `${v.sprite}_${v.dir}:${motion}`;
@@ -726,7 +744,7 @@ export class GameScene extends Phaser.Scene {
     v.pose = pose;
     if (idle) {
       this.setMotion(v, null);
-      v.body.setFlipX(src!.flip).setOrigin(0.5, (45 + IDLE_OFFSET) / 64).play(idle, true);
+      v.body.setFlipX(src!.flip).setOrigin(0.5, (45 + (walking ? WALK_OFFSET : IDLE_OFFSET)) / 64).play(idle, true);
     } else {
       v.body.stop();
       v.body.setFlipX(false).setTexture(`${v.sprite}_${v.dir}`).setOrigin(0.5, 45 / 48);
