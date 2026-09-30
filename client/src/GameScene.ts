@@ -64,6 +64,7 @@ type Dir = (typeof DIRS)[number];
 const STEPS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]] as const;
 const JOY_AHEAD = 4;     // จอยสติ๊ก: สั่งเดินไปช่องข้างหน้ากี่ช่อง
 const JOY_RESEND_MS = 150;
+const PUNCH_WINDUP_MS = 80; // ต่อย: ง้างก่อนกี่ ms แล้วค่อยแสดงผลที่เป้า (ตัวเลข/ประกาย)
 
 function dirOf(dx: number, dy: number): Dir {
   const i = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
@@ -106,6 +107,7 @@ export class GameScene extends Phaser.Scene {
   private questLog: QuestLog = emptyLog();
   private level = 1;
   private invCount = new Map<string, number>();
+  private myWeapon = false; // เราถืออาวุธอยู่ไหม (มือเปล่า = ต่อย)
 
   constructor(private net: Net) {
     super("game");
@@ -370,10 +372,17 @@ export class GameScene extends Phaser.Scene {
         if (dst) {
           dst.hp = m.hp;
           this.drawHp(dst);
-          if (m.miss) this.floatText(dst.c.x, dst.c.y + dst.topY - 9, "พลาด", "#bfc7d5", 700);
-          else { this.floatDamage(dst, m.dmg, m.crit); this.hitFx(dst, this.views.get(m.src), m.crit); }
-          dst.body.setTintFill(0xffffff);
-          this.time.delayedCall(70, () => dst.body.clearTint());
+          // ต่อย: ง้างหมัดก่อน ตัวเลข/ประกายขึ้นตอนหมัดถึงเป้า
+          const impact = () => {
+            if (!dst.body.active) return;
+            if (m.miss) this.floatText(dst.c.x, dst.c.y + dst.topY - 9, "พลาด", "#bfc7d5", 700);
+            else { this.floatDamage(dst, m.dmg, m.crit); this.hitFx(dst, this.views.get(m.src), m.crit); }
+            if (m.miss) return;
+            dst.body.setTintFill(0xffffff);
+            this.time.delayedCall(70, () => dst.body.clearTint());
+          };
+          if (this.isPunch(m.src)) this.time.delayedCall(PUNCH_WINDUP_MS, impact);
+          else impact();
           // มอนจาก sheet ที่มีท่าโดนตี: เล่นพร้อมกะพริบขาว แต่ไม่ขัดท่า attack ที่กำลังเล่นอยู่
           if (dst.sheet && dst.pose !== "attack" && this.anims.exists(`${dst.sheet}_hit`)) {
             dst.pose = "hit";
@@ -388,7 +397,10 @@ export class GameScene extends Phaser.Scene {
         const src = this.views.get(m.src);
         if (src && dst) this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
         // ผู้เล่นตี: พุ่งตัว + รอยฟัน (ตีพลาดก็เห็นท่าเหวี่ยง)
-        if (src?.kind === "player" && dst) this.swingFx(src, dst, m.crit);
+        if (src?.kind === "player" && dst) {
+          if (this.isPunch(src.id)) this.punchFx(src, dst, m.crit);
+          else this.swingFx(src, dst, m.crit);
+        }
         // มอนจาก sheet ตีผู้เล่น: เล่นท่า attack จนจบแล้วกลับท่าเดิม
         if (src?.sheet && this.anims.exists(`${src.sheet}_attack`)) {
           src.pose = "attack";
@@ -629,6 +641,65 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** ผู้เล่นมือเปล่า = ต่อย (ผู้เล่นคนอื่นยังไม่รู้ว่าถืออะไร ถือว่ามือเปล่า) */
+  private isPunch(id: string): boolean {
+    const v = this.views.get(id);
+    return v?.kind === "player" && !(id === this.me && this.myWeapon);
+  }
+
+  /** ต่อย (โค้ดล้วน ยังไม่มีภาพท่าตี): ง้าง = ถอยหลัง+เอนไปข้างหลัง → ต่อย = พุ่งไปข้างหน้า มีหมัดพุ่งออกไปหาเป้า + เส้นความเร็ว
+   *  แขนอยู่ในภาพตัวละครภาพเดียว ขยับแยกไม่ได้ จึงใช้หมัดที่วาดด้วยโค้ดแทน */
+  private punchFx(src: View, dst: View, crit: boolean) {
+    const dx = dst.c.x - src.c.x, dy = dst.c.y - src.c.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const depth = Math.max(src.c.y, dst.c.y) + 2;
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const lean = ux >= 0 ? 1 : -1;
+
+    // ง้าง แล้วต่อย (ขยับแค่ภาพตัว ตำแหน่งจริงบน server ไม่เปลี่ยน)
+    if (!calm) {
+      const bx = src.body.x, by = src.body.y;
+      const push = crit ? 5 : 4;
+      this.tweens.chain({
+        targets: src.body,
+        tweens: [
+          { x: bx - ux * 2, y: by - uy * 1.5, angle: -lean * 6, duration: PUNCH_WINDUP_MS, ease: "Quad.easeOut" },
+          { x: bx + ux * push, y: by + uy * push * 0.7, angle: lean * 5, duration: 55, ease: "Quad.easeIn" },
+          { x: bx, y: by, angle: 0, duration: 120, ease: "Quad.easeOut" },
+        ],
+        onComplete: () => { src.body.setPosition(bx, by).setAngle(0); },
+      });
+    }
+
+    // หมัด: วงกลมสีผิวขอบเข้ม พุ่งจากหน้าอกไปหาเป้าตอนต่อย แล้วจางหาย
+    const sx = src.c.x + ux * 6, sy = src.c.y - 17 + uy * 4;
+    const ex = src.c.x + ux * 20, ey = src.c.y - 15 + uy * 12;
+    const r = crit ? 4 : 3;
+    const fist = this.add.graphics({ x: sx, y: sy }).setDepth(depth).setAlpha(0);
+    fist.fillStyle(0x5a2e1e).fillCircle(0, 0, r + 1).fillStyle(crit ? 0xffd9a0 : 0xf0b089).fillCircle(0, 0, r).fillStyle(0xffffff, 0.6).fillCircle(-1, -1, 1);
+    this.tweens.chain({
+      targets: fist,
+      tweens: [
+        { alpha: 1, duration: 1, delay: PUNCH_WINDUP_MS - 10 },
+        { x: ex, y: ey, duration: 55, ease: "Quad.easeIn" },
+        { alpha: 0, scale: 1.4, duration: 110 },
+      ],
+      onComplete: () => fist.destroy(),
+    });
+
+    // เส้นความเร็วด้านหลังหมัด
+    this.time.delayedCall(PUNCH_WINDUP_MS + 20, () => {
+      const nx = -uy, ny = ux; // ตั้งฉากกับทิศต่อย
+      for (const off of crit ? [-4, 0, 4] : [-3, 3]) {
+        const g = this.add.graphics().setDepth(depth).setBlendMode(Phaser.BlendModes.ADD);
+        const ax = ex - ux * 6 + nx * off, ay = ey - uy * 5 + ny * off;
+        g.lineStyle(1.5, crit ? 0xffd84a : 0xffffff, 0.9).lineBetween(ax, ay, ax - ux * 10, ay - uy * 8);
+        this.tweens.add({ targets: g, alpha: 0, duration: 160, onComplete: () => g.destroy() });
+      }
+    });
+  }
+
   /** ท่าตีของผู้เล่น (โค้ดล้วน ยังไม่มีภาพท่าตี): พุ่งเข้าหาเป้านิดหนึ่งแล้วดีดกลับ + รอยฟันโค้งกวาดไปทางเป้า
    *  มุมมองเอียงจากด้านบน จึงบีบแกนตั้งของรอยฟันให้แบนลง */
   private swingFx(src: View, dst: View, crit: boolean) {
@@ -854,6 +925,7 @@ export class GameScene extends Phaser.Scene {
   private updateStats(s: PlayerStats) {
     this.onStats?.(s);
     if (s.level !== this.level) { this.level = s.level; this.updateMarks(); }
+    this.myWeapon = !!s.equip.weapon;
     document.getElementById("hud-lv")!.textContent = `Lv ${s.level}`;
     (document.getElementById("hud-hp") as HTMLElement).style.width = `${(s.hp / s.maxHp) * 100}%`;
     document.getElementById("hud-hp-text")!.textContent = `HP ${s.hp} / ${s.maxHp}`;
