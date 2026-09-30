@@ -18,20 +18,33 @@ ROOT = Path(__file__).resolve().parent.parent
 
 
 def remove_checker(a):
-    rgb = a[..., :3].astype(int)
+    """ลบพื้นตารางหมากรุกที่วาดติดมา:
+    1) พิกเซลเทาไม่มีสีที่ต่อจากขอบภาพ = พื้นหลัง (โปร่งใส)
+    2) แสงโปร่งที่ผสมพื้นเทาไปแล้ว (สีจืด และไม่สว่างเกินพื้นตาราง) → ความทึบตามความสดของสี
+       แล้วถอดสีเทาออก (ประมาณพื้นเป็นเทากลาง 165) เหลือแต่สีแสงจริง ไม่มีคราบเทา
+    แกนกลาง (หมัด/เท้า/แสงขาวตรงกลาง) คงเดิม"""
+    rgb = a[..., :3].astype(float)
     sat = rgb.max(2) - rgb.min(2)
     light = rgb.min(2)
     bgish = (sat < 12) & (light > 95)   # ตารางหมากรุก: เทาไม่มีสี (ความสด ≤ 3) สว่าง 105–255
     lab, _ = ndimage.label(bgish)
     border = set(np.unique(np.concatenate([lab[0], lab[-1], lab[:, 0], lab[:, -1]]))) - {0}
     bg = np.isin(lab, list(border))
-    bg = ndimage.binary_dilation(bg, iterations=1) & bgish | bg
-    alpha = np.where(bg, 0, 255).astype(np.uint8)
-    # ขอบนุ่ม: พิกเซลติดพื้นหลังที่ยังจางอยู่ (แสงฟุ้ง) ลดความทึบตามความสว่างเทา
-    edge = ndimage.binary_dilation(bg, iterations=2) & ~bg
-    alpha[edge] = np.clip(sat[edge] * 10, 0, 255)
+    # ทุกพิกเซลที่ไม่ใช่พื้นหลัง: ทึบเมื่อสีสด (≥ 80) / สว่างกว่าพื้นตาราง (min > 215 เช่นแกนแสงขาว) / เส้นขอบดำ
+    # นอกนั้น = แสงโปร่งที่ผสมพื้นตารางเทาไปแล้ว → ความทึบตามความสด แล้วถอดสีเทาออก (ไม่เหลือลายตาราง)
+    solid = (sat >= 80) | (light > 215) | (rgb.max(2) < 90)
+    band = ~bg & ~solid
+    alpha = np.full(sat.shape, 255.0)
+    alpha[bg] = 0
+    fa = np.clip((sat - 15) / 65, 0, 1)
+    alpha[band] = fa[band] * 255
+    g = 165.0
+    k = np.maximum(fa, 0.05)[..., None]
+    un = np.clip((rgb - g * (1 - k)) / k, 0, 255)
+    m = band[..., None]
     out = a.copy()
-    out[..., 3] = alpha
+    out[..., :3] = np.where(m, un, rgb).astype(np.uint8)
+    out[..., 3] = alpha.astype(np.uint8)
     return out
 
 
@@ -41,6 +54,7 @@ def main():
     ap.add_argument("--height", type=int, default=40)
     ap.add_argument("--frames", type=int, default=0)
     ap.add_argument("--ms", type=int, default=70, help="ms ต่อเฟรม")
+    ap.add_argument("--hd", type=int, default=2, help="เก็บภาพกี่เท่าของขนาดในเกม")
     A = ap.parse_args()
     im = Image.open(A.src).convert("RGBA")
     a = np.array(im)
@@ -75,8 +89,8 @@ def main():
     fw = max(e - s for s, e in spans)
     out_dir = ROOT / "client/public/sprites/fx" / A.name
     out_dir.mkdir(parents=True, exist_ok=True)
-    scale = A.height / (y1 - y0)
-    FW, FH = max(1, round(fw * scale)), A.height
+    scale = A.height * A.hd / (y1 - y0)
+    FW, FH = max(1, round(fw * scale)), A.height * A.hd
     names = []
     for i, (s, e) in enumerate(spans):
         fr = Image.new("RGBA", (fw, y1 - y0))
@@ -86,13 +100,23 @@ def main():
         lab, n = ndimage.label(ndimage.binary_dilation(pa[..., 3] > 30, iterations=3))
         if n > 1:
             sizes = ndimage.sum(pa[..., 3] > 30, lab, range(1, n + 1))
-            keep = np.isin(lab, [i + 1 for i, v in enumerate(sizes) if v >= sizes.max() * 0.15])
+            keep = np.isin(lab, [i + 1 for i, v in enumerate(sizes) if v >= sizes.max() * 0.35])
             pa[~keep] = 0
-            piece = Image.fromarray(pa)
+        # เศษเส้นตั้งของเฟรมถัดไปที่ติดขอบขวา/ซ้าย: ตัดคอลัมน์ที่อยู่ห่างก้อนหลักด้วยช่องว่าง ≥ 3 px
+        colsum = (pa[..., 3] > 30).sum(0)
+        main = int(np.argmax(ndimage.uniform_filter1d(colsum.astype(float), 15)))
+        gap = colsum <= 2  # เศษแสงประปรายไม่นับ
+        l = main
+        while l > 0 and not gap[max(0, l - 3):l].all(): l -= 1
+        r = main
+        while r < len(colsum) - 1 and not gap[r:r + 3].all(): r += 1
+        pa[:, :l] = 0; pa[:, r + 1:] = 0
+        piece = Image.fromarray(pa)
         fr.alpha_composite(piece, ((fw - (e - s)) // 2, 0))
         fr = fr.resize((FW, FH), Image.LANCZOS)
         n = f"{i}.png"; fr.save(out_dir / n); names.append(n)
-    meta = {"frameWidth": FW, "frameHeight": FH, "frames": names, "frameMs": A.ms}
+    # เก็บที่ 2 เท่าของขนาดในเกม (--height) แล้วแสดงที่ครึ่งหนึ่ง: บนจอ (ซูม 2×) คมกว่าย่อเล็กแล้วขยาย
+    meta = {"frameWidth": FW, "frameHeight": FH, "frames": names, "frameMs": A.ms, "scale": 1 / A.hd}
     (out_dir / "sheet.json").write_text(json.dumps(meta, indent=1), encoding="utf-8")
     src_dir = ROOT / "art/fx"; src_dir.mkdir(parents=True, exist_ok=True)
     im.save(src_dir / f"{A.name}.png")

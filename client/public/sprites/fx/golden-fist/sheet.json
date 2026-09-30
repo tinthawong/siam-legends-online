@@ -1,6 +1,6 @@
 {
- "frameWidth": 49,
- "frameHeight": 48,
+ "frameWidth": 102,
+ "frameHeight": 96,
  "frames": [
   "0.png",
   "1.png",
@@ -9,5 +9,6 @@
   "4.png",
   "5.png"
  ],
- "frameMs": 80
+ "frameMs": 80,
+ "scale": 0.5
 }

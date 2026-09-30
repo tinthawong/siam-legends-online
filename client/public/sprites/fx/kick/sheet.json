@@ -1,11 +1,12 @@
 {
- "frameWidth": 47,
- "frameHeight": 24,
+ "frameWidth": 94,
+ "frameHeight": 48,
  "frames": [
   "0.png",
   "1.png",
   "2.png",
   "3.png"
  ],
- "frameMs": 60
+ "frameMs": 60,
+ "scale": 0.5
 }

@@ -744,22 +744,43 @@ export class GameScene extends Phaser.Scene {
       from: 10, to: 24, height: kick ? -8 : -17, scale: crit ? 1.35 : 1 }));
   }
 
-  /** เล่นเอฟเฟกต์จาก sprites/fx/<name> พุ่งจากตัว src ไปทาง dst (ภาพต้นฉบับหันขวา หมุนตามทิศ ทางซ้ายกลับหัวให้ตั้งตรง) */
-  private playFx(name: string, src: View, dst: View, o: { from: number; to: number; height: number; scale: number }) {
+  /** เล่นเอฟเฟกต์จาก sprites/fx/<name> พุ่งจากตัว src ไปทาง dst (ภาพต้นฉบับหันขวา หมุนตามทิศ ทางซ้ายกลับหัวให้ตั้งตรง)
+   *  ภาพเก็บที่ 2 เท่า (sheet.json scale) + ชั้นแสงเรืองซ้อนแบบ ADD ให้แสงสว่างจ้า */
+  private playFx(name: string, src: View, dst: View, o: { from: number; to: number; height: number; scale: number; glow?: number }) {
     if (!this.anims.exists(`fx_${name}`)) return;
+    const meta = this.cache.json.get(`fxsheet_${name}`) as { scale?: number } | undefined;
+    const sc = (meta?.scale ?? 1) * o.scale;
     const dx = dst.c.x - src.c.x, dy = dst.c.y - src.c.y;
     const len = Math.hypot(dx, dy) || 1;
     const ux = dx / len, uy = dy / len;
     const a = Math.atan2(dy, dx);
     const y0 = src.c.y - src.lift + o.height;
-    const fx = this.add.sprite(src.c.x + ux * o.from, y0 + uy * o.from * 0.7, `fx_${name}_0`)
-      .setOrigin(0.92, 0.5).setRotation(a)  /* จุดยึด = ปลายหมัด/เท้า */.setFlipY(Math.abs(a) > Math.PI / 2).setScale(o.scale)
-      .setDepth(Math.max(src.c.y, dst.c.y) + 3);
-    fx.play(`fx_${name}`);
+    const depth = Math.max(src.c.y, dst.c.y) + 3;
+    const mk = (add: boolean) => this.add.sprite(src.c.x + ux * o.from, y0 + uy * o.from * 0.7, `fx_${name}_0`)
+      .setOrigin(0.92, 0.5).setRotation(a).setFlipY(Math.abs(a) > Math.PI / 2) /* จุดยึด = ปลายหมัด/เท้า */
+      .setScale(add ? sc * 1.12 : sc).setDepth(add ? depth + 0.1 : depth)
+      .setBlendMode(add ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL).setAlpha(add ? (o.glow ?? 0.45) : 1);
+    const parts = [mk(false), mk(true)];
     const dur = this.anims.get(`fx_${name}`).duration;
-    this.tweens.add({ targets: fx, x: src.c.x + ux * o.to, y: y0 + uy * o.to * 0.7, duration: dur * 0.6, ease: "Quad.easeOut" });
-    fx.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () =>
-      this.tweens.add({ targets: fx, alpha: 0, duration: 80, onComplete: () => fx.destroy() }));
+    for (const fx of parts) {
+      fx.play(`fx_${name}`);
+      this.tweens.add({ targets: fx, x: src.c.x + ux * o.to, y: y0 + uy * o.to * 0.7, duration: dur * 0.6, ease: "Quad.easeOut" });
+    }
+    parts[0].once(Phaser.Animations.Events.ANIMATION_COMPLETE, () =>
+      this.tweens.add({ targets: parts, alpha: 0, duration: 90, onComplete: () => parts.forEach((p) => p.destroy()) }));
+  }
+
+  /** หมัดทองชนเป้า: แสงวาบทั้งจอ, คลื่นทองขยาย 2 วง, ดาวทองพุ่ง, จอสั่นแรง */
+  private goldenImpact(dst: View) {
+    const x = dst.c.x, y = dst.c.y - dst.lift + dst.topY / 2, depth = dst.c.y + 4, ADD = Phaser.BlendModes.ADD;
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (!calm) { this.cameras.main.flash(90, 200, 160, 60); this.cameras.main.shake(260, 0.012); }
+    for (let k = 0; k < 2; k++) {
+      const ring = this.add.ellipse(x, y + 10, 24, 10).setStrokeStyle(4 - k, k ? 0xfff2b0 : 0xffc62a).setBlendMode(ADD).setDepth(depth);
+      this.tweens.add({ targets: ring, scaleX: 4.5, scaleY: 4.5, alpha: 0, delay: k * 90, duration: 420, ease: "Cubic.easeOut", onComplete: () => ring.destroy() });
+    }
+    const sun = this.add.star(x, y, 12, 8, 34, 0xffe27a).setBlendMode(ADD).setDepth(depth).setScale(0.3);
+    this.tweens.add({ targets: sun, scale: 1.4, alpha: 0, angle: 30, duration: 300, ease: "Quad.easeOut", onComplete: () => sun.destroy() });
   }
 
   /** สกิลโดน: ชื่อสกิลเหนือหัว + เอฟเฟกต์สกิล แล้วตัวเลข/ประกายของแต่ละครั้งทยอยขึ้น */
@@ -770,8 +791,8 @@ export class GameScene extends Phaser.Scene {
     if (src && dst) {
       this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
       this.floatText(src.c.x, src.c.y - src.lift + src.topY - 16, `${sk.name}!`, "#ffd84a", 900);
-      if (m.skill === "flurry") this.playFx(sk.fx, src, dst, { from: 12, to: 26, height: -16, scale: 1 });
-      else this.playFx(sk.fx, src, dst, { from: 10, to: 28, height: -16, scale: 1.1 });
+      if (m.skill === "flurry") this.playFx(sk.fx, src, dst, { from: 12, to: 28, height: -16, scale: 1.15, glow: 0.5 });
+      else this.playFx(sk.fx, src, dst, { from: 10, to: 30, height: -16, scale: 1.35, glow: 0.7 });
       if (m.src === this.me) this.onSkillCast?.(m.skill);
     }
     if (!dst) return;
@@ -781,6 +802,7 @@ export class GameScene extends Phaser.Scene {
       if (!dst.body.active) return;
       if (h.miss) { this.floatText(dst.c.x, dst.c.y - dst.lift + dst.topY - 9, "พลาด", "#bfc7d5", 700); return; }
       this.floatDamage(dst, h.dmg, h.crit || m.skill === "golden_fist");
+      if (m.skill === "golden_fist") this.goldenImpact(dst);
       this.hitFx(dst, src, h.crit || m.skill === "golden_fist");
       dst.body.setTintFill(0xffffff);
       this.time.delayedCall(70, () => dst.body.clearTint());
