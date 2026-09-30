@@ -62,11 +62,18 @@ const center = (n: number) => n * TILE + TILE / 2;
 const DIRS = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"] as const;
 type Dir = (typeof DIRS)[number];
 
+const DIR_VEC: Record<string, [number, number]> = {
+  east: [1, 0], "south-east": [1, 1], south: [0, 1], "south-west": [-1, 1],
+  west: [-1, 0], "north-west": [-1, -1], north: [0, -1], "north-east": [1, -1],
+};
 // ก้าวของแต่ละทิศ ตามลำดับ DIRS
 const STEPS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]] as const;
 const JOY_AHEAD = 4;     // จอยสติ๊ก: สั่งเดินไปช่องข้างหน้ากี่ช่อง
 const JOY_RESEND_MS = 150;
-const PUNCH_WINDUP_MS = 80; // ต่อย: ง้างก่อนกี่ ms แล้วค่อยแสดงผลที่เป้า (ตัวเลข/ประกาย)
+const PUNCH_WINDUP_MS = 80;
+// มินิแมพ: ภาพพื้นแมพย่อเก็บไว้ที่สัดส่วนนี้ แสดงพื้นที่กว้าง MINI_VIEW px (โลก) รอบตัวเรา วาดใหม่ทุก 100 ms
+const MINI_SCALE = 0.25;
+const MINI_VIEW = 560; // ต่อย: ง้างก่อนกี่ ms แล้วค่อยแสดงผลที่เป้า (ตัวเลข/ประกาย)
 
 function dirOf(dx: number, dy: number): Dir {
   const i = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
@@ -109,6 +116,7 @@ export class GameScene extends Phaser.Scene {
   onExpGain: ((m: Extract<ServerMsg, { t: "exp_gain" }>) => void) | null = null;
   private guideNpc: string | null = null;
   private guideArrow!: Phaser.GameObjects.Graphics;
+  private mini: { ctx: CanvasRenderingContext2D; src: HTMLCanvasElement; next: number } | null = null;
 
   // NPC: เครื่องหมาย ! / ? เหนือหัว คิดจากเลเวล กระเป๋า และสถานะเควสของเรา
   private npcMarks = new Map<string, Phaser.GameObjects.Text>();
@@ -825,8 +833,73 @@ export class GameScene extends Phaser.Scene {
       this.cameras.main.shake(crit ? 180 : onMe ? 140 : 90, crit ? 0.01 : onMe ? 0.007 : 0.004);
   }
 
-  /** เลเวลขึ้น (ทุกคนในแมพเห็น): เสาแสงทองพุ่งขึ้นรอบตัว + ประกายลอยขึ้น + วงแสงที่เท้า */
+  // ---------- มินิแมพ (มุมขวาบน) ----------
+
+  /** ย่อภาพพื้นแมพ (รวมป่า) เก็บไว้ครั้งเดียว */
+  private setupMinimap(ground: HTMLCanvasElement) {
+    const cv = document.getElementById("minimap") as HTMLCanvasElement | null;
+    const ctx = cv?.getContext("2d");
+    if (!cv || !ctx) return;
+    const src = document.createElement("canvas");
+    src.width = Math.ceil(ground.width * MINI_SCALE);
+    src.height = Math.ceil(ground.height * MINI_SCALE);
+    const sctx = src.getContext("2d")!;
+    sctx.imageSmoothingEnabled = true;
+    sctx.drawImage(ground, 0, 0, src.width, src.height);
+    this.mini = { ctx, src, next: 0 };
+  }
+
+  /** วาดพื้นที่รอบตัวเรา (เราอยู่กลางเสมอ แมพเลื่อนตาม) + จุด มอน (แดง) ผู้เล่น (ฟ้า) NPC (ทอง) ทางออก (เขียว) */
+  private drawMinimap(time: number) {
+    const m = this.mini;
+    const me = this.me ? this.views.get(this.me) : undefined;
+    if (!m || !me || time < m.next) return;
+    m.next = time + 100;
+    const cv = m.ctx.canvas;
+    const px = Math.round(cv.clientWidth * (window.devicePixelRatio || 1));
+    if (!px) return;
+    if (cv.width !== px) { cv.width = px; cv.height = px; }
+    const ctx = m.ctx, W = cv.width, k = W / MINI_VIEW; // พิกเซลมินิแมพต่อพิกเซลโลก
+    const cx = me.c.x, cy = me.c.y;
+    ctx.fillStyle = "#0b1626";
+    ctx.fillRect(0, 0, W, W);
+    ctx.imageSmoothingEnabled = true;
+    const sw = MINI_VIEW * MINI_SCALE;
+    ctx.drawImage(m.src, (cx - MINI_VIEW / 2) * MINI_SCALE, (cy - MINI_VIEW / 2) * MINI_SCALE, sw, sw, 0, 0, W, W);
+    const at = (x: number, y: number) => [(x - cx) * k + W / 2, (y - cy) * k + W / 2] as const;
+    const dot = (x: number, y: number, r: number, fill: string) => {
+      const [dx, dy] = at(x, y);
+      if (dx < -r || dy < -r || dx > W + r || dy > W + r) return;
+      ctx.beginPath(); ctx.arc(dx, dy, r, 0, Math.PI * 2);
+      ctx.fillStyle = fill; ctx.fill();
+      ctx.lineWidth = Math.max(1, r * 0.4); ctx.strokeStyle = "rgba(0,0,0,0.7)"; ctx.stroke();
+    };
+    const r = Math.max(2, W / 60);
+    for (const e of EXITS) {
+      const [x0, y0] = at(e.x0 * TILE, e.y0 * TILE), [x1, y1] = at((e.x1 + 1) * TILE, (e.y1 + 1) * TILE);
+      ctx.fillStyle = "rgba(126, 224, 138, 0.8)";
+      ctx.fillRect(x0, y0, Math.max(r, x1 - x0), Math.max(r, y1 - y0));
+    }
+    for (const n of Object.values(NPCS)) dot(center(n.x), center(n.y), r * 1.1, "#ffd84a");
+    for (const v of this.views.values()) {
+      if (v.id === this.me) continue;
+      dot(v.c.x, v.c.y, r * (v.kind === "mob" ? 0.9 : 1.1), v.kind === "mob" ? "#ff5a5a" : "#6cc8ff");
+    }
+    // เรา: ลูกศรชี้ทิศที่หัน
+    const [vx, vy] = DIR_VEC[me.dir] ?? [1, 0];
+    const a = Math.atan2(vy, vx);
+    ctx.save();
+    ctx.translate(W / 2, W / 2);
+    ctx.rotate(a);
+    const s = r * 2.2;
+    ctx.beginPath(); ctx.moveTo(s, 0); ctx.lineTo(-s * 0.7, -s * 0.65); ctx.lineTo(-s * 0.35, 0); ctx.lineTo(-s * 0.7, s * 0.65); ctx.closePath();
+    ctx.fillStyle = "#fff"; ctx.fill(); ctx.lineWidth = Math.max(1, r * 0.5); ctx.strokeStyle = "#3a1a05"; ctx.stroke();
+    ctx.restore();
+  }
+
+  /** เลเวลขึ้น (ทุกคนในแมพเห็น): เสาแสงทองพุ่งขึ้นรอบตัว + ประกายลอยขึ้น + วงแสงที่เท้า + ออร่าทองแบบซูเปอร์ไซย่า */
   private levelUpFx(v: View) {
+    this.superAura(v);
     const x = v.c.x, y = v.c.y - v.lift, depth = v.c.y + 2, ADD = Phaser.BlendModes.ADD;
     const ring = this.add.ellipse(x, y + 6, 20, 8).setStrokeStyle(3, 0xffd84a).setBlendMode(ADD).setDepth(v.c.y - 1);
     this.tweens.add({ targets: ring, scaleX: 2.6, scaleY: 2.6, alpha: 0, duration: 700, ease: "Cubic.easeOut", onComplete: () => ring.destroy() });
@@ -839,6 +912,52 @@ export class GameScene extends Phaser.Scene {
       this.tweens.add({ targets: star, y: sy - 50 - Math.random() * 40, alpha: { from: 1, to: 0 }, angle: 180,
         delay: Math.random() * 500, duration: 800 + Math.random() * 400, ease: "Quad.easeOut", onComplete: () => star.destroy() });
     }
+  }
+
+  /** ออร่าทอง (ราว 2.5 วิ): เปลวทองลุกท่วมรอบตัวจากเท้าถึงหัว, ตัวเรืองแสงทอง, ประกายไฟฟ้าแวบ ๆ
+   *  เปลวอยู่ใน v.inner (หลังตัว) จึงเดินตามตัว (และยกตามสะพาน) */
+  private superAura(v: View) {
+    const ADD = Phaser.BlendModes.ADD;
+    const H = -v.topY + 8; // ความสูงตัวจากเท้า
+    const aura = this.add.container(0, 0);
+    v.inner.addAt(aura, 0); // ข้างหลังตัว (เปลวทับหน้าตัวทำให้หน้าเป็นหย่อมเทา จึงอยู่หลังตัวทั้งหมด)
+    const DUR = 2500;
+    const flame = (parent: Phaser.GameObjects.Container, alpha: number) => {
+      const side = Math.random() < 0.5 ? -1 : 1;
+      const x = side * (6 + Math.random() * 8), y = 8 - Math.random() * H * 0.9;
+      // สามเหลี่ยมยอดแหลมชี้ขึ้น (พิกัดบวก: ฐานล่าง ยอดบน) จุดยึดกลางฐาน
+      const h = 12 + Math.random() * 12;
+      const f = this.add.triangle(x, y, 0, h, 4, 0, 8, h, Math.random() < 0.35 ? 0xfff2b0 : 0xffc62a, alpha)
+        .setBlendMode(ADD).setOrigin(0.5, 1).setAngle(side * (6 + Math.random() * 12));
+      parent.add(f);
+      this.tweens.add({ targets: f, y: y - 14 - Math.random() * 12, scaleY: 1.6, scaleX: 0.5, alpha: 0, duration: 380 + Math.random() * 220,
+        ease: "Quad.easeOut", onComplete: () => f.destroy() });
+    };
+    // แสงเรืองรอบตัว (วงรีหลายชั้น เต้นเป็นจังหวะ)
+    const glow = this.add.ellipse(0, 8 - H / 2, 34, H + 12, 0xffd84a, 0.28).setBlendMode(ADD);
+    aura.add(glow);
+    this.tweens.add({ targets: glow, scaleX: 1.15, scaleY: 1.08, alpha: 0.42, yoyo: true, repeat: -1, duration: 160 });
+    // ตัวเรืองแสงทอง: glow shader ถ้ามี (WebGL) ไม่มีก็ใช้สีทองทับ
+    const fx = v.body.preFX?.addGlow(0xffd84a, 3, 0, false, 0.1, 12);
+    if (!fx) v.body.setTint(0xfff0a0);
+    const flames = this.time.addEvent({ delay: 45, repeat: Math.floor(DUR / 45), callback: () => {
+      flame(aura, 0.85); flame(aura, 0.7);
+    } });
+    // ประกายไฟฟ้า: เส้นซิกแซกสีฟ้าอมขาวแวบ ๆ
+    const sparks = this.time.addEvent({ delay: 260, repeat: Math.floor(DUR / 260), callback: () => {
+      const g = this.add.graphics().setBlendMode(ADD);
+      aura.add(g);
+      let x = (Math.random() - 0.5) * 24, y = 8 - Math.random() * H;
+      g.lineStyle(1.5, 0xd8f4ff, 1).beginPath().moveTo(x, y);
+      for (let i = 0; i < 4; i++) { x += (Math.random() - 0.5) * 10; y -= 4 + Math.random() * 5; g.lineTo(x, y); }
+      g.strokePath();
+      this.tweens.add({ targets: g, alpha: 0, duration: 120, onComplete: () => g.destroy() });
+    } });
+    this.time.delayedCall(DUR, () => {
+      flames.remove(); sparks.remove();
+      if (fx) v.body.preFX?.remove(fx); else if (v.body.active) v.body.clearTint();
+      this.tweens.add({ targets: aura, alpha: 0, duration: 400, onComplete: () => aura.destroy() });
+    });
   }
 
   /** ข้อความลอยขึ้นแล้วจางหาย (+EXP, ฟื้นที่จุดเกิด) */
@@ -1034,6 +1153,7 @@ export class GameScene extends Phaser.Scene {
   update(time: number, dt: number) {
     if (this.joyDir !== null) this.joyStep(time);
     this.updateGuideArrow(time);
+    this.drawMinimap(time);
     const meV = this.me ? this.views.get(this.me) : undefined;
     if (meV) for (const { t, e } of this.exitLabels) {
       const cx = ((e.x0 + e.x1 + 1) / 2) * TILE, cy = ((e.y0 + e.y1 + 1) / 2) * TILE;
@@ -1112,6 +1232,7 @@ export class GameScene extends Phaser.Scene {
       gctx.restore();
     }
     this.textures.addCanvas("map_ground", ground);
+    this.setupMinimap(ground);
     this.add.image(0, 0, "map_ground").setOrigin(0, 0).setDepth(-3);
 
     // ทางออก: ชื่อแมพปลายทางลอยเหนือทางออก เห็นเมื่อผู้เล่นเข้าใกล้ (ดู update)

@@ -270,6 +270,7 @@ function bindHud(net: Net, openQuests: () => void) {
     for (const b of buttons) b.setAttribute("aria-expanded", String(!$(b.dataset.panel!).hidden));
   };
   for (const b of buttons) b.onclick = () => { if (b.dataset.panel === "quest-panel") openQuests(); toggle(b.dataset.panel!); };
+  $("minimap-wrap").onclick = () => toggle("map-panel");
   for (const p of panels) {
     const close = p.querySelector<HTMLButtonElement>(".panel-close");
     if (close) close.onclick = () => toggle(p.id, false);

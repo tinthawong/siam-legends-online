@@ -500,9 +500,16 @@
     /* มือถือ: กรอบสถานะมุมซ้ายบน ปุ่มแถวเดียวมุมขวาบน (จอแคบ: ใต้กรอบสถานะ) */
     @media (max-width: 900px) and (pointer: coarse), (max-width: 560px) {
       #hud-status { top: calc(10px + env(safe-area-inset-top)); bottom: auto; }
-      #menu { left: auto; right: calc(10px + env(safe-area-inset-right)); top: calc(10px + env(safe-area-inset-top)); bottom: auto; }
+      #menu { left: calc(10px + env(safe-area-inset-left)); right: auto; top: calc(10px + var(--hs-w) * 187 / 653 + 6px + env(safe-area-inset-top)); bottom: auto; }
     }
-    @media (max-width: 620px) { #menu { top: calc(10px + var(--hs-w) * 187 / 653 + 6px + env(safe-area-inset-top)); } }
+    /* มินิแมพ: วงกลมขอบทอง มุมขวาบน */
+    #minimap-wrap { position: fixed; right: calc(12px + env(safe-area-inset-right)); top: calc(12px + env(safe-area-inset-top)); z-index: 3;
+      width: var(--mini, 150px); padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    #minimap { display: block; width: 100%; aspect-ratio: 1; border-radius: 50%; border: 3px solid var(--gold);
+      box-shadow: 0 0 0 2px #3a1a05, 0 4px 14px rgba(0, 0, 0, 0.55), inset 0 0 12px rgba(0, 0, 0, 0.6); background: #0b1626; }
+    #minimap-name { position: absolute; left: 50%; bottom: -6px; transform: translateX(-50%); padding: 1px 10px; border-radius: 10px; white-space: nowrap;
+      border: 1px solid var(--gold); background: linear-gradient(180deg, var(--lacquer-2), var(--lacquer)); color: var(--gold-lite); font-size: 12px; }
+    @media (max-width: 560px), (max-height: 500px) { :root { --mini: 100px; } #minimap-name { font-size: 10px; } }
     .set-head { margin: 10px 0 6px; font-size: 13px; color: var(--ink-dim); border-top: 1px solid rgba(159, 192, 236, 0.25); padding-top: 8px; }
     .set-head:first-of-type { border-top: 0; padding-top: 0; margin-top: 4px; }
     .set-account { display: flex; gap: 8px; flex-wrap: wrap; }
@@ -708,6 +715,10 @@
       <span id="xp-text"></span>
     </div>
     <div id="xp-tip" hidden></div>
+    <!-- มินิแมพมุมขวาบน (GameScene.drawMinimap) แตะ = แผนที่โลก -->
+    <button type="button" id="minimap-wrap" aria-label="แผนที่ (แตะเพื่อเปิดแผนที่โลก)" title="แผนที่ (M)">
+      <canvas id="minimap"></canvas><span id="minimap-name">บ้านปากอ่าว</span>
+    </button>
     <div id="levelup-banner" hidden aria-live="polite"><b>LEVEL UP!</b><span id="levelup-lv"></span></div>
     <button id="auto-btn" aria-pressed="false">AUTO</button>
     <!-- เลเวลอัพ: ชวนอัพค่าพลัง หายเมื่อใช้แต้มหมด (main.ts) -->
