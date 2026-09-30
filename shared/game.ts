@@ -16,6 +16,7 @@ export interface MobDef {
   sheetParts?: string[];
   level?: number;      // แสดงต่อท้ายชื่อ เช่น "ปูนา Lv.1"
   atk?: number;        // พลังโจมตี (ใช้ตอนตีกลับ)
+  hit?: number; flee?: number; defPct?: number; defBonus?: number; mdefPct?: number; // ค่าพลังแบบ Ragnarok จาก monsters.json
   retaliate?: boolean; // โดนผู้เล่นตีแล้วตีกลับ + ไล่ตาม (ดู MOB_* ใน constants.ts)
   zone?: string; // โซนที่เกิด/เดินเล่น (ZONES ใน shared/map.ts) ไม่มี = ทั้งแมพ
   drop?: { item: string; chance: number }; // ตายแล้วหล่นของ (key ใน shared/items.ts, โอกาส 0–1)
@@ -26,7 +27,8 @@ export interface MobDef {
 function fromData(id: string, extra: Pick<MobDef, "moveMs" | "count" | "sheet" | "sheetParts" | "retaliate" | "drop" | "zone">): MobDef {
   const m = MONSTERS.find((x) => x.id === id);
   if (!m) throw new Error(`ไม่พบมอน ${id} ใน monsters.json`);
-  return { name: m.name, level: m.level, maxHp: m.hp, def: m.def, exp: m.exp, atk: m.atk, money: [m.moneyMin, m.moneyMax], ...extra };
+  return { name: m.name, level: m.level, maxHp: m.hp, def: m.def, exp: m.exp, atk: m.atk, money: [m.moneyMin, m.moneyMax],
+    hit: m.hit, flee: m.flee, defPct: m.defPct, defBonus: m.defBonus, mdefPct: m.mdefPct, ...extra };
 }
 
 export const MOBS: Record<string, MobDef> = {
@@ -47,25 +49,64 @@ export const MOBS: Record<string, MobDef> = {
 for (const [id, z] of Object.entries(ZONES)) if (MOBS[id]) { MOBS[id].count = z.count; MOBS[id].zone = id; }
 
 export const expToNext = (level: number) => 20 + level * 15;
-export const playerAtk = (level: number) => 10 + level * 2;
-export const playerMaxHp = (level: number) => 90 + level * 10;
-
-// ---------- แต้มสถานะ (อัปเองในหน้าสถานะ) ----------
-export type StatKey = "str" | "vit" | "agi" | "luk";
+// ---------- ค่าพลังแบบ Ragnarok (docs/stat-system.md) — server คำนวณทุกค่า ----------
+export type StatKey = "str" | "agi" | "vit" | "int" | "dex" | "luk";
 export type Stats = Record<StatKey, number>;
-export const STAT_KEYS: StatKey[] = ["str", "vit", "agi", "luk"];
-export const STAT_POINTS_PER_LEVEL = 5;
-export const statPointsTotal = (level: number) => (level - 1) * STAT_POINTS_PER_LEVEL;
-export const statPointsLeft = (level: number, s: Stats) => statPointsTotal(level) - STAT_KEYS.reduce((a, k) => a + s[k], 0);
-/** ค่าที่ได้จากแต้ม: พลัง +1 ATK/แต้ม, อึด +5 HP/แต้ม, ว่องไว ตีเร็วขึ้น 1%/แต้ม (สูงสุด 50%), โชค คริ +0.5%/แต้ม (สูงสุด 50%) */
-export const statAtk = (level: number, s: Stats) => playerAtk(level) + s.str;
-export const statMaxHp = (level: number, s: Stats) => playerMaxHp(level) + s.vit * 5;
-export const statAspdMs = (base: number, s: Stats) => Math.round(base * (1 - Math.min(0.5, s.agi * 0.01)));
-export const statCrit = (s: Stats) => Math.min(0.5, 0.1 + s.luk * 0.005);
+export const STAT_KEYS: StatKey[] = ["str", "agi", "vit", "int", "dex", "luk"];
+export const STAT_START = 5;   // ตัวละครใหม่ทุกค่าเริ่มที่ 5
+export const STAT_MAX = 150;
+export const newStats = (): Stats => ({ str: 5, agi: 5, vit: 5, int: 5, dex: 5, luk: 5 });
+/** แต้มที่ได้ตอนเลเวลขึ้นเป็น newLevel */
+export const statPointsForLevel = (newLevel: number) => Math.floor(newLevel / 5) + 3;
+/** แต้มรวมทั้งหมดที่ได้ตั้งแต่เลเวล 1 ถึง level */
+export const statPointsTotal = (level: number) => { let n = 0; for (let l = 2; l <= level; l++) n += statPointsForLevel(l); return n; };
+/** ราคาเพิ่มค่าจาก x เป็น x+1 */
+export const statCost = (x: number) => Math.floor((x - 1) / 10) + 2;
+/** ราคารวมเพิ่มจาก x ไป n ขั้น */
+export const statCostN = (x: number, n: number) => { let c = 0; for (let i = 0; i < n; i++) c += statCost(x + i); return c; };
 
-export function rollDamage(atk: number, def: number, rng: () => number = Math.random, critChance = 0.1) {
-  let dmg = Math.max(1, Math.round(atk * (0.85 + rng() * 0.3)) - def);
-  const crit = rng() < critChance;
-  if (crit) dmg = Math.round(dmg * 1.5);
-  return { dmg, crit };
+export interface Derived {
+  atk: number; ratk: number; matkMin: number; matkMax: number;
+  hit: number; flee: number; perfectDodge: number; crit: number; // % ทั้งสองค่าหลัง
+  maxHp: number; maxSp: number; defBonus: number; mdefBonus: number;
+  aspdMs: number; castMul: number; hpRegen: number; spRegen: number; weight: number;
+}
+const f = Math.floor;
+/** ค่าที่คำนวณจากค่าหลัก (ยังไม่มีอุปกรณ์ = ATK อาวุธ 0) */
+export function derive(level: number, s: Stats): Derived {
+  const maxHp = f((40 + level * 12) * (1 + s.vit / 100));
+  const maxSp = f((10 + level * 2) * (1 + s.int / 100));
+  return {
+    atk: s.str + f(s.str / 10) ** 2 + f(s.dex / 5) + f(s.luk / 5),
+    ratk: s.dex + f(s.dex / 10) ** 2 + f(s.str / 5) + f(s.luk / 5),
+    matkMin: s.int + f(s.int / 7) ** 2,
+    matkMax: s.int + f(s.int / 5) ** 2,
+    hit: level + s.dex,
+    flee: level + s.agi,
+    perfectDodge: 1 + s.luk / 10,
+    crit: 1 + s.luk * 0.3,
+    maxHp, maxSp,
+    defBonus: f(s.vit / 2),
+    mdefBonus: s.int,
+    aspdMs: Math.max(300, Math.round(1200 * (1 - (s.agi * 4 + s.dex) / 1000))),
+    castMul: Math.max(0, 1 - s.dex / 150),
+    hpRegen: 1 + f(s.vit / 5) + f(maxHp / 200),   // ทุก 6 วินาทีตอนยืนนิ่ง
+    spRegen: 1 + f(s.int / 6) + f(maxSp / 100),   // ทุก 8 วินาทีตอนยืนนิ่ง
+    weight: 2000 + s.str * 30,
+  };
+}
+
+/** โจมตีกายภาพ 1 ครั้ง ตามสูตรใน docs/stat-system.md */
+export function physicalAttack(
+  att: { atk: number; hit: number; crit: number },                                   // crit เป็น %
+  def: { flee: number; defPct: number; defBonus: number; perfectDodge?: number },    // perfectDodge % (เฉพาะผู้เล่น)
+  rng: () => number = Math.random,
+): { dmg: number; crit: boolean; miss: boolean } {
+  // คริ: โดนแน่นอน ไม่หัก DEF
+  if (rng() * 100 < att.crit) return { dmg: Math.max(1, Math.round(att.atk * 1.4)), crit: true, miss: false };
+  const hitPct = Math.min(95, Math.max(5, 80 + att.hit - def.flee));
+  if (rng() * 100 >= hitPct) return { dmg: 0, crit: false, miss: true };
+  if (def.perfectDodge && rng() * 100 < def.perfectDodge) return { dmg: 0, crit: false, miss: true };
+  const dmg = Math.round(att.atk * (0.9 + rng() * 0.2) * (1 - def.defPct / 100) - def.defBonus);
+  return { dmg: Math.max(1, dmg), crit: false, miss: false };
 }

@@ -40,6 +40,14 @@ while mo[f"A{r}"].value:
         "exp": int(mo[f"K{r}"].value),
         "moneyMin": int(mo[f"L{r}"].value),
         "moneyMax": int(mo[f"M{r}"].value),
+        # ค่าพลังแบบ Ragnarok (docs/stat-system.md) — def เดิมยังส่งออกแต่เกมไม่ใช้แล้ว
+        "agi": int(mo[f"P{r}"].value or 0),
+        "dex": int(mo[f"Q{r}"].value or 0),
+        "hit": int(mo[f"R{r}"].value or 0),
+        "flee": int(mo[f"S{r}"].value or 0),
+        "defPct": int(mo[f"T{r}"].value or 0),
+        "defBonus": int(mo[f"U{r}"].value or 0),
+        "mdefPct": int(mo[f"V{r}"].value or 0),
     })
     r += 1
 

@@ -11,7 +11,14 @@
   "atk": 8,
   "exp": 3,
   "moneyMin": 1,
-  "moneyMax": 2
+  "moneyMax": 2,
+  "agi": 0,
+  "dex": 0,
+  "hit": 1,
+  "flee": 1,
+  "defPct": 0,
+  "defBonus": 0,
+  "mdefPct": 0
  },
  {
   "id": "mob002",
@@ -25,7 +32,14 @@
   "atk": 9,
   "exp": 12,
   "moneyMin": 6,
-  "moneyMax": 9
+  "moneyMax": 9,
+  "agi": 1,
+  "dex": 1,
+  "hit": 3,
+  "flee": 3,
+  "defPct": 0,
+  "defBonus": 1,
+  "mdefPct": 0
  },
  {
   "id": "mob003",
@@ -39,7 +53,14 @@
   "atk": 8,
   "exp": 3,
   "moneyMin": 1,
-  "moneyMax": 2
+  "moneyMax": 2,
+  "agi": 0,
+  "dex": 0,
+  "hit": 1,
+  "flee": 1,
+  "defPct": 0,
+  "defBonus": 0,
+  "mdefPct": 0
  },
  {
   "id": "mob004",
@@ -53,7 +74,14 @@
   "atk": 11,
   "exp": 74,
   "moneyMin": 25,
-  "moneyMax": 37
+  "moneyMax": 37,
+  "agi": 2,
+  "dex": 3,
+  "hit": 7,
+  "flee": 6,
+  "defPct": 1,
+  "defBonus": 2,
+  "mdefPct": 0
  },
  {
   "id": "mob005",
@@ -67,7 +95,14 @@
   "atk": 12,
   "exp": 88,
   "moneyMin": 35,
-  "moneyMax": 53
+  "moneyMax": 53,
+  "agi": 3,
+  "dex": 4,
+  "hit": 9,
+  "flee": 8,
+  "defPct": 1,
+  "defBonus": 2,
+  "mdefPct": 1
  },
  {
   "id": "mob006",
@@ -81,7 +116,14 @@
   "atk": 15,
   "exp": 161,
   "moneyMin": 56,
-  "moneyMax": 84
+  "moneyMax": 84,
+  "agi": 4,
+  "dex": 5,
+  "hit": 12,
+  "flee": 11,
+  "defPct": 2,
+  "defBonus": 3,
+  "mdefPct": 1
  },
  {
   "id": "mob007",
@@ -95,7 +137,14 @@
   "atk": 16,
   "exp": 165,
   "moneyMin": 66,
-  "moneyMax": 99
+  "moneyMax": 99,
+  "agi": 4,
+  "dex": 6,
+  "hit": 14,
+  "flee": 12,
+  "defPct": 2,
+  "defBonus": 4,
+  "mdefPct": 1
  },
  {
   "id": "mob008",
@@ -109,7 +158,14 @@
   "atk": 45,
   "exp": 5375,
   "moneyMin": 1720,
-  "moneyMax": 2580
+  "moneyMax": 2580,
+  "agi": 6,
+  "dex": 8,
+  "hit": 18,
+  "flee": 16,
+  "defPct": 3,
+  "defBonus": 5,
+  "mdefPct": 2
  },
  {
   "id": "mob009",
@@ -123,7 +179,14 @@
   "atk": 19,
   "exp": 216,
   "moneyMin": 96,
-  "moneyMax": 144
+  "moneyMax": 144,
+  "agi": 6,
+  "dex": 8,
+  "hit": 19,
+  "flee": 17,
+  "defPct": 3,
+  "defBonus": 5,
+  "mdefPct": 2
  },
  {
   "id": "mob010",
@@ -137,7 +200,14 @@
   "atk": 22,
   "exp": 303,
   "moneyMin": 116,
-  "moneyMax": 173
+  "moneyMax": 173,
+  "agi": 7,
+  "dex": 10,
+  "hit": 23,
+  "flee": 20,
+  "defPct": 3,
+  "defBonus": 6,
+  "mdefPct": 2
  },
  {
   "id": "mob011",
@@ -151,7 +221,14 @@
   "atk": 23,
   "exp": 329,
   "moneyMin": 125,
-  "moneyMax": 188
+  "moneyMax": 188,
+  "agi": 8,
+  "dex": 11,
+  "hit": 25,
+  "flee": 22,
+  "defPct": 4,
+  "defBonus": 7,
+  "mdefPct": 2
  },
  {
   "id": "mob012",
@@ -165,7 +242,14 @@
   "atk": 26,
   "exp": 397,
   "moneyMin": 144,
-  "moneyMax": 217
+  "moneyMax": 217,
+  "agi": 9,
+  "dex": 12,
+  "hit": 28,
+  "flee": 25,
+  "defPct": 4,
+  "defBonus": 8,
+  "mdefPct": 3
  },
  {
   "id": "mob013",
@@ -179,7 +263,14 @@
   "atk": 29,
   "exp": 511,
   "moneyMin": 164,
-  "moneyMax": 245
+  "moneyMax": 245,
+  "agi": 10,
+  "dex": 14,
+  "hit": 32,
+  "flee": 28,
+  "defPct": 5,
+  "defBonus": 9,
+  "mdefPct": 3
  },
  {
   "id": "mob014",
@@ -193,7 +284,14 @@
   "atk": 80,
   "exp": 11425,
   "moneyMin": 3660,
-  "moneyMax": 5480
+  "moneyMax": 5480,
+  "agi": 12,
+  "dex": 16,
+  "hit": 36,
+  "flee": 32,
+  "defPct": 6,
+  "defBonus": 10,
+  "mdefPct": 4
  },
  {
   "id": "mob015",
@@ -207,7 +305,14 @@
   "atk": 35,
   "exp": 554,
   "moneyMin": 202,
-  "moneyMax": 302
+  "moneyMax": 302,
+  "agi": 13,
+  "dex": 17,
+  "hit": 39,
+  "flee": 35,
+  "defPct": 6,
+  "defBonus": 11,
+  "mdefPct": 4
  },
  {
   "id": "mob016",
@@ -221,7 +326,14 @@
   "atk": 39,
   "exp": 497,
   "moneyMin": 221,
-  "moneyMax": 331
+  "moneyMax": 331,
+  "agi": 14,
+  "dex": 19,
+  "hit": 43,
+  "flee": 38,
+  "defPct": 7,
+  "defBonus": 12,
+  "mdefPct": 4
  },
  {
   "id": "mob017",
@@ -235,7 +347,14 @@
   "atk": 42,
   "exp": 629,
   "moneyMin": 240,
-  "moneyMax": 359
+  "moneyMax": 359,
+  "agi": 15,
+  "dex": 20,
+  "hit": 46,
+  "flee": 41,
+  "defPct": 7,
+  "defBonus": 13,
+  "mdefPct": 5
  },
  {
   "id": "mob018",
@@ -249,7 +368,14 @@
   "atk": 48,
   "exp": 737,
   "moneyMin": 268,
-  "moneyMax": 402
+  "moneyMax": 402,
+  "agi": 17,
+  "dex": 23,
+  "hit": 52,
+  "flee": 46,
+  "defPct": 8,
+  "defBonus": 14,
+  "mdefPct": 5
  },
  {
   "id": "mob019",
@@ -263,7 +389,14 @@
   "atk": 54,
   "exp": 999,
   "moneyMin": 296,
-  "moneyMax": 444
+  "moneyMax": 444,
+  "agi": 19,
+  "dex": 25,
+  "hit": 57,
+  "flee": 51,
+  "defPct": 9,
+  "defBonus": 16,
+  "mdefPct": 6
  },
  {
   "id": "mob020",
@@ -277,7 +410,14 @@
   "atk": 153,
   "exp": 20275,
   "moneyMin": 6480,
-  "moneyMax": 9740
+  "moneyMax": 9740,
+  "agi": 21,
+  "dex": 28,
+  "hit": 63,
+  "flee": 56,
+  "defPct": 10,
+  "defBonus": 17,
+  "mdefPct": 7
  },
  {
   "id": "mob021",
@@ -291,7 +431,14 @@
   "atk": 68,
   "exp": 925,
   "moneyMin": 352,
-  "moneyMax": 529
+  "moneyMax": 529,
+  "agi": 22,
+  "dex": 30,
+  "hit": 68,
+  "flee": 60,
+  "defPct": 11,
+  "defBonus": 19,
+  "mdefPct": 7
  },
  {
   "id": "mob022",
@@ -305,7 +452,14 @@
   "atk": 76,
   "exp": 951,
   "moneyMin": 380,
-  "moneyMax": 571
+  "moneyMax": 571,
+  "agi": 24,
+  "dex": 32,
+  "hit": 73,
+  "flee": 65,
+  "defPct": 12,
+  "defBonus": 20,
+  "mdefPct": 8
  },
  {
   "id": "mob023",
@@ -319,7 +473,14 @@
   "atk": 81,
   "exp": 998,
   "moneyMin": 399,
-  "moneyMax": 599
+  "moneyMax": 599,
+  "agi": 25,
+  "dex": 34,
+  "hit": 77,
+  "flee": 68,
+  "defPct": 12,
+  "defBonus": 21,
+  "mdefPct": 8
  },
  {
   "id": "mob024",
@@ -333,7 +494,14 @@
   "atk": 90,
   "exp": 1175,
   "moneyMin": 427,
-  "moneyMax": 641
+  "moneyMax": 641,
+  "agi": 27,
+  "dex": 36,
+  "hit": 82,
+  "flee": 73,
+  "defPct": 13,
+  "defBonus": 23,
+  "mdefPct": 9
  },
  {
   "id": "mob025",
@@ -347,7 +515,14 @@
   "atk": 102,
   "exp": 1511,
   "moneyMin": 465,
-  "moneyMax": 697
+  "moneyMax": 697,
+  "agi": 30,
+  "dex": 40,
+  "hit": 90,
+  "flee": 80,
+  "defPct": 15,
+  "defBonus": 25,
+  "mdefPct": 10
  },
  {
   "id": "mob026",
@@ -361,7 +536,14 @@
   "atk": 298,
   "exp": 31975,
   "moneyMin": 10240,
-  "moneyMax": 15340
+  "moneyMax": 15340,
+  "agi": 33,
+  "dex": 44,
+  "hit": 99,
+  "flee": 88,
+  "defPct": 16,
+  "defBonus": 27,
+  "mdefPct": 11
  },
  {
   "id": "mob027",
@@ -375,7 +557,14 @@
   "atk": 130,
   "exp": 1551,
   "moneyMin": 540,
-  "moneyMax": 809
+  "moneyMax": 809,
+  "agi": 34,
+  "dex": 46,
+  "hit": 104,
+  "flee": 92,
+  "defPct": 17,
+  "defBonus": 29,
+  "mdefPct": 11
  },
  {
   "id": "mob028",
@@ -389,7 +578,14 @@
   "atk": 143,
   "exp": 1561,
   "moneyMin": 568,
-  "moneyMax": 851
+  "moneyMax": 851,
+  "agi": 36,
+  "dex": 48,
+  "hit": 109,
+  "flee": 97,
+  "defPct": 18,
+  "defBonus": 30,
+  "mdefPct": 12
  },
  {
   "id": "mob029",
@@ -403,7 +599,14 @@
   "atk": 155,
   "exp": 1563,
   "moneyMin": 596,
-  "moneyMax": 893
+  "moneyMax": 893,
+  "agi": 38,
+  "dex": 51,
+  "hit": 115,
+  "flee": 102,
+  "defPct": 19,
+  "defBonus": 32,
+  "mdefPct": 12
  },
  {
   "id": "mob030",
@@ -417,7 +620,14 @@
   "atk": 169,
   "exp": 1949,
   "moneyMin": 624,
-  "moneyMax": 935
+  "moneyMax": 935,
+  "agi": 40,
+  "dex": 53,
+  "hit": 120,
+  "flee": 107,
+  "defPct": 20,
+  "defBonus": 33,
+  "mdefPct": 13
  },
  {
   "id": "mob031",
@@ -431,7 +641,14 @@
   "atk": 189,
   "exp": 1901,
   "moneyMin": 661,
-  "moneyMax": 992
+  "moneyMax": 992,
+  "agi": 42,
+  "dex": 56,
+  "hit": 127,
+  "flee": 113,
+  "defPct": 21,
+  "defBonus": 35,
+  "mdefPct": 14
  },
  {
   "id": "mob032",
@@ -445,7 +662,14 @@
   "atk": 528,
   "exp": 43650,
   "moneyMin": 13960,
-  "moneyMax": 20960
+  "moneyMax": 20960,
+  "agi": 45,
+  "dex": 60,
+  "hit": 135,
+  "flee": 120,
+  "defPct": 22,
+  "defBonus": 37,
+  "mdefPct": 15
  },
  {
   "id": "mob033",
@@ -459,7 +683,14 @@
   "atk": 240,
   "exp": 2049,
   "moneyMin": 745,
-  "moneyMax": 1118
+  "moneyMax": 1118,
+  "agi": 48,
+  "dex": 64,
+  "hit": 144,
+  "flee": 128,
+  "defPct": 24,
+  "defBonus": 40,
+  "mdefPct": 16
  },
  {
   "id": "mob034",
@@ -473,7 +704,14 @@
   "atk": 267,
   "exp": 2054,
   "moneyMin": 782,
-  "moneyMax": 1174
+  "moneyMax": 1174,
+  "agi": 50,
+  "dex": 67,
+  "hit": 151,
+  "flee": 134,
+  "defPct": 25,
+  "defBonus": 42,
+  "mdefPct": 16
  },
  {
   "id": "mob035",
@@ -487,7 +725,14 @@
   "atk": 295,
   "exp": 2050,
   "moneyMin": 820,
-  "moneyMax": 1230
+  "moneyMax": 1230,
+  "agi": 52,
+  "dex": 70,
+  "hit": 158,
+  "flee": 140,
+  "defPct": 26,
+  "defBonus": 44,
+  "mdefPct": 17
  },
  {
   "id": "mob036",
@@ -501,7 +746,14 @@
   "atk": 326,
   "exp": 2250,
   "moneyMin": 857,
-  "moneyMax": 1286
+  "moneyMax": 1286,
+  "agi": 55,
+  "dex": 73,
+  "hit": 165,
+  "flee": 147,
+  "defPct": 27,
+  "defBonus": 46,
+  "mdefPct": 18
  },
  {
   "id": "mob037",
@@ -515,7 +767,14 @@
   "atk": 360,
   "exp": 2683,
   "moneyMin": 894,
-  "moneyMax": 1342
+  "moneyMax": 1342,
+  "agi": 57,
+  "dex": 76,
+  "hit": 172,
+  "flee": 153,
+  "defPct": 28,
+  "defBonus": 48,
+  "mdefPct": 19
  },
  {
   "id": "mob038",
@@ -529,7 +788,14 @@
   "atk": 993,
   "exp": 58250,
   "moneyMin": 18640,
-  "moneyMax": 27960
+  "moneyMax": 27960,
+  "agi": 60,
+  "dex": 80,
+  "hit": 180,
+  "flee": 160,
+  "defPct": 30,
+  "defBonus": 50,
+  "mdefPct": 20
  },
  {
   "id": "mob039",
@@ -543,7 +809,14 @@
   "atk": 10,
   "exp": 43,
   "moneyMin": 15,
-  "moneyMax": 22
+  "moneyMax": 22,
+  "agi": 1,
+  "dex": 2,
+  "hit": 5,
+  "flee": 4,
+  "defPct": 0,
+  "defBonus": 1,
+  "mdefPct": 0
  },
  {
   "id": "mob040",
@@ -557,7 +830,14 @@
   "atk": 18,
   "exp": 215,
   "moneyMin": 86,
-  "moneyMax": 129
+  "moneyMax": 129,
+  "agi": 6,
+  "dex": 8,
+  "hit": 18,
+  "flee": 16,
+  "defPct": 3,
+  "defBonus": 5,
+  "mdefPct": 2
  },
  {
   "id": "mob041",
@@ -571,6 +851,13 @@
   "atk": 21,
   "exp": 265,
   "moneyMin": 106,
-  "moneyMax": 159
+  "moneyMax": 159,
+  "agi": 7,
+  "dex": 9,
+  "hit": 21,
+  "flee": 19,
+  "defPct": 3,
+  "defBonus": 6,
+  "mdefPct": 2
  }
 ]

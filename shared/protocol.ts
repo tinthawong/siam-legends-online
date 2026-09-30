@@ -1,5 +1,6 @@
 import type { Cell } from "./pathfind";
 import type { Look } from "./appearance";
+import type { Stats, StatKey, Derived } from "./game";
 
 export type EntityKind = "player" | "mob";
 
@@ -40,10 +41,11 @@ export interface PlayerStats {
   hp: number;
   maxHp: number;
   money: number; // เบี้ย
-  stats: { str: number; vit: number; agi: number; luk: number };
-  points: number;  // แต้มสถานะคงเหลือ
-  aspdMs: number;  // ตีได้ทุก ๆ กี่ ms
-  crit: number;    // โอกาสคริ 0–1
+  sp: number;
+  maxSp: number;
+  stats: Stats;       // ค่าหลัก 6 ค่า
+  points: number;     // แต้มว่าง
+  derived: Derived;   // ค่าที่คำนวณทั้งหมด (docs/stat-system.md)
 }
 
 // client → server
@@ -56,7 +58,7 @@ export type ClientMsg =
   | { t: "use"; item: string }  // ใช้ไอเท็มในกระเป๋า (ยา)
   | { t: "buy"; item: string; count: number } // ซื้อของด้วยเบี้ย
   | { t: "bot"; potionAt: number } // กินยาอัตโนมัติเมื่อเลือดต่ำกว่ากี่ % (0 = ปิด)
-  | { t: "stat"; stat: "str" | "vit" | "agi" | "luk"; n: number }; // ใช้แต้มสถานะ
+  | { t: "stat_add"; stat: StatKey; amount: number }; // ใช้แต้มค่าพลัง
 
 // server → client
 export type ServerMsg =
@@ -64,7 +66,7 @@ export type ServerMsg =
   | { t: "spawn"; e: EntityState }
   | { t: "despawn"; id: string }
   | { t: "move"; id: string; from: Cell; path: Cell[]; moveMs: number }
-  | { t: "hit"; src: string; dst: string; dmg: number; crit: boolean; hp: number }
+  | { t: "hit"; src: string; dst: string; dmg: number; crit: boolean; hp: number; miss?: boolean }
   | { t: "die"; id: string }
   | { t: "dead"; id: string; cause: string }           // ผู้เล่นเลือดหมด สลบอยู่กับที่ (cause = สาเหตุ เช่น "ปูแดง Lv.3 โจมตี")
   | { t: "respawn"; id: string; x: number; y: number } // กดกลับเมืองแล้ว → ฟื้นที่จุดเกิด
@@ -91,7 +93,8 @@ export interface JoinCharacter {
   look: Look;
   inv: InvItem[];
   money: number;
-  stats: { str: number; vit: number; agi: number; luk: number };
+  stats: Stats;
+  points: number;
 }
 
 /** close code ที่ client ต้องรู้ */

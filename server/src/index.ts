@@ -25,9 +25,12 @@ interface CharacterRow {
   eyes: string;
   money: number;
   str: number;
-  vit: number;
   agi: number;
+  vit: number;
+  int: number;
+  dex: number;
   luk: number;
+  stat_points: number;
 }
 
 const lookOf = (r: { gender: string; hair: string; eyes: string }): Look =>
@@ -111,7 +114,8 @@ export default {
       const join: JoinCharacter = {
         userId: row.user_id, name: row.name, level: row.level, exp: row.exp, x: row.x, y: row.y,
         look: lookOf(row), inv: inv.results, money: row.money ?? 0,
-        stats: { str: row.str ?? 0, vit: row.vit ?? 0, agi: row.agi ?? 0, luk: row.luk ?? 0 },
+        stats: { str: row.str, agi: row.agi, vit: row.vit, int: row.int, dex: row.dex, luk: row.luk },
+        points: row.stat_points,
       };
       // สร้าง request ใหม่ทั้งก้อน client จึงปลอม X-Character มาเองไม่ได้
       const headers = new Headers(req.headers);

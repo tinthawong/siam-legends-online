@@ -251,7 +251,8 @@ export class GameScene extends Phaser.Scene {
         if (dst) {
           dst.hp = m.hp;
           this.drawHp(dst);
-          this.floatDamage(dst, m.dmg, m.crit);
+          if (m.miss) this.floatText(dst.c.x, dst.c.y + dst.topY - 9, "พลาด", "#bfc7d5", 700);
+          else this.floatDamage(dst, m.dmg, m.crit);
           dst.body.setTintFill(0xffffff);
           this.time.delayedCall(70, () => dst.body.clearTint());
           // มอนจาก sheet ที่มีท่าโดนตี: เล่นพร้อมกะพริบขาว แต่ไม่ขัดท่า attack ที่กำลังเล่นอยู่
