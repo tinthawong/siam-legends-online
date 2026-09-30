@@ -1,6 +1,7 @@
 import type { Cell } from "./pathfind";
 import type { Look } from "./appearance";
 import type { Stats, StatKey, Derived } from "./game";
+import type { QuestLog } from "./quests";
 
 export type EntityKind = "player" | "mob";
 
@@ -58,11 +59,14 @@ export type ClientMsg =
   | { t: "use"; item: string }  // ใช้ไอเท็มในกระเป๋า (ยา)
   | { t: "buy"; item: string; count: number } // ซื้อของด้วยเบี้ย
   | { t: "bot"; potionAt: number } // กินยาอัตโนมัติเมื่อเลือดต่ำกว่ากี่ % (0 = ปิด)
-  | { t: "stat_add"; stat: StatKey; amount: number }; // ใช้แต้มค่าพลัง
+  | { t: "stat_add"; stat: StatKey; amount: number } // ใช้แต้มค่าพลัง
+  | { t: "talk"; npc: string }         // กดที่ NPC: เดินไปหาแล้วคุย
+  | { t: "quest_accept"; id: string }  // รับเควส (ต้องอยู่ใกล้ NPC)
+  | { t: "quest_done"; id: string };   // ส่งเควส รับรางวัล (ต้องอยู่ใกล้ NPC ที่ส่ง)
 
 // server → client
 export type ServerMsg =
-  | { t: "welcome"; you: string; entities: EntityState[]; self: PlayerStats; ground: GroundItem[]; inv: InvItem[] }
+  | { t: "welcome"; you: string; entities: EntityState[]; self: PlayerStats; ground: GroundItem[]; inv: InvItem[]; quests: QuestLog }
   | { t: "spawn"; e: EntityState }
   | { t: "despawn"; id: string }
   | { t: "move"; id: string; from: Cell; path: Cell[]; moveMs: number }
@@ -80,6 +84,9 @@ export type ServerMsg =
   | { t: "stats"; self: PlayerStats }
   | { t: "target"; id: string | null }
   | { t: "auto"; on: boolean }
+  | { t: "quests"; log: QuestLog }                    // สถานะเควสของเราเปลี่ยน
+  | { t: "dialog"; npc: string; stage: "offer" | "progress" | "done" | "idle"; quest: string | null } // เปิดหน้าคุยกับ NPC
+  | { t: "quest_reward"; id: string; exp: number; money: number; items: InvItem[] } // ส่งเควสสำเร็จ
   | { t: "kicked" };
 
 /** ข้อมูลตัวละครที่ Worker โหลดจาก D1 แล้วส่งต่อให้ MapRoom */
@@ -95,6 +102,7 @@ export interface JoinCharacter {
   money: number;
   stats: Stats;
   points: number;
+  quests: QuestLog;
 }
 
 /** close code ที่ client ต้องรู้ */

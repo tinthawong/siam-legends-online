@@ -34,9 +34,9 @@ export interface Inventory {
 
 /**
  * root = <section id="bag"> (ว่างเปล่า) — เปิด/ปิดโดย main.ts
- * onUse: แตะไอเท็มที่ใช้ได้ · onClose: กดปุ่มกระเป๋าในกรอบ
+ * onUse: แตะไอเท็มที่ใช้ได้ · onClose: กดปุ่มกระเป๋าในกรอบ · onQuest: กดปุ่มเควส (เปิดรายการเควส)
  */
-export function createInventory(root: HTMLElement, onUse: (item: string) => void, onClose: () => void): Inventory {
+export function createInventory(root: HTMLElement, onUse: (item: string) => void, onClose: () => void, onQuest: () => void): Inventory {
   let items: InvItem[] = [];
   let tab = 0;
   let page = 0;
@@ -99,7 +99,7 @@ export function createInventory(root: HTMLElement, onUse: (item: string) => void
   const NAV: Record<string, [string, (() => void) | null]> = {
     bag: ["กระเป๋า", onClose],
     consumables: ["ของใช้ได้", () => { tab = 1; page = 0; render(); }],
-    quest: ["เควส", null],
+    quest: ["เควส", onQuest],
     settings: ["ตั้งค่า", null],
     menu: ["เมนู", null],
   };

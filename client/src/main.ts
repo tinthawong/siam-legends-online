@@ -10,6 +10,7 @@ import { ITEMS } from "../../shared/items";
 import type { InvItem, PlayerStats } from "../../shared/protocol";
 import { statCost, STAT_MAX, type StatKey } from "../../shared/game";
 import { createInventory } from "./inventory";
+import { bindQuests } from "./quests";
 import { bindAttackButton, bindJoystick } from "./controls";
 
 interface Character { name: string; level: number; exp: number; look: Look }
@@ -126,13 +127,21 @@ function startGame(ch: Character, session: Session) {
   };
 
   const scene = new GameScene(net);
-  const hud = bindHud(net);
+  let invCount = new Map<string, number>();
+  const quests = bindQuests(net, (i) => invCount.get(i) ?? 0);
+  const hud = bindHud(net, () => quests.openList());
   // จอยสติ๊กมุมซ้ายล่าง + ปุ่มโจมตีมุมขวาล่าง แสดงทั้งมือถือและคอม (คอมลากด้วยเมาส์ได้)
   $("joystick").hidden = false;
   $("attack-btn").hidden = false;
   bindJoystick($("joystick"), (d) => scene.setJoystick(d));
   bindAttackButton($<HTMLButtonElement>("attack-btn"), () => scene.attackButton());
-  scene.onInventory = hud.inventory;
+  scene.onInventory = (items) => {
+    invCount = new Map(items.map((i) => [i.item, i.count]));
+    hud.inventory(items);
+    quests.refresh();
+  };
+  scene.onQuests = quests.setLog;
+  scene.onDialog = quests.dialog;
   scene.onStats = hud.stats;
   scene.onJoined = hud.joined;
   // สลบ: แสดงสาเหตุ กดกลับเมืองแล้ว server ฟื้นให้ที่จุดเกิด
@@ -232,7 +241,7 @@ function bindForms() {
 }
 
 /** แถบเมนูล่าง + หน้าต่าง สถานะ / กระเป๋า / เบี้ย / บอท */
-function bindHud(net: Net) {
+function bindHud(net: Net, openQuests: () => void) {
   const buttons = Array.from(document.querySelectorAll<HTMLButtonElement>("#menu button[data-panel]"));
   const panels = buttons.map((b) => $(b.dataset.panel!));
   // เปิดได้ทีละหน้า: กดปุ่มเดิมซ้ำ = ปิด
@@ -301,7 +310,8 @@ function bindHud(net: Net) {
   pct.onchange = sendBot;
   $("bot-pct-text").textContent = `${pct.value}%`;
 
-  const bag = createInventory(bagEl, (item) => net.send({ t: "use", item }), () => toggle("bag", false));
+  const bag = createInventory(bagEl, (item) => net.send({ t: "use", item }), () => toggle("bag", false),
+    () => { toggle("bag", false); openQuests(); });
   const renderBag = () => {
     bag.setItems(inv);
     $("bot-potions").textContent = String(inv.filter((i) => ITEMS[i.item]?.heal).reduce((a, i) => a + i.count, 0));

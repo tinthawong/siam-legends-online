@@ -28,7 +28,7 @@ export const TERRAIN_NAMES = ["grass", "water", "sand", "dirt", "paddy"] as cons
 const LETTER: Record<string, number> = { G: GRASS, W: WATER, S: SAND, D: DIRT, P: PADDY, F: FOREST };
 
 // ชื่อมอนใน layout → id ในเกม (MOBS)
-const MOB_ID: Record<string, string> = {
+export const MOB_ID: Record<string, string> = {
   "rice-crab": "mud_crab", "red-crab": "red_crab", "lotus-frog": "lotus_frog",
   grasshopper: "grasshopper", octopus: "octopus", scarecrow: "scarecrow",
 };

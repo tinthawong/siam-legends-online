@@ -375,6 +375,26 @@
     .inv-money { display: flex; align-items: center; padding-left: 3%; font-size: 3.4cqw; font-weight: 700; color: #ffe39a; text-shadow: 0 0.2cqw 0.3cqw #000; }
     @media (prefers-reduced-motion: reduce) { .inv-thumb { transition: none; } }
 
+    /* คุยกับ NPC: กล่องข้อความกลางล่างจอ */
+    #dialog { position: fixed; left: 50%; bottom: calc(min(22vmin, 170px) + 40px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+      width: min(520px, calc(100vw - 20px)); padding: 12px 16px 14px; z-index: 6; }
+    #dialog[hidden] { display: none; }
+    .dlg-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 10px; }
+    .dlg-head b { color: var(--gold-lite); font-family: var(--font-title); font-weight: 400; font-size: 19px; }
+    .dlg-head span { font-size: 13px; color: var(--ink-dim); }
+    .dlg-head span::before { content: "เควส: "; }
+    #dlg-text { margin: 8px 0 6px; font-size: 15px; line-height: 1.6; }
+    #dlg-info { margin: 0 0 10px; padding: 6px 8px; border-radius: 4px; background: rgba(0, 0, 0, 0.25); font-size: 13px; color: var(--gold-lite); }
+    #dlg-info[hidden] { display: none; }
+    .dlg-btns { display: flex; justify-content: flex-end; gap: 8px; }
+    .dlg-btns .btn { width: auto; margin: 0; padding: 8px 18px; font-size: 15px; }
+    .dlg-btns .btn[hidden] { display: none; }
+    #quest-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+    #quest-list li { display: grid; gap: 2px; padding: 8px 10px; border-radius: 4px; border: 1px solid var(--gold-deep); background: rgba(0, 0, 0, 0.3); font-size: 14px; }
+    #quest-list b { color: var(--gold-lite); font-weight: 600; }
+    #quest-list small { color: var(--ink-dim); font-size: 12px; }
+    #quest-empty[hidden] { display: none; }
+
     /* จอยสติ๊ก / ปุ่มโจมตี: ขนาดเทียบด้านสั้นของจอ ภาพความละเอียดสูง ไม่ใช้ pixelated */
     #joystick { position: fixed; left: calc(12px + env(safe-area-inset-left)); bottom: calc(96px + env(safe-area-inset-bottom));
       width: min(28vmin, 220px); aspect-ratio: 512 / 529; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -594,6 +614,25 @@
       </div>
       <div class="st-tip" id="st-tip"></div>
       <div class="st-points">แต้มว่าง <b id="st-points">0</b></div>
+    </section>
+
+    <!-- คุยกับ NPC (quests.ts) -->
+    <section id="dialog" class="gold-panel-theme" hidden aria-live="polite" aria-label="คุยกับ NPC">
+      <div class="dlg-head"><b id="dlg-npc"></b><span id="dlg-quest"></span></div>
+      <p id="dlg-text"></p>
+      <p id="dlg-info"></p>
+      <div class="dlg-btns">
+        <button type="button" class="btn btn-line" id="dlg-close">ปิด</button>
+        <button type="button" class="btn btn-gold" id="dlg-ok">รับเควส</button>
+      </div>
+    </section>
+
+    <!-- รายการเควส: เปิดจากปุ่มเควสในกระเป๋า -->
+    <section id="quest-panel" class="panel-pop gold-panel-theme" hidden aria-label="เควส">
+      <div class="bag-head"><b>เควส</b><button class="panel-close" id="quest-close" aria-label="ปิด">✕</button></div>
+      <ul id="quest-list"></ul>
+      <p id="quest-empty" class="panel-hint">ยังไม่ได้รับเควส ลองคุยกับ NPC ที่มีเครื่องหมาย ! เหนือหัว</p>
+      <p class="panel-hint">ทำเสร็จแล้ว <b id="quest-done-count">0</b> เควส</p>
     </section>
 
     <!-- กระเป๋า: ภาพ ui/inventory-panel.webp + พิกัดจาก shared/data/inventory-layout.json (สร้างใน inventory.ts) -->

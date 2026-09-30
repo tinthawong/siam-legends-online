@@ -10,11 +10,13 @@ import { MAP_W, MAP_H, SPAWN, ZONES, isWalkable, inZone, exitAt } from "../../sh
 import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
 import { MOBS, expToNext, STAT_KEYS, STAT_MAX, statCostN, statPointsForLevel, derive, physicalAttack, type Stats, type Derived } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
+import { NPCS, QUESTS, canAccept, isComplete, talkTo, type QuestLog } from "../../shared/quests";
 import { CLOSE_KICKED } from "../../shared/protocol";
 import type { ClientMsg, ServerMsg, EntityState, PlayerStats, JoinCharacter, GroundItem, InvItem } from "../../shared/protocol";
 import type { Look } from "../../shared/appearance";
 
 const SAVE_EVERY_MS = 30_000;
+const TALK_RANGE = 2; // คุย/รับ/ส่งเควสได้เมื่ออยู่ห่าง NPC ไม่เกินกี่ช่อง
 
 interface Ent {
   id: string;
@@ -52,6 +54,8 @@ interface Player extends Ent {
   potionAt: number;        // กินยาอัตโนมัติเมื่อเลือดต่ำกว่ากี่ % (0 = ปิด)
   nextPotionAt: number;
   inv: Map<string, number>; // กระเป๋า: item → จำนวน
+  quests: QuestLog;         // เควสที่รับอยู่ / ทำเสร็จแล้ว
+  talk: string | null;      // NPC ที่กำลังเดินไปคุย
 }
 
 interface Mob extends Ent {
@@ -102,7 +106,7 @@ export class MapRoom extends DurableObject<Env> {
     // บัญชีเดียวกันเข้าซ้ำ → เตะตัวเก่า และใช้ค่าล่าสุดในหน่วยความจำ (ใหม่กว่าใน D1)
     for (const old of this.players.values()) {
       if (old.userId !== ch.userId) continue;
-      ch = { ...ch, level: old.level, exp: old.exp, x: old.x, y: old.y, inv: invList(old.inv), money: old.money, stats: { ...old.st }, points: old.points };
+      ch = { ...ch, level: old.level, exp: old.exp, x: old.x, y: old.y, inv: invList(old.inv), money: old.money, stats: { ...old.st }, points: old.points, quests: old.quests };
       this.players.delete(old.id);
       this.broadcast({ t: "despawn", id: old.id });
       this.send(old, { t: "kicked" }); // แจ้งก่อน เพราะ close event อาจมาช้า
@@ -127,12 +131,13 @@ export class MapRoom extends DurableObject<Env> {
       target: null, auto: false, nextAttackAt: 0, chaseKey: null,
       nextHpRegenAt: 0, nextSpRegenAt: 0,
       pickup: null, dead: false, money: ch.money ?? 0, st: { ...ch.stats }, points: ch.points, der: derive(ch.level, ch.stats), potionAt: 0, nextPotionAt: 0, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
+      quests: ch.quests ?? { active: {}, done: [] }, talk: null,
     };
     this.players.set(id, p);
 
     this.send(p, {
       t: "welcome", you: id, entities: this.snapshot(), self: this.stats(p),
-      ground: [...this.ground.values()], inv: invList(p.inv),
+      ground: [...this.ground.values()], inv: invList(p.inv), quests: p.quests,
     });
     this.broadcast({ t: "spawn", e: this.view(p) }, id);
     this.ensureLoop();
@@ -165,6 +170,7 @@ export class MapRoom extends DurableObject<Env> {
         if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
         p.chaseKey = null;
         p.pickup = null;
+        p.talk = null;
         this.setPath(p, path, now);
         break;
       }
@@ -176,12 +182,14 @@ export class MapRoom extends DurableObject<Env> {
         if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
         p.pickup = g.id;
         p.chaseKey = null;
+        p.talk = null;
         break;
       }
       case "attack": {
         const m = this.mobs.get(String(msg.target));
         if (!m || !m.alive) return;
         p.pickup = null;
+        p.talk = null;
         p.target = m.id;
         p.chaseKey = null;
         this.send(p, { t: "target", id: m.id });
@@ -218,6 +226,32 @@ export class MapRoom extends DurableObject<Env> {
         p.potionAt = v >= 0 && v <= 95 ? v : 0;
         break;
       }
+      case "talk": {
+        // กดที่ NPC = เดินไปหา (ยกเลิกการตีและ auto เหมือนเดินเอง) ถึงแล้วเปิดหน้าคุย
+        const npc = NPCS[String(msg.npc)];
+        if (!npc) return;
+        if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
+        if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
+        p.pickup = null;
+        p.chaseKey = null;
+        p.talk = npc.id;
+        break;
+      }
+      case "quest_accept": {
+        const q = QUESTS[String(msg.id)];
+        if (!q || !this.nearNpc(p, q.npc) || !canAccept(q, p.level, p.quests)) return;
+        p.quests.active[q.id] = 0;
+        this.send(p, { t: "quests", log: p.quests });
+        this.openDialog(p, q.npc); // เควสคุยกับคนให้เอง (q001) ส่งได้ทันที
+        break;
+      }
+      case "quest_done": {
+        const q = QUESTS[String(msg.id)];
+        if (!q || !this.nearNpc(p, q.turnIn) || !isComplete(q, p.quests, (i) => p.inv.get(i) ?? 0)) return;
+        this.completeQuest(p, q.id);
+        this.openDialog(p, q.turnIn); // มีเควสต่อจากนี้ → เสนอต่อเลย
+        break;
+      }
       case "auto": {
         p.auto = !!msg.on;
         this.send(p, { t: "auto", on: p.auto });
@@ -252,14 +286,14 @@ export class MapRoom extends DurableObject<Env> {
     if (!list.length) return;
     const now = Date.now();
     const stmt = this.env.DB.prepare(
-      "UPDATE characters SET level = ?, exp = ?, x = ?, y = ?, money = ?, str = ?, agi = ?, vit = ?, int = ?, dex = ?, luk = ?, stat_points = ?, updated_at = ? WHERE user_id = ?",
+      "UPDATE characters SET level = ?, exp = ?, x = ?, y = ?, money = ?, str = ?, agi = ?, vit = ?, int = ?, dex = ?, luk = ?, stat_points = ?, quests = ?, updated_at = ? WHERE user_id = ?",
     );
     const invStmt = this.env.DB.prepare(
       "INSERT INTO inventory (user_id, item, count) VALUES (?, ?, ?) ON CONFLICT (user_id, item) DO UPDATE SET count = excluded.count",
     );
     try {
       await this.env.DB.batch(list.flatMap((p) => [
-        stmt.bind(p.level, p.exp, p.x, p.y, p.money, p.st.str, p.st.agi, p.st.vit, p.st.int, p.st.dex, p.st.luk, p.points, now, p.userId),
+        stmt.bind(p.level, p.exp, p.x, p.y, p.money, p.st.str, p.st.agi, p.st.vit, p.st.int, p.st.dex, p.st.luk, p.points, JSON.stringify(p.quests), now, p.userId),
         ...[...p.inv].map(([item, count]) => invStmt.bind(p.userId, item, count)),
       ]));
     } catch (e) {
@@ -341,6 +375,7 @@ export class MapRoom extends DurableObject<Env> {
   private updatePlayer(p: Player, now: number) {
     if (p.dead) return;
     if (p.pickup) { this.updatePickup(p, now); return; }
+    if (p.talk) { this.updateTalk(p, now); return; }
     // auto: ไม่มีเป้าหมายที่ยังมีชีวิต → หามอนที่ใกล้ที่สุดในรัศมี
     if (p.auto && !this.aliveMob(p.target)) {
       const t = this.nearestMob(p);
@@ -415,6 +450,63 @@ export class MapRoom extends DurableObject<Env> {
     }
   }
 
+  // ---------- NPC / เควส ----------
+
+  private nearNpc(p: Player, npc: string): boolean {
+    const n = NPCS[npc];
+    return !!n && cheb(p.x, p.y, n.x, n.y) <= TALK_RANGE;
+  }
+
+  /** เดินไปหา NPC ถึงระยะคุยแล้วเปิดหน้าคุย */
+  private updateTalk(p: Player, now: number) {
+    const n = NPCS[p.talk!];
+    if (!n) { p.talk = null; return; }
+    if (cheb(p.x, p.y, n.x, n.y) <= TALK_RANGE) {
+      if (p.path.length) this.setPath(p, [], now);
+      p.talk = null;
+      this.openDialog(p, n.id);
+      return;
+    }
+    if (p.path.length === 0) {
+      const path = pathNear(p.x, p.y, n.x, n.y, TALK_RANGE);
+      if (!path) { p.talk = null; return; }
+      this.setPath(p, path, now);
+    }
+  }
+
+  private openDialog(p: Player, npc: string) {
+    const t = talkTo(npc, p.level, p.quests, (i) => p.inv.get(i) ?? 0);
+    this.send(p, { t: "dialog", npc, stage: t.stage, quest: t.quest?.id ?? null });
+  }
+
+  /** ส่งเควส: เก็บของที่ต้องส่ง (collect) แล้วให้รางวัล EXP / เบี้ย / ไอเท็ม */
+  private completeQuest(p: Player, id: string) {
+    const q = QUESTS[id];
+    if (q.type === "collect") p.inv.set(q.target, (p.inv.get(q.target) ?? 0) - q.count);
+    delete p.quests.active[id];
+    p.quests.done.push(id);
+    for (const it of q.reward.items) p.inv.set(it.item, (p.inv.get(it.item) ?? 0) + it.count);
+    p.money += q.reward.money;
+    this.gainExp(p, q.reward.exp);
+    this.send(p, { t: "quest_reward", id, exp: q.reward.exp, money: q.reward.money, items: q.reward.items.map((i) => ({ item: i.item, count: i.count })) });
+    this.send(p, { t: "quests", log: p.quests });
+    this.send(p, { t: "inv", items: invList(p.inv) });
+    this.send(p, { t: "stats", self: this.stats(p) });
+  }
+
+  /** ฆ่ามอน: นับให้เควสล่ามอนที่รับอยู่ */
+  private countKill(p: Player, type: string) {
+    let changed = false;
+    for (const [id, n] of Object.entries(p.quests.active)) {
+      const q = QUESTS[id];
+      if (q.type !== "kill" || q.target !== type || n >= q.count) continue;
+      p.quests.active[id] = n + 1;
+      changed = true;
+      this.send(p, { t: "notice", text: `${q.name} ${n + 1}/${q.count}` });
+    }
+    if (changed) this.send(p, { t: "quests", log: p.quests });
+  }
+
   // ---------- มอนตีกลับ ----------
 
   private updateAggro(m: Mob, now: number) {
@@ -469,6 +561,7 @@ export class MapRoom extends DurableObject<Env> {
     if (p.path.length) this.setPath(p, [], now);
     p.chaseKey = null;
     p.pickup = null;
+    p.talk = null;
     if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
     if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
     this.broadcast({ t: "dead", id: p.id, cause });
@@ -546,18 +639,24 @@ export class MapRoom extends DurableObject<Env> {
 
     const def = MOBS[m.type];
     const money = def.money ? def.money[0] + Math.floor(Math.random() * (def.money[1] - def.money[0] + 1)) : 0;
-    killer.exp += def.exp;
     killer.money += money;
+    this.gainExp(killer, def.exp);
     this.send(killer, { t: "exp", x: m.x, y: m.y, exp: def.exp, money });
-    while (killer.exp >= expToNext(killer.level)) {
-      killer.exp -= expToNext(killer.level);
-      killer.level++;
-      killer.points += statPointsForLevel(killer.level);
-      this.recalc(killer);
-      killer.hp = killer.maxHp;
-      killer.sp = killer.maxSp;
-    }
+    this.countKill(killer, m.type);
     this.send(killer, { t: "stats", self: this.stats(killer) });
+  }
+
+  /** ได้ EXP แล้วเลเวลขึ้นกี่ขั้นก็ได้ (เลือด/SP เต็มเมื่อขึ้นเลเวล) */
+  private gainExp(p: Player, exp: number) {
+    p.exp += exp;
+    while (p.exp >= expToNext(p.level)) {
+      p.exp -= expToNext(p.level);
+      p.level++;
+      p.points += statPointsForLevel(p.level);
+      this.recalc(p);
+      p.hp = p.maxHp;
+      p.sp = p.maxSp;
+    }
   }
 
   private aliveMob(id: string | null): Mob | undefined {

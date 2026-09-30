@@ -11,6 +11,7 @@ import { recolorSprite } from "./recolor";
 import { MOBS } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
+import { NPCS, emptyLog, npcMark, type QuestLog } from "../../shared/quests";
 import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, animSource, idleFrameUrl } from "./sprites";
 
 interface View {
@@ -92,6 +93,16 @@ export class GameScene extends Phaser.Scene {
   onRevived: (() => void) | null = null;
   onStats: ((s: PlayerStats) => void) | null = null;
   onJoined: (() => void) | null = null;
+  /** เควส: สถานะเปลี่ยน / NPC เปิดหน้าคุย / ส่งเควสสำเร็จ → main.ts แสดงหน้าต่าง */
+  onQuests: ((log: QuestLog) => void) | null = null;
+  onDialog: ((m: Extract<ServerMsg, { t: "dialog" }>) => void) | null = null;
+  onQuestReward: ((m: Extract<ServerMsg, { t: "quest_reward" }>) => void) | null = null;
+
+  // NPC: เครื่องหมาย ! / ? เหนือหัว คิดจากเลเวล กระเป๋า และสถานะเควสของเรา
+  private npcMarks = new Map<string, Phaser.GameObjects.Text>();
+  private questLog: QuestLog = emptyLog();
+  private level = 1;
+  private invCount = new Map<string, number>();
 
   constructor(private net: Net) {
     super("game");
@@ -111,6 +122,15 @@ export class GameScene extends Phaser.Scene {
     for (const kind of new Set([...PROPS.map((p) => p.kind), ...FOREST_KINDS])) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
+    // NPC: client/public/sprites/<sprite>/sheet.json (ท่ายืน) ยังไม่มีภาพ = โหลดไม่เจอ ใช้ภาพชั่วคราว (drawNpcs)
+    for (const n of Object.values(NPCS)) {
+      const dir = `sprites/${n.sprite}`, key = `npcsheet_${n.id}`;
+      this.load.once(`filecomplete-json-${key}`, (_key: string, _type: string, data: SheetMeta) => {
+        for (const a of Object.values(data.animations))
+          for (const f of a.frames) this.load.image(`${n.id}_${f.replace(/\.png$/, "")}`, `${dir}/${f}`);
+      });
+      this.load.json(key, `${dir}/sheet.json`);
+    }
     // มอนจาก sheet: โหลด sheet.json ก่อน แล้วค่อยโหลดทุกเฟรมที่ระบุในนั้น (ชุดหลัก + ชุดท่าเพิ่มแต่ละโฟลเดอร์)
     for (const { name, part } of sheetList()) {
       const dir = `sprites/monsters/${name}${part ? `/${part}` : ""}`;
@@ -154,6 +174,7 @@ export class GameScene extends Phaser.Scene {
     this.makeTextures();
     this.makeSheetAnims();
     this.drawMap();
+    this.drawNpcs();
 
     const cam = this.cameras.main;
     cam.setBounds(0, 0, MAP_W * TILE, MAP_H * TILE);
@@ -178,6 +199,13 @@ export class GameScene extends Phaser.Scene {
   // ---------- input ----------
 
   private onTap(pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]) {
+    // กดที่ NPC → เดินไปคุย
+    const npc = over.find((o) => o.getData("npcId"));
+    if (npc) {
+      this.net.send({ t: "talk", npc: npc.getData("npcId") as string });
+      this.setTarget(null);
+      return;
+    }
     // กดที่ของบนพื้น → เดินไปเก็บ
     const item = over.find((o) => o.getData("groundId"));
     if (item) {
@@ -267,9 +295,29 @@ export class GameScene extends Phaser.Scene {
         for (const g of m.ground) this.addGround(g, false);
         this.cameras.main.startFollow(this.views.get(m.you)!.c, true, 0.2, 0.2);
         this.updateStats(m.self);
-        this.onInventory?.(m.inv);
+        this.setInv(m.inv);
+        this.questLog = m.quests;
+        this.onQuests?.(m.quests);
+        this.updateMarks();
         this.onJoined?.();
         break;
+      case "quests":
+        this.questLog = m.log;
+        this.onQuests?.(m.log);
+        this.updateMarks();
+        break;
+      case "dialog":
+        this.onDialog?.(m);
+        break;
+      case "quest_reward": {
+        const v = this.me ? this.views.get(this.me) : undefined;
+        if (v) {
+          this.floatText(v.c.x, v.c.y + v.topY - 26, "เควสสำเร็จ!", "#ffd84a", 1500);
+          if (m.exp) this.floatText(v.c.x, v.c.y + v.topY - 12, `+${m.exp} EXP`, "#ffd84a", 1300);
+        }
+        this.onQuestReward?.(m);
+        break;
+      }
       case "drop":
         this.addGround(m.g, true);
         break;
@@ -286,7 +334,7 @@ export class GameScene extends Phaser.Scene {
         break;
       }
       case "inv":
-        this.onInventory?.(m.items);
+        this.setInv(m.items);
         break;
       case "expire": {
         const img = this.groundViews.get(m.id);
@@ -317,7 +365,7 @@ export class GameScene extends Phaser.Scene {
           dst.hp = m.hp;
           this.drawHp(dst);
           if (m.miss) this.floatText(dst.c.x, dst.c.y + dst.topY - 9, "พลาด", "#bfc7d5", 700);
-          else this.floatDamage(dst, m.dmg, m.crit);
+          else { this.floatDamage(dst, m.dmg, m.crit); this.hitFx(dst, this.views.get(m.src), m.crit); }
           dst.body.setTintFill(0xffffff);
           this.time.delayedCall(70, () => dst.body.clearTint());
           // มอนจาก sheet ที่มีท่าโดนตี: เล่นพร้อมกะพริบขาว แต่ไม่ขัดท่า attack ที่กำลังเล่นอยู่
@@ -550,12 +598,54 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** ตัวเลขดาเมจ: ตีมอน = ขาว (คริ = ทอง), ผู้เล่นโดนตี = แดง */
+  /** ตัวเลขดาเมจ: เด้งขยายแล้วหดกลับ ลอยโค้งขึ้นไปด้านข้างแล้วจาง คริใหญ่กว่า สีทอง มี ! */
   private floatDamage(v: View, dmg: number, crit: boolean) {
-    const t = this.add.text(v.c.x, v.c.y + v.topY - 9, String(dmg), {
-      fontFamily: "Mitr, sans-serif", fontSize: crit ? "16px" : "12px",
-      color: v.kind === "player" ? "#ff6b6b" : crit ? "#ffd84a" : "#ffffff", stroke: "#10192a", strokeThickness: 3,
-    }).setOrigin(0.5).setDepth(100000).setResolution(2);
-    this.tweens.add({ targets: t, y: t.y - 22, alpha: 0, duration: 750, ease: "Cubic.easeOut", onComplete: () => t.destroy() });
+    const mine = v.kind === "player";
+    const t = this.add.text(v.c.x, v.c.y + v.topY - 9, crit ? `${dmg}!` : String(dmg), {
+      fontFamily: "Mitr, sans-serif", fontStyle: "bold", fontSize: crit ? "17px" : "13px",
+      color: mine ? "#ff6b6b" : crit ? "#ffd84a" : "#ffffff",
+      stroke: crit ? "#6b2400" : "#10192a", strokeThickness: crit ? 4 : 3,
+      shadow: { offsetX: 0, offsetY: 1, color: "#000", blur: 2, fill: true, stroke: true },
+    }).setOrigin(0.5).setDepth(100000).setResolution(2).setScale(0.3);
+    const drift = (Math.random() - 0.5) * 18;
+    this.tweens.chain({
+      targets: t,
+      tweens: [
+        { scale: crit ? 1.6 : 1.25, duration: 90, ease: "Back.easeOut" },
+        { scale: 1, duration: 110, ease: "Quad.easeOut" },
+        { x: t.x + drift, y: t.y - (crit ? 30 : 22), alpha: 0, duration: crit ? 750 : 600, ease: "Cubic.easeIn" },
+      ],
+      onComplete: () => t.destroy(),
+    });
+  }
+
+  /** เอฟเฟกต์ตีโดน (โค้ดล้วน): ประกายแตกกระจาย, หยุดชั่ววูบ (hit-stop) + ตัวสั่น, จอสั่นเมื่อเราเกี่ยวข้อง */
+  private hitFx(dst: View, src: View | undefined, crit: boolean) {
+    const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const x = dst.c.x, y = dst.c.y + dst.topY / 2, depth = dst.c.y + 1;
+    // ประกาย: ดาวเล็ก ๆ พุ่งออกรอบจุดโดน (ADD ให้สว่างเรือง)
+    const n = crit ? 9 : 5;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, d = (crit ? 18 : 12) + Math.random() * 8;
+      const star = this.add.star(x, y, 4, 1, crit ? 4 : 3, crit ? 0xffd84a : 0xfff6c0)
+        .setBlendMode(Phaser.BlendModes.ADD).setDepth(depth).setAngle(Math.random() * 90);
+      this.tweens.add({ targets: star, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.7, scale: 0, angle: star.angle + 120,
+        duration: 220 + Math.random() * 80, ease: "Quad.easeOut", onComplete: () => star.destroy() });
+    }
+    // วงแสงขยายออกตรงจุดโดน
+    const ring = this.add.circle(x, y, crit ? 10 : 6).setStrokeStyle(2, crit ? 0xffd84a : 0xffffff).setBlendMode(Phaser.BlendModes.ADD).setDepth(depth);
+    this.tweens.add({ targets: ring, scale: crit ? 2.4 : 1.8, alpha: 0, duration: 200, ease: "Quad.easeOut", onComplete: () => ring.destroy() });
+    if (calm) return;
+
+    // hit-stop: หยุดท่าของทั้งคนตีและคนโดนชั่ววูบ ตัวที่โดนสั่นซ้ายขวา
+    const stop = crit ? 110 : 60;
+    for (const v of [dst, src]) v?.body.anims.pause();
+    const bx = dst.body.x;
+    this.tweens.add({ targets: dst.body, x: bx + 2, duration: stop / 4, yoyo: true, repeat: 1, onComplete: () => { dst.body.x = bx; } });
+    this.time.delayedCall(stop, () => { for (const v of [dst, src]) if (v?.body.active) v.body.anims.resume(); });
+
+    // จอสั่น: เฉพาะตอนเราตีคริ หรือเราโดนตี
+    if (this.me && ((crit && src?.id === this.me) || dst.id === this.me)) this.cameras.main.shake(crit ? 140 : 100, crit ? 0.006 : 0.004);
   }
 
   /** ข้อความลอยขึ้นแล้วจางหาย (+EXP, ฟื้นที่จุดเกิด) */
@@ -640,8 +730,50 @@ export class GameScene extends Phaser.Scene {
     this.targetRing.setVisible(!!id && this.views.has(id));
   }
 
+  private setInv(items: InvItem[]) {
+    this.invCount = new Map(items.map((i) => [i.item, i.count]));
+    this.onInventory?.(items);
+    this.updateMarks();
+  }
+
+  private updateMarks() {
+    for (const [id, t] of this.npcMarks) {
+      const mark = npcMark(id, this.level, this.questLog, (i) => this.invCount.get(i) ?? 0);
+      t.setText(mark ?? "").setColor(mark === "?" ? "#7ee08a" : "#ffd84a");
+    }
+  }
+
+  /** NPC ยืนนิ่งตามตำแหน่งใน layout แมพ: ชื่อสีทอง + เครื่องหมายเควสเหนือหัว กดแล้วเดินไปคุย */
+  private drawNpcs() {
+    for (const n of Object.values(NPCS)) {
+      const x = center(n.x), y = center(n.y);
+      const data = this.cache.json.get(`npcsheet_${n.id}`) as SheetMeta | undefined;
+      let body: Phaser.GameObjects.Sprite;
+      if (data?.animations.idle) {
+        const frames = data.animations.idle.frames.map((f) => ({ key: `${n.id}_${f.replace(/\.png$/, "")}` }));
+        if (!this.anims.exists(`${n.id}_idle`))
+          this.anims.create({ key: `${n.id}_idle`, frames, frameRate: 1000 / data.animations.idle.frameMs, repeat: -1 });
+        body = this.add.sprite(x, y, frames[0].key).setOrigin(data.anchor.x / data.frameWidth, data.anchor.y / data.frameHeight).play(`${n.id}_idle`);
+      } else {
+        // ยังไม่มีภาพ NPC: ใช้ตัว base ผู้ชายไปก่อน
+        body = this.add.sprite(x, y, "base_male_south").setOrigin(0.5, 45 / 48);
+      }
+      this.add.ellipse(x, y, 20, 6, 0x000000, 70 / 255).setDepth(y - 0.5);
+      body.setDepth(y).setInteractive({ useHandCursor: true }).setData("npcId", n.id);
+      this.add.text(x, y + 7, n.name, {
+        fontFamily: "Mitr, sans-serif", fontSize: "10px", color: "#ffe39a", stroke: "#10192a", strokeThickness: 3,
+      }).setOrigin(0.5, 0).setDepth(90000).setResolution(2);
+      const mark = this.add.text(x, y - body.displayHeight - 2, "", {
+        fontFamily: "Mitr, sans-serif", fontStyle: "bold", fontSize: "18px", color: "#ffd84a", stroke: "#3a1a05", strokeThickness: 4,
+      }).setOrigin(0.5, 1).setDepth(90001).setResolution(2);
+      this.tweens.add({ targets: mark, y: mark.y - 4, yoyo: true, repeat: -1, duration: 600, ease: "Sine.easeInOut" });
+      this.npcMarks.set(n.id, mark);
+    }
+  }
+
   private updateStats(s: PlayerStats) {
     this.onStats?.(s);
+    if (s.level !== this.level) { this.level = s.level; this.updateMarks(); }
     document.getElementById("hud-lv")!.textContent = `Lv ${s.level}`;
     (document.getElementById("hud-hp") as HTMLElement).style.width = `${(s.hp / s.maxHp) * 100}%`;
     document.getElementById("hud-hp-text")!.textContent = `HP ${s.hp} / ${s.maxHp}`;
