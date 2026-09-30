@@ -9,6 +9,8 @@ import { NAME_RE } from "../../shared/constants";
 import { ITEMS } from "../../shared/items";
 import type { InvItem, PlayerStats } from "../../shared/protocol";
 import { statCost, STAT_MAX, type StatKey } from "../../shared/game";
+import { createInventory } from "./inventory";
+import { bindAttackButton, bindJoystick } from "./controls";
 
 interface Character { name: string; level: number; exp: number; look: Look }
 
@@ -125,6 +127,11 @@ function startGame(ch: Character, session: Session) {
 
   const scene = new GameScene(net);
   const hud = bindHud(net);
+  // จอยสติ๊กมุมซ้ายล่าง + ปุ่มโจมตีมุมขวาล่าง แสดงทั้งมือถือและคอม (คอมลากด้วยเมาส์ได้)
+  $("joystick").hidden = false;
+  $("attack-btn").hidden = false;
+  bindJoystick($("joystick"), (d) => scene.setJoystick(d));
+  bindAttackButton($<HTMLButtonElement>("attack-btn"), () => scene.attackButton());
   scene.onInventory = hud.inventory;
   scene.onStats = hud.stats;
   scene.onJoined = hud.joined;
@@ -238,7 +245,16 @@ function bindHud(net: Net) {
     }
   };
   for (const b of buttons) b.onclick = () => toggle(b.dataset.panel!);
-  for (const p of panels) p.querySelector<HTMLButtonElement>(".panel-close")!.onclick = () => toggle(p.id, false);
+  for (const p of panels) {
+    const close = p.querySelector<HTMLButtonElement>(".panel-close");
+    if (close) close.onclick = () => toggle(p.id, false);
+  }
+  // กระเป๋า: แตะนอกกรอบ = ปิด
+  const bagEl = $("bag");
+  document.addEventListener("pointerdown", (e) => {
+    const t = e.target as HTMLElement;
+    if (!bagEl.hidden && !bagEl.contains(t) && !t.closest('#menu button[data-panel="bag"]')) toggle("bag", false);
+  }, true);
   // คีย์ลัดบนคอม (รองรับแป้นไทยตำแหน่งเดียวกัน)
   const keys: Record<string, string> = { c: "stat-panel", "แ": "stat-panel", i: "bag", "ไ": "bag", g: "gold-panel", "เ": "gold-panel", b: "bot-panel", "ิ": "bot-panel" };
   window.addEventListener("keydown", (e) => {
@@ -285,27 +301,9 @@ function bindHud(net: Net) {
   pct.onchange = sendBot;
   $("bot-pct-text").textContent = `${pct.value}%`;
 
+  const bag = createInventory(bagEl, (item) => net.send({ t: "use", item }), () => toggle("bag", false));
   const renderBag = () => {
-    const grid = $("bag-grid");
-    grid.innerHTML = "";
-    for (const it of inv) {
-      const def = ITEMS[it.item];
-      if (!def) continue;
-      const slot = document.createElement("div");
-      slot.className = "slot" + (def.heal ? " usable" : "");
-      slot.title = `${def.name} ×${it.count}${def.heal ? ` · กดเพื่อกิน (เติมเลือด ${def.heal})` : ""}`;
-      // ไอเท็มที่ยังไม่มีภาพ แสดงชื่อแทน
-      const img = def.icon ? document.createElement("img") : document.createElement("small");
-      if (img instanceof HTMLImageElement) { img.src = `/sprites/items/${def.icon}-64.png`; img.alt = def.name; }
-      else { img.textContent = def.name; img.style.cssText = "font-size:11px;text-align:center;padding:2px"; }
-      const n = document.createElement("span");
-      n.className = "n";
-      n.textContent = String(it.count);
-      slot.append(img, n);
-      if (def.heal) slot.onclick = () => net.send({ t: "use", item: it.item });
-      grid.appendChild(slot);
-    }
-    $("bag-empty").hidden = grid.children.length > 0;
+    bag.setItems(inv);
     $("bot-potions").textContent = String(inv.filter((i) => ITEMS[i.item]?.heal).reduce((a, i) => a + i.count, 0));
   };
 
@@ -372,6 +370,8 @@ function bindHud(net: Net) {
   // Alt+A เปิด/ปิดหน้าต่างค่าพลัง แบบ Ragnarok
   window.addEventListener("keydown", (e) => {
     if (e.altKey && (e.key === "a" || e.key === "A" || e.key === "ฟ")) { e.preventDefault(); toggle("stat-panel"); }
+    // Alt+E เปิด/ปิดกระเป๋า แบบ Ragnarok
+    if (e.altKey && (e.key === "e" || e.key === "E" || e.key === "ำ")) { e.preventDefault(); toggle("bag"); }
   });
 
   return {
@@ -379,6 +379,7 @@ function bindHud(net: Net) {
     stats: (s: PlayerStats) => {
       money = s.money;
       $("gold-amount").textContent = money.toLocaleString("th-TH");
+      bag.setMoney(money);
       for (const { btn, cost } of buyButtons) btn.disabled = money < cost;
       last = s;
       const dv = s.derived;

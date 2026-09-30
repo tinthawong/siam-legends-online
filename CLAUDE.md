@@ -53,6 +53,8 @@ npm run typecheck       # tsc ทั้ง client และ server
 - `client/src/creator.ts` หน้าสร้างตัวละคร (ตัวอย่างหมุนได้ 8 ทิศ)
 - `client/src/recolor.ts` เปลี่ยนสีผม/ตาของ sprite base ตอนโหลด
 - `client/src/GameScene.ts` ฉากเกม Phaser
+- `client/src/inventory.ts` หน้ากระเป๋าจากภาพ `ui/inventory-panel.webp` + พิกัด `shared/data/inventory-layout.json` (Alt+E)
+- `client/src/controls.ts` จอยสติ๊ก + ปุ่มโจมตี แสดงทั้งมือถือและคอม (สเปก `docs/ui-controls.md`, ต้นฉบับภาพ `art/ui/`)
 - `client/src/forest.ts` ต้นไม้ในช่องป่า: ช่องละ 2 ต้น สุ่มจากพิกัดช่อง พลิกซ้าย-ขวาครึ่งหนึ่ง ต้นดอก (หางนกยูง, ราชพฤกษ์) ~12% ต้นด้านในวาดรวมกับภาพพื้น ต้นริมป่าเป็น sprite เรียงตาม y ช่องป่าที่ด้านบนเดินได้ใช้พุ่มเตี้ย (ไม่บังตัวละครเกินครึ่งตัว)
 - ทางออก (`EXITS`): ยังไม่มีแมพอื่น เดินเข้าแล้ว server ส่ง `notice` "เส้นทางนี้ยังไม่เปิด" และหยุดก่อนถึงช่องทางออก ชื่อปลายทางลอยเหนือทางออกเมื่อเข้าใกล้ 7 ช่อง
 - `docs/map-system.md` สเปกระบบแมพจากผู้ใช้ (Tiled .tmj → `tools/build_map.py` → JSON) **ยังไม่ได้ทำส่วน Tiled/build_map** ตอนนี้แก้ `shared/data/maps/ban-pak-ao.json` ตรง ๆ

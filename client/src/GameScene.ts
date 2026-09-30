@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
 import type { Cell } from "../../shared/pathfind";
-import { TILE } from "../../shared/constants";
+import { TILE, AUTO_RADIUS, cheb } from "../../shared/constants";
 import { MAP_W, MAP_H, PROPS, FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, EXITS, isWalkable, isSolidProp, PROP_SET_OF } from "../../shared/map";
 import { forestTrees, FOREST_KINDS } from "./forest";
 import { renderGround, TILE_URLS } from "./mapRender";
@@ -56,6 +56,11 @@ const center = (n: number) => n * TILE + TILE / 2;
 const DIRS = ["east", "south-east", "south", "south-west", "west", "north-west", "north", "north-east"] as const;
 type Dir = (typeof DIRS)[number];
 
+// ก้าวของแต่ละทิศ ตามลำดับ DIRS
+const STEPS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, -1]] as const;
+const JOY_AHEAD = 4;     // จอยสติ๊ก: สั่งเดินไปช่องข้างหน้ากี่ช่อง
+const JOY_RESEND_MS = 150;
+
 function dirOf(dx: number, dy: number): Dir {
   const i = Math.round(Math.atan2(dy, dx) / (Math.PI / 4));
   return DIRS[((i % 8) + 8) % 8];
@@ -75,6 +80,10 @@ export class GameScene extends Phaser.Scene {
   private tapMarker!: Phaser.GameObjects.Image;
   private autoOn = false;
   private autoBtn = document.getElementById("auto-btn") as HTMLButtonElement;
+  // จอยสติ๊ก: ทิศที่ลากอยู่ (index ใน DIRS) และคำสั่งเดินล่าสุดที่ส่งไป
+  private joyDir: number | null = null;
+  private joyMoved = false;
+  private joySent = { dir: -1, x: -1, y: -1, at: 0 };
 
   /** กระเป๋าเปลี่ยน → main.ts วาดหน้ากระเป๋า (HTML) */
   onInventory: ((items: InvItem[]) => void) | null = null;
@@ -190,6 +199,62 @@ export class GameScene extends Phaser.Scene {
 
     this.tapMarker.setPosition(center(x), center(y)).setVisible(true).setAlpha(1).setScale(1);
     this.tweens.add({ targets: this.tapMarker, alpha: 0, scale: 0.4, duration: 450 });
+  }
+
+  /** จอยสติ๊ก: dir = ทิศที่ลาก, null = ปล่อยนิ้ว (หยุดที่ช่องถัดไป) */
+  setJoystick(dir: { dx: number; dy: number } | null) {
+    if (dir) {
+      const i = Math.round(Math.atan2(dir.dy, dir.dx) / (Math.PI / 4));
+      this.joyDir = ((i % 8) + 8) % 8;
+      return;
+    }
+    this.joyDir = null;
+    const v = this.me ? this.views.get(this.me) : undefined;
+    if (this.joyMoved && v && v.path.length > 1) this.net.send({ t: "move", x: v.path[0].x, y: v.path[0].y });
+    this.joyMoved = false;
+    this.joySent.dir = -1;
+  }
+
+  /** เดินตามจอย: server หาเส้นทางเอง client แค่บอกช่องปลายทางข้างหน้า แล้วส่งใหม่เมื่อใกล้ถึง/เปลี่ยนทิศ */
+  private joyStep(time: number) {
+    const v = this.me ? this.views.get(this.me) : undefined;
+    if (!v || this.joyDir === null) return;
+    if (this.joyDir === this.joySent.dir && v.path.length > 2) return;
+    if (time - this.joySent.at < JOY_RESEND_MS) return;
+    const cx = Math.floor(v.c.x / TILE), cy = Math.floor(v.c.y / TILE);
+    // ติดกำแพงตรง ๆ ลองทิศข้างเคียง (ไถลเลียบกำแพง)
+    for (const d of [this.joyDir, (this.joyDir + 1) % 8, (this.joyDir + 7) % 8]) {
+      const [sx, sy] = STEPS[d];
+      let k = 0;
+      while (k < JOY_AHEAD && isWalkable(cx + sx * (k + 1), cy + sy * (k + 1))) k++;
+      if (!k) continue;
+      const x = cx + sx * k, y = cy + sy * k;
+      // ส่งปลายทางเดิมซ้ำเฉพาะเมื่อผ่านไปนานพอ (กันส่งรัวตอนเดินไม่ได้)
+      if (x === this.joySent.x && y === this.joySent.y && time - this.joySent.at < 500) return;
+      this.net.send({ t: "move", x, y });
+      this.joySent = { dir: this.joyDir, x, y, at: time };
+      this.joyMoved = true;
+      return;
+    }
+  }
+
+  /** ปุ่มโจมตี: ตีเป้าหมายที่เลือกอยู่ ถ้าไม่มี เลือกมอนที่ใกล้ที่สุดในระยะ (รัศมีเดียวกับ auto) */
+  attackButton() {
+    let id = this.targetId && this.views.has(this.targetId) ? this.targetId : null;
+    if (!id) {
+      const me = this.me ? this.views.get(this.me) : undefined;
+      if (!me) return;
+      const cx = Math.floor(me.c.x / TILE), cy = Math.floor(me.c.y / TILE);
+      let best = Infinity;
+      for (const v of this.views.values()) {
+        if (v.kind !== "mob" || v.hp <= 0) continue;
+        const d = cheb(cx, cy, Math.floor(v.c.x / TILE), Math.floor(v.c.y / TILE));
+        if (d <= AUTO_RADIUS && d < best) { best = d; id = v.id; }
+      }
+    }
+    if (!id) return;
+    this.net.send({ t: "attack", target: id });
+    this.setTarget(id);
   }
 
   // ---------- ข้อความจาก server ----------
@@ -586,7 +651,8 @@ export class GameScene extends Phaser.Scene {
 
   // ---------- เดินตาม path ทุกเฟรม ----------
 
-  update(_time: number, dt: number) {
+  update(time: number, dt: number) {
+    if (this.joyDir !== null) this.joyStep(time);
     const meV = this.me ? this.views.get(this.me) : undefined;
     if (meV) for (const { t, e } of this.exitLabels) {
       const cx = ((e.x0 + e.x1 + 1) / 2) * TILE, cy = ((e.y0 + e.y1 + 1) / 2) * TILE;

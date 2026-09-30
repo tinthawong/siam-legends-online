@@ -277,9 +277,10 @@
     .bar-text { font-size: 12px; color: var(--ink-dim); margin-top: 3px; }
     .bar.hp i { background: #e0525a; }
 
-    #auto-btn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(20px + env(safe-area-inset-bottom));
-      width: 76px; height: 76px; border-radius: 50%; border: 3px solid var(--window-edge);
-      background: var(--window); color: var(--ink); font-size: 17px; font-weight: 600; }
+    /* AUTO อยู่เหนือปุ่มโจมตี */
+    #auto-btn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(min(22vmin, 170px) + 26px + env(safe-area-inset-bottom));
+      width: 60px; height: 60px; border-radius: 50%; border: 3px solid var(--window-edge);
+      background: var(--window); color: var(--ink); font-size: 14px; font-weight: 600; }
     #menu { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(12px + env(safe-area-inset-bottom));
       display: flex; gap: 6px; padding: 6px; border-radius: 12px; background: var(--window); border: 2px solid var(--window-edge); }
     #menu button { width: 58px; height: 56px; padding: 4px 0 2px; border: 0; border-radius: 8px; background: rgba(10, 18, 32, 0.55);
@@ -295,6 +296,12 @@
     .stat-list dt { color: var(--ink-dim); }
     .stat-list dd { margin: 0; text-align: right; font-weight: 600; }
     #menu button { position: relative; }
+    /* ปุ่มภาพ (ตัดจากกรอบกระเป๋า art/ui/inventory-panel.png) */
+    #menu button.img-btn { padding: 0; background: none; }
+    #menu button.img-btn img { width: 54px; height: 54px; pointer-events: none; transition: transform 90ms; }
+    #menu button.img-btn:active img { transform: scale(0.92); }
+    #menu button.img-btn[aria-expanded="true"] { background: none; box-shadow: none; }
+    #menu button.img-btn[aria-expanded="true"] img { filter: brightness(1.15) drop-shadow(0 0 5px rgba(242, 193, 78, 0.9)); }
     .badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
       background: #e0525a; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; line-height: 20px; box-shadow: 0 0 0 2px var(--window); }
     .dot { position: absolute; top: 4px; right: 6px; width: 10px; height: 10px; border-radius: 50%; background: #e0525a; box-shadow: 0 0 0 2px var(--window); animation: dotpulse 1.4s ease-in-out infinite; }
@@ -344,15 +351,42 @@
     .shop-item button:disabled { opacity: 0.45; cursor: default; }
     .bot-row { display: flex; align-items: center; gap: 8px; font-size: 14px; margin-bottom: 8px; cursor: pointer; }
     #bot-pct { width: 100%; accent-color: var(--exp); }
-    #bag .slot.usable { cursor: pointer; }
-    #bag .slot.usable:hover { border-color: var(--exp); }
     .bag-head { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-    #bag-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
-    .slot { position: relative; aspect-ratio: 1; border-radius: 6px; background: rgba(10, 18, 32, 0.7); border: 1px solid rgba(159, 192, 236, 0.35);
-      display: grid; place-items: center; }
-    .slot img { width: 80%; height: 80%; image-rendering: pixelated; }
-    .slot .n { position: absolute; right: 4px; bottom: 2px; font-size: 12px; font-weight: 600; text-shadow: 0 1px 2px #000; }
-    #bag-empty { margin: 4px 0 0; font-size: 13px; color: var(--ink-dim); text-align: center; }
+    /* กระเป๋า: กรอบจากภาพ ทุกชิ้นวางด้วย % ของภาพ (inventory.ts) ตัวอักษรย่อตามกรอบด้วย cqw */
+    #bag.inv { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 5;
+      height: min(745px, calc(100vh - 24px), calc((100vw - 16px) * 1490 / 962)); aspect-ratio: 962 / 1490;
+      container-type: inline-size; user-select: none; -webkit-user-select: none; filter: drop-shadow(0 14px 30px rgba(0, 0, 0, 0.55)); }
+    #bag.inv[hidden] { display: none; }
+    .inv-bg { display: block; width: 100%; height: 100%; pointer-events: none; }
+    .inv > button, .inv-slot, .inv-money, .inv-thumb { position: absolute; }
+    .inv > button { padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .inv-hit { border-radius: 50%; }
+    .inv-hit:active { background: rgba(255, 255, 255, 0.18); }
+    .inv-tab { border-radius: 1.2cqw 1.2cqw 0 0; font-family: var(--font); font-weight: 600; font-size: 3.1cqw; color: #fff4d6;
+      text-shadow: 0 0.2cqw 0 #6b3208, 0 0 0.6cqw rgba(60, 25, 0, 0.8); background: rgba(40, 14, 0, 0.28) !important; }
+    .inv-tab.on { background: none !important; color: #4a2106; text-shadow: 0 0.15cqw 0 rgba(255, 240, 200, 0.7); }
+    .inv-thumb { pointer-events: none; transition: top 160ms ease-out; }
+    .inv-slot { display: grid; place-items: center; border-radius: 1.2cqw; }
+    .inv-slot img { width: 62%; height: auto; image-rendering: pixelated; pointer-events: none; }
+    .inv-slot small { font-size: 2.3cqw; color: #4a2106; text-align: center; line-height: 1.2; padding: 0 4%; }
+    .inv-slot .n { position: absolute; right: 7%; bottom: 3%; font-size: 3cqw; font-weight: 700; color: #fff; text-shadow: 0 0 0.4cqw #000, 0 0.2cqw 0.3cqw #000; }
+    .inv-slot.usable { cursor: pointer; }
+    .inv-slot.usable:hover, .inv-slot.usable:active { box-shadow: inset 0 0 0 0.4cqw rgba(233, 185, 73, 0.9); }
+    .inv-money { display: flex; align-items: center; padding-left: 3%; font-size: 3.4cqw; font-weight: 700; color: #ffe39a; text-shadow: 0 0.2cqw 0.3cqw #000; }
+    @media (prefers-reduced-motion: reduce) { .inv-thumb { transition: none; } }
+
+    /* จอยสติ๊ก / ปุ่มโจมตี: ขนาดเทียบด้านสั้นของจอ ภาพความละเอียดสูง ไม่ใช้ pixelated */
+    #joystick { position: fixed; left: calc(12px + env(safe-area-inset-left)); bottom: calc(96px + env(safe-area-inset-bottom));
+      width: min(28vmin, 220px); aspect-ratio: 512 / 529; touch-action: none; user-select: none; -webkit-user-select: none; }
+    #joystick img { position: absolute; pointer-events: none; -webkit-user-drag: none; }
+    .joy-base { inset: 0; width: 100%; height: 100%; opacity: 0.9; }
+    .joy-knob { left: 50%; top: 50%; width: 42%; transform: translate(-50%, -50%); transition: transform 140ms cubic-bezier(0.3, 1.6, 0.5, 1); }
+    #joystick.held .joy-knob { transition: none; }
+    #attack-btn { position: fixed; right: calc(12px + env(safe-area-inset-right)); bottom: calc(14px + env(safe-area-inset-bottom));
+      width: min(22vmin, 170px); aspect-ratio: 400 / 445; padding: 0; border: 0; background: none; touch-action: none; user-select: none;
+      -webkit-user-select: none; -webkit-tap-highlight-color: transparent; }
+    #attack-btn img { width: 100%; height: 100%; object-fit: contain; pointer-events: none; }
+    #joystick[hidden], #attack-btn[hidden] { display: none; }
     #auto-btn.on { background: var(--auto); border-color: #d9fff2; color: #06291f; box-shadow: 0 0 0 6px rgba(63,208,164,0.3); }
 
     #dc { position: fixed; inset: 0; display: grid; place-items: center; background: rgba(8,14,24,0.6); }
@@ -514,14 +548,20 @@
       <button id="logout">ออกจากระบบ</button><button id="link-google" hidden>ผูกบัญชี Google</button>
     </div>
     <button id="auto-btn" aria-pressed="false">AUTO</button>
+    <!-- จอยสติ๊ก + ปุ่มโจมตี (docs/ui-controls.md): แสดงทั้งมือถือและคอม -->
+    <div id="joystick" hidden aria-hidden="true">
+      <img class="joy-base" src="/ui/joystick-base.webp" alt="" draggable="false" />
+      <img class="joy-knob" src="/ui/joystick-knob.webp" alt="" draggable="false" />
+    </div>
+    <button type="button" id="attack-btn" hidden aria-label="โจมตี"><img src="/ui/attack-button.webp" alt="" draggable="false" /></button>
     <!-- แถบเมนูล่าง: กดปุ่มเปิด/ปิดหน้าต่างของปุ่มนั้น (เปิดได้ทีละหน้า) -->
     <nav id="menu" aria-label="เมนู">
       <button type="button" data-panel="stat-panel" aria-expanded="false" title="สถานะ (C)">
         <i class="dot" id="stat-badge" hidden></i>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="7" r="4"/><path d="M4 21c0-4.4 3.6-8 8-8s8 3.6 8 8"/></svg><span>สถานะ</span>
       </button>
-      <button type="button" data-panel="bag" aria-expanded="false" title="กระเป๋า (I)">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M6 8h12l1 12H5z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/></svg><span>กระเป๋า</span>
+      <button type="button" class="img-btn" data-panel="bag" aria-expanded="false" aria-label="กระเป๋า" title="กระเป๋า (Alt+E)">
+        <img src="/ui/bag-button.webp" alt="" draggable="false" />
       </button>
       <button type="button" data-panel="gold-panel" aria-expanded="false" title="เบี้ย (G)">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="8"/><path d="M12 7v10M9 9.5c0-1 1.3-1.5 3-1.5s3 .7 3 1.8c0 2.7-6 1.5-6 4.4 0 1.1 1.3 1.8 3 1.8s3-.5 3-1.5"/></svg><span>เบี้ย</span>
@@ -556,12 +596,8 @@
       <div class="st-points">แต้มว่าง <b id="st-points">0</b></div>
     </section>
 
-    <section id="bag" class="window panel-pop" hidden aria-label="กระเป๋า">
-      <div class="bag-head"><b>กระเป๋า</b><button class="panel-close" aria-label="ปิด">✕</button></div>
-      <div id="bag-grid"></div>
-      <p id="bag-empty">ยังไม่มีของ</p>
-      <p class="panel-hint">กดที่ยาเพื่อกิน</p>
-    </section>
+    <!-- กระเป๋า: ภาพ ui/inventory-panel.webp + พิกัดจาก shared/data/inventory-layout.json (สร้างใน inventory.ts) -->
+    <section id="bag" hidden aria-label="กระเป๋า"></section>
 
     <section id="gold-panel" class="window panel-pop" hidden aria-label="เบี้ย">
       <div class="bag-head"><b>เบี้ย</b><button class="panel-close" aria-label="ปิด">✕</button></div>
