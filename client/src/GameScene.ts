@@ -624,16 +624,16 @@ export class GameScene extends Phaser.Scene {
   private floatDamage(v: View, dmg: number, crit: boolean) {
     const mine = v.kind === "player";
     const t = this.add.text(v.c.x, v.c.y + v.topY - 9, crit ? `${dmg}!` : String(dmg), {
-      fontFamily: "Mitr, sans-serif", fontStyle: "bold", fontSize: crit ? "17px" : "13px",
+      fontFamily: "Mitr, sans-serif", fontStyle: "bold", fontSize: crit ? "24px" : "17px",
       color: mine ? "#ff6b6b" : crit ? "#ffd84a" : "#ffffff",
-      stroke: crit ? "#6b2400" : "#10192a", strokeThickness: crit ? 4 : 3,
+      stroke: crit ? "#6b2400" : "#10192a", strokeThickness: crit ? 5 : 4,
       shadow: { offsetX: 0, offsetY: 1, color: "#000", blur: 2, fill: true, stroke: true },
-    }).setOrigin(0.5).setDepth(100000).setResolution(2).setScale(0.3);
+    }).setOrigin(0.5).setDepth(100000).setResolution(2).setScale(0.3).setAlpha(0); // ซ่อนเฟรมแรก (กันภาพเพี้ยนก่อนเริ่มเด้ง)
     const drift = (Math.random() - 0.5) * 18;
     this.tweens.chain({
       targets: t,
       tweens: [
-        { scale: crit ? 1.6 : 1.25, duration: 90, ease: "Back.easeOut" },
+        { scale: crit ? 1.7 : 1.35, alpha: 1, duration: 90, ease: "Back.easeOut" },
         { scale: 1, duration: 110, ease: "Quad.easeOut" },
         { x: t.x + drift, y: t.y - (crit ? 30 : 22), alpha: 0, duration: crit ? 750 : 600, ease: "Cubic.easeIn" },
       ],
@@ -660,12 +660,12 @@ export class GameScene extends Phaser.Scene {
     // ง้าง แล้วต่อย (ขยับแค่ภาพตัว ตำแหน่งจริงบน server ไม่เปลี่ยน)
     if (!calm) {
       const bx = src.body.x, by = src.body.y;
-      const push = crit ? 5 : 4;
+      const push = crit ? 8 : 6;
       this.tweens.chain({
         targets: src.body,
         tweens: [
-          { x: bx - ux * 2, y: by - uy * 1.5, angle: -lean * 6, duration: PUNCH_WINDUP_MS, ease: "Quad.easeOut" },
-          { x: bx + ux * push, y: by + uy * push * 0.7, angle: lean * 5, duration: 55, ease: "Quad.easeIn" },
+          { x: bx - ux * 3, y: by - uy * 2, angle: -lean * 8, duration: PUNCH_WINDUP_MS, ease: "Quad.easeOut" },
+          { x: bx + ux * push, y: by + uy * push * 0.7, angle: lean * 7, duration: 55, ease: "Quad.easeIn" },
           { x: bx, y: by, angle: 0, duration: 120, ease: "Quad.easeOut" },
         ],
         onComplete: () => { src.body.setPosition(bx, by).setAngle(0); },
@@ -674,16 +674,21 @@ export class GameScene extends Phaser.Scene {
 
     // หมัด: วงกลมสีผิวขอบเข้ม พุ่งจากหน้าอกไปหาเป้าตอนต่อย แล้วจางหาย
     const sx = src.c.x + ux * 6, sy = src.c.y - 17 + uy * 4;
-    const ex = src.c.x + ux * 20, ey = src.c.y - 15 + uy * 12;
-    const r = crit ? 4 : 3;
+    const ex = src.c.x + ux * 24, ey = src.c.y - 15 + uy * 14;
+    const r = crit ? 8 : 6;
     const fist = this.add.graphics({ x: sx, y: sy }).setDepth(depth).setAlpha(0);
-    fist.fillStyle(0x5a2e1e).fillCircle(0, 0, r + 1).fillStyle(crit ? 0xffd9a0 : 0xf0b089).fillCircle(0, 0, r).fillStyle(0xffffff, 0.6).fillCircle(-1, -1, 1);
+    // หมัด: เงาเรือง + ขอบเข้ม + สีผิว + ข้อนิ้ว + ไฮไลต์
+    fist.fillStyle(crit ? 0xffd84a : 0xffffff, 0.35).fillCircle(0, 0, r + 4)
+      .fillStyle(0x5a2e1e).fillCircle(0, 0, r + 1.5)
+      .fillStyle(crit ? 0xffd9a0 : 0xf0b089).fillCircle(0, 0, r)
+      .lineStyle(1, 0x8a4a30, 0.9).lineBetween(-r * 0.5, -r * 0.2, -r * 0.5, r * 0.5).lineBetween(0, -r * 0.3, 0, r * 0.5).lineBetween(r * 0.5, -r * 0.2, r * 0.5, r * 0.5)
+      .fillStyle(0xffffff, 0.7).fillCircle(-r * 0.35, -r * 0.45, r * 0.25);
     this.tweens.chain({
       targets: fist,
       tweens: [
         { alpha: 1, duration: 1, delay: PUNCH_WINDUP_MS - 10 },
         { x: ex, y: ey, duration: 55, ease: "Quad.easeIn" },
-        { alpha: 0, scale: 1.4, duration: 110 },
+        { alpha: 0, scale: 1.6, duration: 130 },
       ],
       onComplete: () => fist.destroy(),
     });
@@ -691,11 +696,12 @@ export class GameScene extends Phaser.Scene {
     // เส้นความเร็วด้านหลังหมัด
     this.time.delayedCall(PUNCH_WINDUP_MS + 20, () => {
       const nx = -uy, ny = ux; // ตั้งฉากกับทิศต่อย
-      for (const off of crit ? [-4, 0, 4] : [-3, 3]) {
+      for (const off of crit ? [-8, -4, 0, 4, 8] : [-6, -2, 2, 6]) {
         const g = this.add.graphics().setDepth(depth).setBlendMode(Phaser.BlendModes.ADD);
-        const ax = ex - ux * 6 + nx * off, ay = ey - uy * 5 + ny * off;
-        g.lineStyle(1.5, crit ? 0xffd84a : 0xffffff, 0.9).lineBetween(ax, ay, ax - ux * 10, ay - uy * 8);
-        this.tweens.add({ targets: g, alpha: 0, duration: 160, onComplete: () => g.destroy() });
+        const ax = ex - ux * 9 + nx * off, ay = ey - uy * 7 + ny * off;
+        const l = 14 + Math.random() * 6;
+        g.lineStyle(2.5, crit ? 0xffd84a : 0xffffff, 0.95).lineBetween(ax, ay, ax - ux * l, ay - uy * l * 0.8);
+        this.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() });
       }
     });
   }
@@ -707,13 +713,14 @@ export class GameScene extends Phaser.Scene {
     const len = Math.hypot(dx, dy) || 1;
     const ux = dx / len, uy = dy / len;
     const a = Math.atan2(dy, dx);
-    const cx = src.c.x + ux * 10, cy = src.c.y - 14 + uy * 8;
+    const cx = src.c.x + ux * 14, cy = src.c.y - 14 + uy * 10;
     const depth = Math.max(src.c.y, dst.c.y) + 2;
     const sweep = 1.3; // ครึ่งมุมกวาด (เรเดียน)
     const dirSign = Math.random() < 0.5 ? 1 : -1; // ฟันสลับซ้าย-ขวา
+    // ชั้นแรก = แถบเรืองหนา (ตัวรอยฟัน) ถัดมา = เส้นคม และขอบนอก
     const layers = crit
-      ? [{ r: 18, w: 4, c: 0xffd84a, a: 1 }, { r: 23, w: 2, c: 0xfff2b0, a: 0.8 }]
-      : [{ r: 15, w: 3, c: 0xffffff, a: 0.9 }, { r: 19, w: 1.5, c: 0xbfe3ff, a: 0.6 }];
+      ? [{ r: 22, w: 16, c: 0xffd84a, a: 0.3 }, { r: 28, w: 8, c: 0xffd84a, a: 1 }, { r: 35, w: 4, c: 0xfff2b0, a: 0.85 }]
+      : [{ r: 18, w: 12, c: 0xbfe3ff, a: 0.25 }, { r: 24, w: 6, c: 0xffffff, a: 0.95 }, { r: 30, w: 3, c: 0xbfe3ff, a: 0.7 }];
     for (const [i, l] of layers.entries()) {
       const g = this.add.graphics({ x: cx, y: cy }).setDepth(depth).setBlendMode(Phaser.BlendModes.ADD).setScale(1, 0.62);
       g.lineStyle(l.w, l.c, l.a);
@@ -723,46 +730,72 @@ export class GameScene extends Phaser.Scene {
       g.rotation = a - dirSign * sweep;
       this.tweens.add({
         targets: g, rotation: a + dirSign * sweep * 0.6, alpha: { from: 1, to: 0 },
-        delay: i * 25, duration: crit ? 220 : 170, ease: "Cubic.easeOut", onComplete: () => g.destroy(),
+        delay: i * 20, duration: crit ? 260 : 200, ease: "Cubic.easeOut", onComplete: () => g.destroy(),
       });
     }
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
     // พุ่งตัว: ขยับภาพตัวไปทางเป้าแล้วกลับที่เดิม (ตัวจริงบน server ไม่ได้ขยับ)
     const bx = src.body.x, by = src.body.y;
-    const push = crit ? 5 : 3;
+    const push = crit ? 7 : 5;
     this.tweens.add({
       targets: src.body, x: bx + ux * push, y: by + uy * push * 0.7, duration: 60, yoyo: true, ease: "Quad.easeOut",
       onComplete: () => { src.body.x = bx; src.body.y = by; },
     });
   }
 
-  /** เอฟเฟกต์ตีโดน (โค้ดล้วน): ประกายแตกกระจาย, หยุดชั่ววูบ (hit-stop) + ตัวสั่น, จอสั่นเมื่อเราเกี่ยวข้อง */
+  /** เอฟเฟกต์ตีโดน (โค้ดล้วน ใหญ่ ชัด): แสงวาบดาวแหลม + วงแสงกลาง + คลื่นกระแทก + ประกายกระจาย + เส้นแตก
+   *  hit-stop + ตัวสั่น, จอสั่นทุกครั้งที่เราตีหรือโดนตี · เราโดนตี = สีแดง, คริ = สีทองและใหญ่กว่า */
   private hitFx(dst: View, src: View | undefined, crit: boolean) {
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const x = dst.c.x, y = dst.c.y + dst.topY / 2, depth = dst.c.y + 1;
-    // ประกาย: ดาวเล็ก ๆ พุ่งออกรอบจุดโดน (ADD ให้สว่างเรือง)
-    const n = crit ? 9 : 5;
-    for (let i = 0; i < n; i++) {
-      const a = Math.random() * Math.PI * 2, d = (crit ? 18 : 12) + Math.random() * 8;
-      const star = this.add.star(x, y, 4, 1, crit ? 4 : 3, crit ? 0xffd84a : 0xfff6c0)
-        .setBlendMode(Phaser.BlendModes.ADD).setDepth(depth).setAngle(Math.random() * 90);
-      this.tweens.add({ targets: star, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.7, scale: 0, angle: star.angle + 120,
-        duration: 220 + Math.random() * 80, ease: "Quad.easeOut", onComplete: () => star.destroy() });
+    const onMe = !!this.me && dst.id === this.me;
+    const main = onMe ? 0xff5a5a : crit ? 0xffd84a : 0xffffff;
+    const glow = onMe ? 0xff9a8a : crit ? 0xfff2b0 : 0xbfe3ff;
+    const ADD = Phaser.BlendModes.ADD;
+
+    // แสงวาบ: ดาวแหลม 8 แฉก ขยายเร็วแล้วหาย
+    const burst = this.add.star(x, y, 8, crit ? 6 : 4, crit ? 26 : 18, main).setBlendMode(ADD).setDepth(depth + 1)
+      .setScale(0.2).setAngle(Math.random() * 45);
+    this.tweens.add({ targets: burst, scale: crit ? 1.25 : 1, alpha: 0, angle: burst.angle + 25, duration: crit ? 240 : 170,
+      ease: "Quad.easeOut", onComplete: () => burst.destroy() });
+    // วงแสงขาวตรงกลาง
+    const flash = this.add.circle(x, y, crit ? 11 : 8, 0xffffff).setBlendMode(ADD).setDepth(depth + 1);
+    this.tweens.add({ targets: flash, scale: 1.9, alpha: 0, duration: 130, ease: "Quad.easeOut", onComplete: () => flash.destroy() });
+    // คลื่นกระแทก (แบนตามมุมมองเอียง)
+    for (let k = 0; k < (crit ? 3 : 2); k++) {
+      const ring = this.add.circle(x, y, 8).setStrokeStyle(3 - k * 0.8, k ? glow : main).setBlendMode(ADD).setDepth(depth).setScale(1, 0.6);
+      this.tweens.add({ targets: ring, scaleX: crit ? 4 : 3, scaleY: crit ? 2.4 : 1.8, alpha: 0, delay: k * 55, duration: 280,
+        ease: "Cubic.easeOut", onComplete: () => ring.destroy() });
     }
-    // วงแสงขยายออกตรงจุดโดน
-    const ring = this.add.circle(x, y, crit ? 10 : 6).setStrokeStyle(2, crit ? 0xffd84a : 0xffffff).setBlendMode(Phaser.BlendModes.ADD).setDepth(depth);
-    this.tweens.add({ targets: ring, scale: crit ? 2.4 : 1.8, alpha: 0, duration: 200, ease: "Quad.easeOut", onComplete: () => ring.destroy() });
+    // ประกาย: ดาวพุ่งกระจาย
+    const n = crit ? 16 : 10;
+    for (let i = 0; i < n; i++) {
+      const a = Math.random() * Math.PI * 2, d = (crit ? 30 : 22) + Math.random() * 14;
+      const star = this.add.star(x, y, 4, 1.5, crit ? 6 : 4.5, i % 3 ? main : glow)
+        .setBlendMode(ADD).setDepth(depth + 1).setAngle(Math.random() * 90);
+      this.tweens.add({ targets: star, x: x + Math.cos(a) * d, y: y + Math.sin(a) * d * 0.7, scale: 0, angle: star.angle + 180,
+        duration: 260 + Math.random() * 120, ease: "Quad.easeOut", onComplete: () => star.destroy() });
+    }
+    // เส้นแตกพุ่งออกจากจุดโดน
+    const streaks = this.add.graphics({ x, y }).setBlendMode(ADD).setDepth(depth + 1);
+    streaks.lineStyle(crit ? 3 : 2, main, 1);
+    for (let i = 0; i < (crit ? 8 : 6); i++) {
+      const a = (i / (crit ? 8 : 6)) * Math.PI * 2 + Math.random() * 0.4, r0 = 6, r1 = (crit ? 22 : 16) + Math.random() * 6;
+      streaks.lineBetween(Math.cos(a) * r0, Math.sin(a) * r0 * 0.7, Math.cos(a) * r1, Math.sin(a) * r1 * 0.7);
+    }
+    this.tweens.add({ targets: streaks, scale: 1.4, alpha: 0, duration: 180, ease: "Quad.easeOut", onComplete: () => streaks.destroy() });
     if (calm) return;
 
     // hit-stop: หยุดท่าของทั้งคนตีและคนโดนชั่ววูบ ตัวที่โดนสั่นซ้ายขวา
-    const stop = crit ? 110 : 60;
+    const stop = crit ? 140 : 80;
     for (const v of [dst, src]) v?.body.anims.pause();
     const bx = dst.body.x;
-    this.tweens.add({ targets: dst.body, x: bx + 2, duration: stop / 4, yoyo: true, repeat: 1, onComplete: () => { dst.body.x = bx; } });
+    this.tweens.add({ targets: dst.body, x: bx + 3, duration: stop / 4, yoyo: true, repeat: 1, onComplete: () => { dst.body.x = bx; } });
     this.time.delayedCall(stop, () => { for (const v of [dst, src]) if (v?.body.active) v.body.anims.resume(); });
 
-    // จอสั่น: เฉพาะตอนเราตีคริ หรือเราโดนตี
-    if (this.me && ((crit && src?.id === this.me) || dst.id === this.me)) this.cameras.main.shake(crit ? 140 : 100, crit ? 0.006 : 0.004);
+    // จอสั่น: ทุกครั้งที่เราตีหรือเราโดนตี
+    if (this.me && (src?.id === this.me || onMe))
+      this.cameras.main.shake(crit ? 180 : onMe ? 140 : 90, crit ? 0.01 : onMe ? 0.007 : 0.004);
   }
 
   /** ข้อความลอยขึ้นแล้วจางหาย (+EXP, ฟื้นที่จุดเกิด) */
