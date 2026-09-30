@@ -6,6 +6,7 @@ export const NAME_RE = /^[\p{L}\p{M}\p{N}_]{2,16}$/u; // ชื่อตัว�
 export const PLAYER_MOVE_MS = 150;   // เวลาเดิน 1 ช่อง (แนวตรง)
 // ความเร็วตีของผู้เล่นคิดจาก AGI/DEX (derive ใน shared/game.ts)
 export const PLAYER_RANGE = 1;       // ระยะตี (ช่อง)
+export const MISS_LEVEL_GAP = 30;    // ผู้เล่นตีมอนไม่พลาด ยกเว้นมอนเลเวลสูงกว่าเราตั้งแต่เท่านี้ขึ้นไป (ใช้สูตร HIT/FLEE)
 export const AUTO_RADIUS = 12;       // รัศมีหามอนของระบบ auto (ช่อง)
 export const MOB_RESPAWN_MS = 8000;
 export const GROUND_ITEM_MS = 60 * 60_000; // ของบนพื้นหายเองหลัง 60 นาที (ผู้ใช้กำหนด)

@@ -103,13 +103,13 @@ export function derive(level: number, base: Stats, gear: Gear = NO_GEAR): Derive
 
 /** โจมตีกายภาพ 1 ครั้ง ตามสูตรใน docs/stat-system.md */
 export function physicalAttack(
-  att: { atk: number; hit: number; crit: number },                                   // crit เป็น %
+  att: { atk: number; hit: number; crit: number; noMiss?: boolean },                 // crit เป็น %, noMiss = ตีโดนแน่นอน
   def: { flee: number; defPct: number; defBonus: number; perfectDodge?: number },    // perfectDodge % (เฉพาะผู้เล่น)
   rng: () => number = Math.random,
 ): { dmg: number; crit: boolean; miss: boolean } {
   // คริ: โดนแน่นอน ไม่หัก DEF
   if (rng() * 100 < att.crit) return { dmg: Math.max(1, Math.round(att.atk * 1.4)), crit: true, miss: false };
-  const hitPct = Math.min(95, Math.max(5, 80 + att.hit - def.flee));
+  const hitPct = att.noMiss ? 100 : Math.min(95, Math.max(5, 80 + att.hit - def.flee));
   if (rng() * 100 >= hitPct) return { dmg: 0, crit: false, miss: true };
   if (def.perfectDodge && rng() * 100 < def.perfectDodge) return { dmg: 0, crit: false, miss: true };
   const dmg = Math.round(att.atk * (0.9 + rng() * 0.2) * (1 - def.defPct / 100) - def.defBonus);

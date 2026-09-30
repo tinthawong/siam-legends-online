@@ -1,7 +1,7 @@
 import { DurableObject } from "cloudflare:workers";
 import type { Env } from "./index";
 import {
-  TICK_MS, GROUND_ITEM_MS, PLAYER_MOVE_MS, PLAYER_RANGE, AUTO_RADIUS, MOB_RESPAWN_MS,
+  TICK_MS, GROUND_ITEM_MS, PLAYER_MOVE_MS, PLAYER_RANGE, AUTO_RADIUS, MOB_RESPAWN_MS, MISS_LEVEL_GAP,
   MOB_ASPD_MS, MOB_RANGE, MOB_CHASE_RANGE,
   POTION_COOLDOWN_MS, MAX_BUY,
   stepMs, cheb,
@@ -437,8 +437,10 @@ export class MapRoom extends DurableObject<Env> {
   private attack(p: Player, m: Mob, now: number) {
     p.nextAttackAt = now + p.der.aspdMs;
     const def = MOBS[m.type];
+    // ตีไม่พลาด ยกเว้นมอนเลเวลสูงกว่าเราตั้งแต่ MISS_LEVEL_GAP ขึ้นไป
+    const noMiss = (def.level ?? 0) - p.level < MISS_LEVEL_GAP;
     const { dmg, crit, miss } = physicalAttack(
-      { atk: p.der.atk, hit: p.der.hit, crit: p.der.crit },
+      { atk: p.der.atk, hit: p.der.hit, crit: p.der.crit, noMiss },
       { flee: def.flee ?? 0, defPct: def.defPct ?? 0, defBonus: def.defBonus ?? 0 },
     );
     m.hp = Math.max(0, m.hp - dmg);
