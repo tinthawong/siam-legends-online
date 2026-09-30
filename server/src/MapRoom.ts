@@ -8,7 +8,7 @@ import {
 } from "../../shared/constants";
 import { MAP_W, MAP_H, SPAWN, ZONES, isWalkable, inZone, exitAt } from "../../shared/map";
 import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
-import { MOBS, expToNext, STAT_KEYS, STAT_MAX, statCostN, statPointsForLevel, derive, physicalAttack, type Stats, type Derived } from "../../shared/game";
+import { MOBS, expToNext, MAX_LEVEL, STAT_KEYS, STAT_MAX, statCostN, statPointsForLevel, derive, physicalAttack, type Stats, type Derived } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import { NPCS, QUESTS, canAccept, isComplete, talkTo, type QuestLog } from "../../shared/quests";
 import { SLOTS, gearOf, slotsFor, type Equipped, type Gear } from "../../shared/equipment";
@@ -683,10 +683,11 @@ export class MapRoom extends DurableObject<Env> {
     this.send(killer, { t: "stats", self: this.stats(killer) });
   }
 
-  /** ได้ EXP แล้วเลเวลขึ้นกี่ขั้นก็ได้ (เลือด/SP เต็มเมื่อขึ้นเลเวล) */
+  /** ได้ EXP แล้วเลเวลขึ้นกี่ขั้นก็ได้ (เลือด/SP เต็มเมื่อขึ้นเลเวล) เลเวลสูงสุดแล้ว EXP ไม่เกินหลอด */
   private gainExp(p: Player, exp: number) {
     p.exp += exp;
-    while (p.exp >= expToNext(p.level)) {
+    if (p.level >= MAX_LEVEL) { p.exp = Math.min(p.exp, expToNext(p.level)); return; }
+    while (p.level < MAX_LEVEL && p.exp >= expToNext(p.level)) {
       p.exp -= expToNext(p.level);
       p.level++;
       p.points += statPointsForLevel(p.level);

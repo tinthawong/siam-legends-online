@@ -1,5 +1,6 @@
 // ข้อมูลเกมและสูตรคำนวณ — อยู่ใน shared เพื่อให้ client/server ใช้ค่าเดียวกัน
 import MONSTERS from "./data/monsters.json";
+import LEVELS from "./data/levels.json";
 import { NO_GEAR, type Gear } from "./equipment";
 import { ZONES } from "./map";
 
@@ -49,7 +50,9 @@ export const MOBS: Record<string, MobDef> = {
 // จำนวนและโซนเกิดมาจาก spawns ใน layout แมพ (shared/data/maps/ban-pak-ao.json) — มอนที่ไม่มีใน spawns ไม่เกิด
 for (const [id, z] of Object.entries(ZONES)) if (MOBS[id]) { MOBS[id].count = z.count; MOBS[id].zone = id; }
 
-export const expToNext = (level: number) => 20 + level * 15;
+// EXP ขึ้นเลเวล จากตารางสมดุล (ชีตเลเวล → shared/data/levels.json) = 15 × เลเวล³
+export const MAX_LEVEL = LEVELS.maxLevel;
+export const expToNext = (level: number) => LEVELS.expToNext[Math.min(Math.max(level, 1), MAX_LEVEL) - 1];
 // ---------- ค่าพลังแบบ Ragnarok (docs/stat-system.md) — server คำนวณทุกค่า ----------
 export type StatKey = "str" | "agi" | "vit" | "int" | "dex" | "luk";
 export type Stats = Record<StatKey, number>;
