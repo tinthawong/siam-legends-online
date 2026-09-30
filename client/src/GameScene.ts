@@ -12,7 +12,7 @@ import { MOBS } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, emptyLog, npcMark, type QuestLog } from "../../shared/quests";
-import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, animSource, idleFrameUrl } from "./sprites";
+import { IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, animSource, idleDirs, idleFrameUrl } from "./sprites";
 
 interface View {
   id: string;
@@ -26,6 +26,7 @@ interface View {
   path: Cell[];
   moveMs: number;
   sprite: string | null; // มี = ภาพ 8 ทิศ (ผู้เล่น หรือมอนที่มีภาพ)
+  look: Look | null;     // ผู้เล่น: เพศใช้เลือกทิศที่มีท่ายืน
   sheet: string | null;  // มี = มอนจาก sheet (ทิศเดียว มีท่า walk/attack/death)
   bob: Phaser.Tweens.Tween | null; // ท่ายืนของมอนจาก sheet (ขยับขึ้นลงด้วยโค้ด)
   topY: number;          // ขอบบนของตัว (ใช้วางแถบ HP / ตัวเลขดาเมจ)
@@ -113,7 +114,7 @@ export class GameScene extends Phaser.Scene {
     for (const g of Object.keys(GENDERS))
       for (const d of DIRS) this.load.image(`base_${g}_${d}`, `sprites/base-${g}/${d}.png`);
     for (const g of Object.keys(GENDERS))
-      for (const d of IDLE_DIRS)
+      for (const d of idleDirs(g))
         for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
     // พื้นหญ้า 64×64 ปูซ้ำทั้งแมพ (ขนาดเดิม ไม่ย่อ/ขยาย)
     TILE_URLS.forEach((url, i) => this.load.image(`tile_${TERRAIN_NAMES[i]}`, url));
@@ -509,7 +510,7 @@ export class GameScene extends Phaser.Scene {
 
     const v: View = {
       id: e.id, kind: e.kind, c, oc, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
-      sprite, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
+      sprite, look: e.look ?? null, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
     if (e.dead) this.setDead(v, true);
@@ -664,8 +665,8 @@ export class GameScene extends Phaser.Scene {
         const src = this.textures.get(`base_${look.gender}_${d}`).getSourceImage() as HTMLImageElement;
         this.textures.addCanvas(`${prefix}_${d}`, recolorSprite(src, look));
       }
-      // ท่ายืน: เปลี่ยนสีทุกเฟรม แล้วสร้าง animation (ทิศฝั่งตะวันตกใช้ของฝั่งตะวันออกกลับภาพ ดู updatePose)
-      for (const d of IDLE_DIRS) {
+      // ท่ายืน: เปลี่ยนสีทุกเฟรม แล้วสร้าง animation (ทิศที่ไม่มีใช้ของฝั่งตรงข้ามกลับภาพ ดู updatePose)
+      for (const d of idleDirs(look.gender)) {
         const frames: Phaser.Types.Animations.AnimationFrame[] = [];
         for (let i = 0; i < IDLE_FRAMES; i++) {
           const key = `base_${look.gender}_idle_${d}_${i}`;
@@ -712,7 +713,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (!v.sprite) return;
-    const src = v.kind === "player" && !v.path.length ? animSource(IDLE_DIRS, v.dir) : null;
+    const src = v.kind === "player" && !v.path.length && v.look ? animSource(idleDirs(v.look.gender), v.dir) : null;
     const idle = src && this.anims.exists(`${v.sprite}_idle_${src.dir}`) ? `${v.sprite}_idle_${src.dir}` : null;
     const pose = idle ? `${idle}${src!.flip ? ":flip" : ""}` : `${v.sprite}_${v.dir}`;
     if (pose === v.pose) return;

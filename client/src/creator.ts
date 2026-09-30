@@ -1,7 +1,7 @@
 // หน้าสร้างตัวละคร: ตัวอย่างหมุนได้ + เลือกเพศ / สีผม / สีตา
 import { DEFAULT_LOOK, GENDERS, HAIR_COLORS, EYE_COLORS, lookKey, type Gender, type Look } from "../../shared/appearance";
 import { recolorSprite } from "./recolor";
-import { IDLE_DIRS, IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, animSource, idleFrameUrl } from "./sprites";
+import { IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, animSource, idleDirs, idleFrameUrl } from "./sprites";
 
 // เรียงตามเข็มนาฬิกาเวลามองจากด้านบน ใช้กับปุ่มหมุน
 const ROTATION = ["south", "south-west", "west", "north-west", "north", "north-east", "east", "south-east"];
@@ -34,7 +34,7 @@ export class Creator {
       }
     // ท่ายืน: ทิศที่มีเฟรมจะเล่นวนเหมือนในเกม
     for (const g of Object.keys(GENDERS))
-      for (const d of IDLE_DIRS)
+      for (const d of idleDirs(g))
         for (let i = 0; i < IDLE_FRAMES; i++) {
           const img = new Image();
           img.src = `/${idleFrameUrl(g, d, i)}`;
@@ -42,7 +42,7 @@ export class Creator {
           loads.push(img.decode().catch(() => undefined));
         }
     setInterval(() => {
-      if (!this.canvas.offsetParent || !animSource(IDLE_DIRS, ROTATION[this.dir])) return; // ซ่อนอยู่ / ทิศนี้ไม่มีท่ายืน
+      if (!this.canvas.offsetParent || !animSource(idleDirs(this.look.gender), ROTATION[this.dir])) return; // ซ่อนอยู่ / ทิศนี้ไม่มีท่ายืน
       this.frame = (this.frame + 1) % IDLE_FRAMES;
       this.render();
     }, 1000 / IDLE_FPS);
@@ -78,7 +78,7 @@ export class Creator {
 
   private render() {
     const d = ROTATION[this.dir];
-    const anim = animSource(IDLE_DIRS, d); // ทิศฝั่งตะวันตกใช้ท่ายืนของฝั่งตะวันออกกลับภาพ
+    const anim = animSource(idleDirs(this.look.gender), d); // ทิศที่ไม่มีใช้ท่ายืนของฝั่งตรงข้ามกลับภาพ
     const idle = anim ? `idle_${anim.dir}_${this.frame}` : null;
     const src = idle ?? d;
     const key = `${lookKey(this.look)}_${src}`;
