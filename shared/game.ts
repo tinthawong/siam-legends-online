@@ -2,7 +2,6 @@
 import MONSTERS from "./data/monsters.json";
 import LEVELS from "./data/levels.json";
 import { NO_GEAR, type Gear } from "./equipment";
-import { ZONES } from "./map";
 
 export interface MobDef {
   name: string;
@@ -47,8 +46,6 @@ export const MOBS: Record<string, MobDef> = {
   octopus: fromData("mob041", { moveMs: 500, count: 0, sheet: "octopus", sheetParts: ["hit", "death", "idle"], retaliate: true,
     drop: { item: "iron_helmet", chance: 1 } }),                                 // หมึกหมวกเหล็ก Lv12
 };
-// จำนวนและโซนเกิดมาจาก spawns ใน layout แมพ (shared/data/maps/ban-pak-ao.json) — มอนที่ไม่มีใน spawns ไม่เกิด
-for (const [id, z] of Object.entries(ZONES)) if (MOBS[id]) { MOBS[id].count = z.count; MOBS[id].zone = id; }
 
 // EXP ขึ้นเลเวล จากตารางสมดุล (ชีตเลเวล → shared/data/levels.json) = 15 × เลเวล³
 export const MAX_LEVEL = LEVELS.maxLevel;

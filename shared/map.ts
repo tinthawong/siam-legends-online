@@ -1,8 +1,9 @@
-// แมพ "บ้านปากอ่าว" อ่านจาก layout ที่ผู้ใช้ออกแบบ: shared/data/maps/ban-pak-ao.json
-//   terrain = ตัวอักษรต่อช่อง (G/S/W/D/P), props = ของประดับที่พิกัดพิกเซล (จุดยึดกึ่งกลางฐาน),
-//   start = จุดเกิด, npcs = ตำแหน่ง NPC, spawns = กรอบเกิดมอน (พิกเซล) + จำนวน
-// แก้แมพ = แก้ไฟล์ JSON นั้น (ห้ามวางของในโค้ด) ทั้ง client และ server ใช้ไฟล์เดียวกัน
-import LAYOUT from "./data/maps/ban-pak-ao.json";
+// แมพทั้งหมดของเกม อ่านจาก shared/data/maps/<id>.json (สร้างจาก Tiled ด้วย npm run map หรือผังที่ผู้ใช้ส่งมา)
+//   terrain = ตัวอักษรต่อช่อง (G/S/W/D/P/F), props = ของประดับที่พิกัดพิกเซล (จุดยึดกึ่งกลางฐาน),
+//   start = จุดเกิด, entries = จุดเข้าเมื่อวาปมาจากแมพอื่น, npcs, spawns, exits (to = id แมพปลายทาง, entry = ชื่อจุดเข้า)
+// เพิ่มแมพใหม่: import ไฟล์แล้วใส่ใน MAPS ข้างล่าง · ทั้ง client และ server ใช้ไฟล์เดียวกัน
+import BAN_PAK_AO from "./data/maps/ban-pak-ao.json";
+import THUNG_NA from "./data/maps/thung-na.json";
 import P1 from "../client/public/sprites/props/set1/props.json";
 import P2 from "../client/public/sprites/props/set2/props.json";
 import P3 from "../client/public/sprites/props/set3/props.json";
@@ -13,12 +14,7 @@ import P7 from "../client/public/sprites/props/bridges/props.json";
 /** ขนาดภาพของประดับทุกชิ้น (จาก props.json ของแต่ละชุด) ใช้คิดฐานที่ขวางทาง */
 const PROP_SIZE: Record<string, { width: number; height: number }> = { ...P1, ...P2, ...P3, ...P4, ...P5, ...P6, ...P7 };
 
-export const TILE_PX = LAYOUT.tile;
-/** id แมพตาม layout (ใช้หาภาพพื้นที่ bake แล้ว client/public/maps/<id>/ground.webp) */
-export const MAP_LAYOUT_ID = LAYOUT.id;
-export const MAP_W = LAYOUT.width;
-export const MAP_H = LAYOUT.height;
-export const SPAWN = { x: Math.floor(LAYOUT.start.x / TILE_PX), y: Math.floor(LAYOUT.start.y / TILE_PX) };
+export const TILE_PX = 32; // ตารางเดิน (ทุกแมพ)
 
 // พื้น: รูปอยู่ที่ client/public/sprites/tiles/<ชื่อ>.png (64×64 ปูซ้ำ)
 export const GRASS = 0;
@@ -35,33 +31,6 @@ export const MOB_ID: Record<string, string> = {
   "rice-crab": "mud_crab", "red-crab": "red_crab", "lotus-frog": "lotus_frog",
   grasshopper: "grasshopper", octopus: "octopus", scarecrow: "scarecrow",
 };
-
-/** โซนเกิดมอน (ช่อง) key = id มอนในเกม: มอนเกิดและเดินเล่นในกรอบนี้ ไล่ตามผู้เล่นออกนอกกรอบได้ */
-export const ZONES: Record<string, { x0: number; y0: number; x1: number; y1: number; count: number }> = {};
-for (const s of LAYOUT.spawns) {
-  const id = MOB_ID[s.monster] ?? s.monster;
-  ZONES[id] = {
-    x0: Math.floor(s.x / TILE_PX), y0: Math.floor(s.y / TILE_PX),
-    x1: Math.floor((s.x + s.w - 1) / TILE_PX), y1: Math.floor((s.y + s.h - 1) / TILE_PX), count: s.count,
-  };
-}
-export const inZone = (zone: string, x: number, y: number) => {
-  const z = ZONES[zone];
-  return !!z && x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1;
-};
-
-/** ทางออกไปแมพอื่น (ช่อง) — ยังไม่มีแมพอื่น: เดินเข้าแล้วขึ้น "เส้นทางนี้ยังไม่เปิด" และถูกดันกลับ */
-export const EXITS = (LAYOUT.exits ?? []).map((e) => ({
-  to: e.to, label: e.label,
-  x0: Math.floor(e.x / TILE_PX), y0: Math.floor(e.y / TILE_PX),
-  x1: Math.floor((e.x + e.w - 1) / TILE_PX), y1: Math.floor((e.y + e.h - 1) / TILE_PX),
-}));
-export const exitAt = (x: number, y: number) => EXITS.find((e) => x >= e.x0 && x <= e.x1 && y >= e.y0 && y <= e.y1);
-
-/** ตำแหน่ง NPC (ช่อง) จาก layout */
-export const NPC_POS: Record<string, { x: number; y: number }> = Object.fromEntries(
-  LAYOUT.npcs.map((n) => [n.npc, { x: Math.floor(n.x / TILE_PX), y: Math.floor(n.y / TILE_PX) }]),
-);
 
 /** ของประดับชิ้นหนึ่ง: px,py = จุดยึดกึ่งกลางฐาน (พิกเซล), x,y = ช่องที่ฐานอยู่ */
 export interface MapProp {
@@ -110,11 +79,89 @@ export const FLAT_PROPS = new Set(["pier", "pier-plank", "stepping-stone"]);
 /** สะพานโค้ง: แถวที่เดินได้ + ข้อมูลคิดความโค้ง (docs/bridges.md) */
 export interface ArchBridge { cx: number; left: number; right: number; row: number; width: number }
 
-function generate() {
+interface Layout {
+  id: string; name?: string; width: number; height: number; tile: number; terrain: string[];
+  props: LayoutProp[]; start: { x: number; y: number }; blocked?: number[][];
+  entries?: { name: string; x: number; y: number }[];
+  exits?: { to: string; label: string; entry?: string; x: number; y: number; w: number; h: number }[];
+  npcs?: { npc: string; x: number; y: number }[];
+  spawns?: { monster: string; count: number; x: number; y: number; w: number; h: number }[];
+}
+export type Zone = { x0: number; y0: number; x1: number; y1: number; count: number };
+export type MapExit = { to: string; label: string; entry: string | null; x0: number; y0: number; x1: number; y1: number };
+
+/** แมพหนึ่งแมพ: ตารางเดิน, ของประดับ, โซนมอน, ทางออก, จุดเข้า, NPC */
+export class GameMap {
+  readonly id: string;
+  readonly name: string;
+  readonly W: number;
+  readonly H: number;
+  readonly spawn: { x: number; y: number };
+  readonly terrain: Uint8Array;
+  readonly props: readonly MapProp[];
+  readonly arches: readonly ArchBridge[];
+  readonly zones: Record<string, Zone> = {};  // key = id มอนในเกม
+  readonly exits: readonly MapExit[];
+  readonly entries: Record<string, { x: number; y: number }> = {};
+  readonly npcPos: Record<string, { x: number; y: number }> = {};
+  private blocked: Uint8Array;
+  private bridge: Uint8Array;
+
+  constructor(L: Layout) {
+    const cell = (v: number) => Math.floor(v / TILE_PX);
+    this.id = L.id; this.name = L.name ?? L.id; this.W = L.width; this.H = L.height;
+    this.spawn = { x: cell(L.start.x), y: cell(L.start.y) };
+    for (const s of L.spawns ?? []) {
+      const id = MOB_ID[s.monster] ?? s.monster;
+      this.zones[id] = { x0: cell(s.x), y0: cell(s.y), x1: cell(s.x + s.w - 1), y1: cell(s.y + s.h - 1), count: s.count };
+    }
+    this.exits = (L.exits ?? []).map((e) => ({ to: e.to, label: e.label, entry: e.entry ?? null,
+      x0: cell(e.x), y0: cell(e.y), x1: cell(e.x + e.w - 1), y1: cell(e.y + e.h - 1) }));
+    for (const e of L.entries ?? []) this.entries[e.name] = { x: cell(e.x), y: cell(e.y) };
+    for (const n of L.npcs ?? []) this.npcPos[n.npc] = { x: cell(n.x), y: cell(n.y) };
+    const g = generate(L, this.spawn);
+    this.terrain = g.T; this.props = g.props; this.arches = g.arches; this.blocked = g.blocked; this.bridge = g.bridge;
+  }
+
+  isWalkable(x: number, y: number): boolean {
+    if (x < 0 || y < 0 || x >= this.W || y >= this.H) return false;
+    const i = y * this.W + x, t = this.terrain[i];
+    return ((t !== WATER && t !== FOREST) || this.bridge[i] === 1) && !this.blocked[i];
+  }
+  inZone(zone: string, x: number, y: number): boolean {
+    const z = this.zones[zone];
+    return !!z && x >= z.x0 && x <= z.x1 && y >= z.y0 && y <= z.y1;
+  }
+  exitAt(x: number, y: number): MapExit | undefined {
+    return this.exits.find((e) => x >= e.x0 && x <= e.x1 && y >= e.y0 && y <= e.y1);
+  }
+  /** จุดเกิดเมื่อวาปเข้ามาทางจุดเข้าชื่อนี้ (ไม่มี = จุดเกิดปกติ) ถ้าช่องนั้นเดินไม่ได้ หาช่องเดินได้ใกล้สุด */
+  entryCell(name: string | null): { x: number; y: number } {
+    const e = (name && this.entries[name]) || this.spawn;
+    for (let r = 0; r < 6; r++)
+      for (let dy = -r; dy <= r; dy++) for (let dx = -r; dx <= r; dx++)
+        if (this.isWalkable(e.x + dx, e.y + dy)) return { x: e.x + dx, y: e.y + dy };
+    return this.spawn;
+  }
+  /** ความสูงที่ยกภาพตัวละครบนสะพานโค้ง (px) — แค่วาด ตำแหน่งจริงไม่เปลี่ยน
+   *  t = min(1, |x - กึ่งกลาง| / (กว้าง × 0.37)), ยก = 16 × (1 - t²) */
+  bridgeLift(px: number, py: number): number {
+    const row = Math.floor(py / TILE_PX);
+    for (const b of this.arches) {
+      if (row !== b.row || px < b.left || px >= b.right) continue;
+      const t = Math.min(1, Math.abs(px - b.cx) / (b.width * 0.37));
+      return 16 * (1 - t * t);
+    }
+    return 0;
+  }
+}
+
+function generate(L: Layout, SPAWN: { x: number; y: number }) {
+  const MAP_W = L.width, MAP_H = L.height, LAYOUT = L;
   const T = new Uint8Array(MAP_W * MAP_H);
   LAYOUT.terrain.forEach((row, y) => { for (let x = 0; x < MAP_W; x++) T[y * MAP_W + x] = LETTER[row[x]] ?? GRASS; });
 
-  const props: MapProp[] = (LAYOUT.props as LayoutProp[]).map((p) => {
+  const props: MapProp[] = LAYOUT.props.map((p) => {
     const kind = PROP_ALIAS[p.name] ?? p.name;
     return { kind, px: p.x, py: p.y, x: Math.floor(p.x / TILE_PX), y: Math.floor((p.y - 1) / TILE_PX), flip: !!p.flipX, solid: p.solid, deck: p.deck };
   });
@@ -174,7 +221,7 @@ function generate() {
   }
 
   // ช่องเดินไม่ได้ที่ระบายเองในเลเยอร์ block ของ Tiled
-  for (const [x, y] of ((LAYOUT as { blocked?: number[][] }).blocked ?? [])) mark(blocked, x, y);
+  for (const [x, y] of LAYOUT.blocked ?? []) mark(blocked, x, y);
 
   // ช่องที่เดินได้แต่ไปไม่ถึงจากจุดเกิด → กันไว้ ไม่ให้มอนเกิดในที่ปิดตาย
   const open = (i: number) => ((T[i] !== WATER && T[i] !== FOREST) || bridge[i]) && !blocked[i];
@@ -196,27 +243,10 @@ function generate() {
   return { T, props, blocked, bridge, arches };
 }
 
-const GEN = generate();
-export const TERRAIN = GEN.T;
-export const PROPS: readonly MapProp[] = GEN.props;
-const BLOCKED = GEN.blocked;
-const BRIDGE = GEN.bridge;
-export const ARCHES: readonly ArchBridge[] = GEN.arches;
-
-/** ความสูงที่ยกภาพตัวละครบนสะพานโค้ง (px) — แค่วาด ตำแหน่งจริงไม่เปลี่ยน
- *  t = min(1, |x - กึ่งกลาง| / (กว้าง × 0.37)), ยก = 16 × (1 - t²) */
-export function bridgeLift(px: number, py: number): number {
-  const row = Math.floor(py / TILE_PX);
-  for (const b of GEN.arches) {
-    if (row !== b.row || px < b.left || px >= b.right) continue;
-    const t = Math.min(1, Math.abs(px - b.cx) / (b.width * 0.37));
-    return 16 * (1 - t * t);
-  }
-  return 0;
-}
-
-export function isWalkable(x: number, y: number): boolean {
-  if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false;
-  const i = y * MAP_W + x;
-  return ((TERRAIN[i] !== WATER && TERRAIN[i] !== FOREST) || BRIDGE[i] === 1) && !BLOCKED[i];
-}
+/** แมพทั้งหมด (id = ชื่อไฟล์) */
+export const MAPS: Record<string, GameMap> = Object.fromEntries(
+  [BAN_PAK_AO, THUNG_NA].map((L) => [L.id, new GameMap(L as unknown as Layout)]),
+);
+/** แมพเริ่มต้น (ตัวละครใหม่ / ข้อมูลแมพที่ไม่รู้จัก) */
+export const DEFAULT_MAP = "ban-pak-ao";
+export const getMap = (id: string | null | undefined): GameMap => MAPS[id ?? ""] ?? MAPS[DEFAULT_MAP];

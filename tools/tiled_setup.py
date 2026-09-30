@@ -182,14 +182,16 @@ def layout_to_tmj(L, prop_names, sizes):
          "objects": [obj(x=n["x"], y=n["y"], width=0, height=0, point=True, properties=props_of({"npc": n["npc"]})) for n in L.get("npcs", [])]},
         {"id": 6, "name": "start", "type": "objectgroup", "draworder": "topdown", "opacity": 1, "visible": True, "x": 0, "y": 0, "color": "#7ee08a",
          "objects": [obj(x=L["start"]["x"], y=L["start"]["y"], width=0, height=0, point=True)]},
+        {"id": 8, "name": "entries", "type": "objectgroup", "draworder": "topdown", "opacity": 1, "visible": True, "x": 0, "y": 0, "color": "#c08cff",
+         "objects": [obj(name=e["name"], x=e["x"], y=e["y"], width=0, height=0, point=True) for e in L.get("entries", [])]},
         {"id": 7, "name": "exits", "type": "objectgroup", "draworder": "topdown", "opacity": 1, "visible": True, "x": 0, "y": 0, "color": "#6cc8ff",
-         "objects": [obj(x=e["x"], y=e["y"], width=e["w"], height=e["h"], properties=props_of({"to": e["to"], "label": e["label"]})) for e in L.get("exits", [])]},
+         "objects": [obj(x=e["x"], y=e["y"], width=e["w"], height=e["h"], properties=props_of({"to": e["to"], "label": e["label"], **({"entry": e["entry"]} if e.get("entry") else {})})) for e in L.get("exits", [])]},
     ]
     return {
         "type": "map", "version": "1.10", "tiledversion": "1.12.2", "orientation": "orthogonal", "renderorder": "right-down",
         "width": W, "height": H, "tilewidth": TILE, "tileheight": TILE, "infinite": False,
         "properties": [{"name": "id", "type": "string", "value": L["id"]}, {"name": "name", "type": "string", "value": L.get("name", L["id"])}],
-        "layers": layers, "nextlayerid": 8, "nextobjectid": oid,
+        "layers": layers, "nextlayerid": 9, "nextobjectid": oid,
         "tilesets": [{"firstgid": 1, "source": "tilesets/terrain.tsx"}, {"firstgid": first_block, "source": "tilesets/block.tsx"},
                      {"firstgid": first_prop, "source": "tilesets/props.tsx"}],
     }

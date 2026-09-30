@@ -47,6 +47,7 @@ npm run typecheck       # tsc ทั้ง client และ server
   - `appearance.ts` เพศ / สีผม / สีตา (key ที่ใช้เก็บใน D1)
 - `server/src/index.ts` Worker: `/api/config`, `/api/character` (GET/POST), `/ws` (ตรวจ token กับ Supabase แล้วส่งต่อให้ Durable Object ของแมพ)
 - `server/src/MapRoom.ts` Durable Object 1 ตัว = 1 แมพ: game loop, AI มอน, ตี, auto, บันทึก D1
+- **หลายแมพ + วาป:** `shared/map.ts` `MAPS` (เพิ่มแมพ = import ไฟล์ใน shared/data/maps แล้วใส่ใน MAPS) id แมพ = ชื่อไฟล์ (ban-pak-ao, thung-na) เก็บใน D1 คอลัมน์ map · ทางออก `to` = id แมพ, `entry` = ชื่อจุดเข้าในแมพปลายทาง (เลเยอร์ entries ใน Tiled) · เดินเข้าทางออก: server บันทึกแมพ+จุดเข้าลง D1 → ส่ง `warp` → ปิด socket (4002) → client ต่อใหม่ Worker ส่งไปห้องของแมพปลายทาง → โหลดฉากใหม่ · แมพปลายทางยังไม่มี = "เส้นทางนี้ยังไม่เปิด"
 - `client/index.html` หน้าล็อกอิน (ล็อบบี้แนวตั้ง: โลโก้ → การ์ดเข้าสู่ระบบ → ลิงก์ผู้เล่น → Discord → ดาวน์โหลดแอป → footer) / สร้างตัวละคร / HUD (CSS อยู่ในไฟล์นี้)
 - `client/src/main.ts` ระบบล็อกอินและลำดับหน้าจอ
   - ปุ่ม Guest → ไปหน้าสร้างตัวละครทันที บัญชี anonymous สร้างตอนกด "เข้าเกม" แล้วเข้าเกมเลย

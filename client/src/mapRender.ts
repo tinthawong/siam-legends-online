@@ -2,7 +2,7 @@
 // - ลายพื้น 64×64 ปูซ้ำตามพิกัดโลก (ไม่ย่อ/ขยาย)
 // - ขอบระหว่างพื้นต่างชนิดโค้งด้วย noise (เฉพาะภาพ ช่องเดินได้/ไม่ได้ยังเป็นตารางเดิม)
 // - ทรายริมน้ำเข้มขึ้น, ฟองคลื่นสีขาวที่ขอบน้ำ, เส้นหญ้าเข้ม 1px ที่ขอบหญ้า
-import { MAP_W, MAP_H, TERRAIN, GRASS, WATER, SAND, FOREST, TERRAIN_NAMES } from "../../shared/map";
+import { GRASS, WATER, SAND, FOREST, TERRAIN_NAMES, type GameMap } from "../../shared/map";
 import { TILE } from "../../shared/constants";
 
 const TEX = 64;       // ขนาดลายพื้น
@@ -56,7 +56,8 @@ function distance(src: (i: number) => boolean, W: number, H: number): Uint16Arra
 }
 
 /** tiles[ชนิดพื้น] = รูปลายพื้น 64×64 → คืน canvas ขนาดแมพทั้งแผ่น */
-export function renderGround(tiles: HTMLImageElement[]): HTMLCanvasElement {
+export function renderGround(m: GameMap, tiles: HTMLImageElement[]): HTMLCanvasElement {
+  const MAP_W = m.W, MAP_H = m.H, TERRAIN = m.terrain;
   const W = MAP_W * TILE, H = MAP_H * TILE;
 
   // พิกเซลของลายพื้นแต่ละชนิด

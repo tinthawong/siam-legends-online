@@ -168,18 +168,28 @@ def build(tmj_path: Path) -> dict:
     if not walkable_cell(start["x"], start["y"]):
         raise MapError(f"จุดเกิดผู้เล่น ({start['x']}, {start['y']}) อยู่บนช่องที่เดินไม่ได้ (น้ำ/ป่า/block) ถ้าอยู่บนท่าเรือ ต้องวางท่าเรือที่มีภาพแล้วทับด้วย")
 
+    # จุดเข้า (วาปมาจากแมพอื่น): จุด (Point) ชื่อ = property name หรือชื่อวัตถุ เช่น west, east
+    entries = []
+    for o in layers.get("entries", {}).get("objects", []):
+        nm = obj_props(o).get("name") or o.get("name")
+        if not nm:
+            raise MapError(f"จุดเข้า id {o['id']} ต้องมีชื่อ (ตั้งชื่อวัตถุ หรือ property name)")
+        if not walkable_cell(o["x"], o["y"]):
+            raise MapError(f"จุดเข้า '{nm}' อยู่บนช่องที่เดินไม่ได้")
+        entries.append({"name": nm, "x": round(o["x"]), "y": round(o["y"])})
+
     exits = []
     for o in layers["exits"]["objects"]:
         pr = obj_props(o)
         if not pr.get("to") or not pr.get("label"):
             raise MapError(f"ทางออก id {o['id']} ต้องมี property to และ label")
-        exits.append({"to": pr["to"], "label": pr["label"], "x": round(o["x"]), "y": round(o["y"]), "w": round(o["width"]), "h": round(o["height"])})
+        exits.append({"to": pr["to"], "label": pr["label"], "entry": pr.get("entry"), "x": round(o["x"]), "y": round(o["y"]), "w": round(o["width"]), "h": round(o["height"])})
 
     out = {
         "id": mid, "name": mprops.get("name", mid), "width": W * 2, "height": H * 2, "tile": WALK,
         "legend": {v: k for k, v in LETTER.items()},
         "terrain": ["".join(r) for r in terrain],
-        "props": props_out, "blocked": blocked, "start": start, "exits": exits, "npcs": npcs, "spawns": spawns,
+        "props": props_out, "blocked": blocked, "start": start, "entries": entries, "exits": exits, "npcs": npcs, "spawns": spawns,
     }
     if placeholders:
         print(f"  คำเตือน: ยังไม่มีภาพ (ในเกมจะมองไม่เห็นและเดินทะลุได้): {', '.join(sorted(placeholders))}")

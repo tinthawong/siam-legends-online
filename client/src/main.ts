@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { createClient, type Session, type SupabaseClient } from "@supabase/supabase-js";
 import { GameScene } from "./GameScene";
 import { Net } from "./net";
-import { CLOSE_KICKED } from "../../shared/protocol";
+import { CLOSE_KICKED, CLOSE_WARP } from "../../shared/protocol";
 import type { Look } from "../../shared/appearance";
 import { Creator } from "./creator";
 import { NAME_RE } from "../../shared/constants";
@@ -12,12 +12,12 @@ import { statCost, STAT_MAX, type StatKey } from "../../shared/game";
 import { createInventory } from "./inventory";
 import { bindQuests } from "./quests";
 import { EQUIP, SLOTS } from "../../shared/equipment";
-import { bindWorldMap } from "./worldmap";
+import { setWorldMapPin } from "./worldmap";
 import { createHud } from "./hud";
 import { SKILL_LIST } from "../../shared/skills";
 import { bindAttackButton, bindJoystick } from "./controls";
 
-interface Character { name: string; level: number; exp: number; look: Look }
+interface Character { name: string; level: number; exp: number; look: Look; map?: string }
 
 const $ = <T extends HTMLElement = HTMLElement>(id: string) => document.getElementById(id) as T;
 const screens = ["loading", "login", "create", "hud"];
@@ -108,13 +108,15 @@ function startGame(ch: Character, session: Session) {
   show("hud");
   const bars = createHud(ch.name);
 
-  const net = new Net(session.access_token);
-  net.onClose = (code) => {
+  let net = new Net(session.access_token);
+  const onNetClose = (code: number) => {
+    if (code === CLOSE_WARP) return; // วาป: server ปิดเอง client ต่อใหม่ไปแมพปลายทาง (onWarp)
     $("dc-text").textContent = code === CLOSE_KICKED
       ? "บัญชีนี้เข้าเกมจากอุปกรณ์อื่น การเชื่อมต่อนี้จึงถูกปิด"
       : "หลุดการเชื่อมต่อกับเซิร์ฟเวอร์ ตัวละครออกจากแมพแล้ว";
     $("dc").hidden = false;
   };
+  net.onClose = onNetClose;
   $("logout").onclick = async () => {
     if (session.user.is_anonymous && !confirm("ตัวละครผู้เยี่ยมชมจะหายไปถาวรหลังออกจากระบบ ถ้ายังไม่ได้ผูก Google ต้องการออกจริงหรือไม่?")) return;
     net.close();
@@ -130,11 +132,26 @@ function startGame(ch: Character, session: Session) {
     if (error) toast(`ผูกบัญชีไม่สำเร็จ: ${error.message}`);
   };
 
-  const scene = new GameScene(net);
+  const scene = new GameScene(net, ch.map ?? "ban-pak-ao");
+  // วาป: หน้าจอดำ "กำลังเดินทาง" → ต่อ server ใหม่ (Worker ส่งไปห้องของแมพปลายทางตามที่บันทึกใน D1) → โหลดฉากใหม่
+  scene.onWarp = async (map, name) => {
+    $("warp-text").textContent = `กำลังเดินทางไป ${name}…`;
+    $("warp").hidden = false;
+    net.onClose = null;
+    net.close();
+    const { data } = await sb.auth.getSession(); // token อาจต่ออายุไปแล้ว
+    net = new Net(data.session?.access_token ?? session.access_token);
+    net.onClose = onNetClose;
+    scene.warpTo(map, net);
+  };
+  scene.onMapReady = (id, name) => {
+    $("minimap-name").textContent = name;
+    setWorldMapPin(id);
+    setTimeout(() => { $("warp").hidden = true; }, 250);
+  };
   let invCount = new Map<string, number>();
   const quests = bindQuests(net, (i) => invCount.get(i) ?? 0);
   const hud = bindHud(net, () => quests.openList());
-  bindWorldMap();
   // จอยสติ๊กมุมซ้ายล่าง + ปุ่มโจมตีมุมขวาล่าง แสดงทั้งมือถือและคอม (คอมลากด้วยเมาส์ได้)
   $("joystick").hidden = false;
   $("attack-btn").hidden = false;

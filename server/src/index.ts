@@ -1,7 +1,7 @@
 import { MapRoom } from "./MapRoom";
-import { MAP_ID, NAME_RE } from "../../shared/constants";
+import { NAME_RE } from "../../shared/constants";
 import { STAT_START } from "../../shared/game";
-import { SPAWN } from "../../shared/map";
+import { DEFAULT_MAP, getMap } from "../../shared/map";
 import type { JoinCharacter } from "../../shared/protocol";
 import { parseLook, DEFAULT_LOOK, type Look } from "../../shared/appearance";
 import { parseLog } from "../../shared/quests";
@@ -72,10 +72,10 @@ export default {
 
       if (req.method === "GET") {
         const row = await env.DB.prepare(
-          "SELECT name, level, exp, gender, hair, eyes FROM characters WHERE user_id = ?",
-        ).bind(uid).first<{ name: string; level: number; exp: number; gender: string; hair: string; eyes: string }>();
+          "SELECT name, level, exp, gender, hair, eyes, map FROM characters WHERE user_id = ?",
+        ).bind(uid).first<{ name: string; level: number; exp: number; gender: string; hair: string; eyes: string; map: string }>();
         if (!row) return json({ character: null });
-        return json({ character: { name: row.name, level: row.level, exp: row.exp, look: lookOf(row) } });
+        return json({ character: { name: row.name, level: row.level, exp: row.exp, look: lookOf(row), map: getMap(row.map).id } });
       }
 
       if (req.method === "POST") {
@@ -91,7 +91,7 @@ export default {
           await env.DB.prepare(
             // ค่าพลังทุกค่าเริ่มที่ STAT_START (5) — ต้องใส่เอง เพราะคอลัมน์ str/agi/vit/luk (migration 0007) ค่าเริ่มต้นเป็น 0
             "INSERT INTO characters (user_id, name, level, exp, map, x, y, gender, hair, eyes, str, agi, vit, int, dex, luk, stat_points, created_at, updated_at) VALUES (?, ?, 1, 0, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, ?, ?)",
-          ).bind(uid, name, MAP_ID, SPAWN.x, SPAWN.y, look.gender, look.hair, look.eyes,
+          ).bind(uid, name, DEFAULT_MAP, getMap(DEFAULT_MAP).spawn.x, getMap(DEFAULT_MAP).spawn.y, look.gender, look.hair, look.eyes,
             STAT_START, STAT_START, STAT_START, STAT_START, STAT_START, STAT_START, now, now).run();
         } catch (e) {
           const msg = String(e);
@@ -99,7 +99,7 @@ export default {
           if (msg.includes("characters.user_id")) return json({ error: "บัญชีนี้มีตัวละครแล้ว" }, 409);
           throw e;
         }
-        return json({ character: { name, level: 1, exp: 0, look } });
+        return json({ character: { name, level: 1, exp: 0, look, map: DEFAULT_MAP } });
       }
       return json({ error: "method not allowed" }, 405);
     }
@@ -127,13 +127,14 @@ export default {
           int: Math.max(row.int, STAT_START), dex: Math.max(row.dex, STAT_START), luk: Math.max(row.luk, STAT_START),
         },
         points: row.stat_points,
+        map: getMap(row.map).id,
         quests: parseLog(row.quests),
         equip: parseEquip(row.equip),
       };
       // สร้าง request ใหม่ทั้งก้อน client จึงปลอม X-Character มาเองไม่ได้
       const headers = new Headers(req.headers);
       headers.set("X-Character", JSON.stringify(join));
-      const room = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(row.map));
+      const room = env.MAP_ROOM.get(env.MAP_ROOM.idFromName(join.map)); // 1 Durable Object = 1 แมพ
       return room.fetch(new Request(req.url, { headers }));
     }
 

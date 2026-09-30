@@ -3,7 +3,7 @@
 // - ต้นในช่องป่าที่ไม่ติดช่องเดินได้ → วาดรวมกับภาพพื้น (sprite: false)
 // - ต้นริมป่า (ติดช่องเดินได้) → วาดเป็น sprite แยก เรียงความลึกตาม y (sprite: true)
 // - ช่องป่าที่ด้านบนเป็นช่องเดินได้ ใช้พุ่มเตี้ย ไม่ให้ต้นไม้บังตัวละครที่ยืนอยู่เหนือป่าเกินครึ่งตัว
-import { MAP_W, MAP_H, TERRAIN, FOREST, TILE_PX, isWalkable } from "../../shared/map";
+import { FOREST, TILE_PX, type GameMap } from "../../shared/map";
 
 const TREES = ["mango-tree", "jackfruit-tree", "tamarind-tree", "rain-tree", "round-tree", "tall-forest-tree", "indian-almond"];
 const FLOWERING = ["flame-tree", "golden-shower"]; // ราว 12%
@@ -18,7 +18,9 @@ function hash(x: number, y: number, k: number): number {
   return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
 }
 
-export function forestTrees(): ForestTree[] {
+export function forestTrees(m: GameMap): ForestTree[] {
+  const MAP_W = m.W, MAP_H = m.H, TERRAIN = m.terrain;
+  const isWalkable = (x: number, y: number) => m.isWalkable(x, y);
   const out: ForestTree[] = [];
   const isForest = (x: number, y: number) => x >= 0 && y >= 0 && x < MAP_W && y < MAP_H && TERRAIN[y * MAP_W + x] === FOREST;
   for (let ty = 0; ty < MAP_H; ty++)

@@ -2250,6 +2250,11 @@
        "name": "label",
        "type": "string",
        "value": "นครสุวรรณ (ยังไม่เปิด)"
+      },
+      {
+       "name": "entry",
+       "type": "string",
+       "value": "south"
       }
      ]
     },
@@ -2273,6 +2278,11 @@
        "name": "label",
        "type": "string",
        "value": "ทุ่งนาริมคลอง"
+      },
+      {
+       "name": "entry",
+       "type": "string",
+       "value": "west"
       }
      ]
     },
@@ -2296,14 +2306,68 @@
        "name": "label",
        "type": "string",
        "value": "ป่าพรุสวนยาง (ยังไม่เปิด)"
+      },
+      {
+       "name": "entry",
+       "type": "string",
+       "value": "east"
       }
      ]
     }
    ]
+  },
+  {
+   "id": 8,
+   "name": "entries",
+   "type": "objectgroup",
+   "draworder": "topdown",
+   "opacity": 1,
+   "visible": true,
+   "x": 0,
+   "y": 0,
+   "color": "#c08cff",
+   "objects": [
+    {
+     "id": 64,
+     "name": "north",
+     "type": "",
+     "rotation": 0,
+     "visible": true,
+     "x": 851,
+     "y": 160,
+     "width": 0,
+     "height": 0,
+     "point": true
+    },
+    {
+     "id": 65,
+     "name": "east",
+     "type": "",
+     "rotation": 0,
+     "visible": true,
+     "x": 1808,
+     "y": 672,
+     "width": 0,
+     "height": 0,
+     "point": true
+    },
+    {
+     "id": 66,
+     "name": "west",
+     "type": "",
+     "rotation": 0,
+     "visible": true,
+     "x": 128,
+     "y": 777,
+     "width": 0,
+     "height": 0,
+     "point": true
+    }
+   ]
   }
  ],
- "nextlayerid": 8,
- "nextobjectid": 64,
+ "nextlayerid": 9,
+ "nextobjectid": 67,
  "tilesets": [
   {
    "firstgid": 1,

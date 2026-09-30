@@ -72,7 +72,7 @@ export type ClientMsg =
 
 // server → client
 export type ServerMsg =
-  | { t: "welcome"; you: string; entities: EntityState[]; self: PlayerStats; ground: GroundItem[]; inv: InvItem[]; quests: QuestLog }
+  | { t: "welcome"; map: string; you: string; entities: EntityState[]; self: PlayerStats; ground: GroundItem[]; inv: InvItem[]; quests: QuestLog }
   | { t: "spawn"; e: EntityState }
   | { t: "despawn"; id: string }
   | { t: "move"; id: string; from: Cell; path: Cell[]; moveMs: number }
@@ -97,6 +97,7 @@ export type ServerMsg =
   | { t: "level_up"; id: string; level: number }    // เลเวลขึ้น ส่งทุกคนในแมพ (เห็นแสงรอบตัว)
   | { t: "skill_hit"; src: string; dst: string; skill: string; hits: { dmg: number; crit: boolean; miss: boolean }[]; hp: number } // ใช้สกิลโดน (ทุกคนเห็น)
   | { t: "regen"; hp: number; sp: number }          // ฟื้นเอง (เฉพาะเจ้าตัว) ตัวเลขลอยเหนือหัว
+  | { t: "warp"; map: string; name: string }          // เดินเข้าทางออก → ย้ายแมพ (server ปิด socket ด้วย CLOSE_WARP) client ต่อใหม่
   | { t: "kicked" };
 
 /** ข้อมูลตัวละครที่ Worker โหลดจาก D1 แล้วส่งต่อให้ MapRoom */
@@ -114,7 +115,9 @@ export interface JoinCharacter {
   points: number;
   quests: QuestLog;
   equip: Equipped;
+  map: string; // id แมพ (shared/map.ts MAPS)
 }
 
 /** close code ที่ client ต้องรู้ */
 export const CLOSE_KICKED = 4001; // บัญชีเดียวกันเข้าจากที่อื่น
+export const CLOSE_WARP = 4002;   // วาปไปแมพอื่น (client ต่อใหม่ ไม่ใช่หลุด)

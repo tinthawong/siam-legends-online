@@ -1892,6 +1892,11 @@
        "name": "label",
        "type": "string",
        "value": "ป่าชายเลน (ยังไม่เปิด)"
+      },
+      {
+       "name": "entry",
+       "type": "string",
+       "value": "north"
       }
      ]
     },
@@ -1915,6 +1920,11 @@
        "name": "label",
        "type": "string",
        "value": "นครสุวรรณ (ยังไม่เปิด)"
+      },
+      {
+       "name": "entry",
+       "type": "string",
+       "value": "south"
       }
      ]
     },
@@ -1938,14 +1948,44 @@
        "name": "label",
        "type": "string",
        "value": "บ้านปากอ่าว"
+      },
+      {
+       "name": "entry",
+       "type": "string",
+       "value": "east"
       }
      ]
     }
    ]
+  },
+  {
+   "id": 8,
+   "name": "entries",
+   "type": "objectgroup",
+   "draworder": "topdown",
+   "opacity": 1,
+   "visible": true,
+   "x": 0,
+   "y": 0,
+   "color": "#c08cff",
+   "objects": [
+    {
+     "id": 41,
+     "name": "west",
+     "type": "",
+     "rotation": 0,
+     "visible": true,
+     "x": 160,
+     "y": 1024,
+     "width": 0,
+     "height": 0,
+     "point": true
+    }
+   ]
   }
  ],
- "nextlayerid": 8,
- "nextobjectid": 41,
+ "nextlayerid": 9,
+ "nextobjectid": 42,
  "tilesets": [
   {
    "firstgid": 1,

@@ -1,4 +1,4 @@
-import { MAP_W, isWalkable } from "./map";
+import type { GameMap } from "./map";
 import { DIAG, cheb } from "./constants";
 
 export interface Cell { x: number; y: number }
@@ -48,12 +48,15 @@ const octile = (dx: number, dy: number) => {
 
 /** A* 8 ทิศ ห้ามตัดมุม — คืนเส้นทางที่ไม่รวมช่องเริ่มต้น หรือ null ถ้าไปไม่ได้ */
 export function findPath(
+  m: GameMap,
   sx: number, sy: number,
   isGoal: (x: number, y: number) => boolean,
   h: (x: number, y: number) => number,
   maxNodes = 6000,
 ): Cell[] | null {
   if (isGoal(sx, sy)) return [];
+  const MAP_W = m.W;
+  const isWalkable = (x: number, y: number) => m.isWalkable(x, y);
   const start = sy * MAP_W + sx;
   const g = new Map<number, number>([[start, 0]]);
   const came = new Map<number, number>();
@@ -92,15 +95,15 @@ export function findPath(
 }
 
 /** เดินไปช่องที่ระบุพอดี */
-export function pathTo(sx: number, sy: number, tx: number, ty: number): Cell[] | null {
-  if (!isWalkable(tx, ty)) return null;
-  return findPath(sx, sy, (x, y) => x === tx && y === ty, (x, y) => octile(x - tx, y - ty));
+export function pathTo(m: GameMap, sx: number, sy: number, tx: number, ty: number): Cell[] | null {
+  if (!m.isWalkable(tx, ty)) return null;
+  return findPath(m, sx, sy, (x, y) => x === tx && y === ty, (x, y) => octile(x - tx, y - ty));
 }
 
 /** เดินไปให้อยู่ในระยะ range ช่องของเป้าหมาย (ใช้ตอนไล่ตีมอน) */
-export function pathNear(sx: number, sy: number, tx: number, ty: number, range: number): Cell[] | null {
+export function pathNear(m: GameMap, sx: number, sy: number, tx: number, ty: number, range: number): Cell[] | null {
   return findPath(
-    sx, sy,
+    m, sx, sy,
     (x, y) => cheb(x, y, tx, ty) <= range,
     (x, y) => Math.max(0, cheb(x, y, tx, ty) - range),
   );

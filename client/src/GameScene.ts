@@ -3,7 +3,7 @@ import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
 import type { Cell } from "../../shared/pathfind";
 import { TILE, AUTO_RADIUS, cheb } from "../../shared/constants";
-import { MAP_LAYOUT_ID, MAP_W, MAP_H, PROPS, FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, EXITS, ARCH_BRIDGES, isWalkable, isSolidProp, PROP_SET_OF, bridgeLift } from "../../shared/map";
+import { FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, ARCH_BRIDGES, isSolidProp, PROP_SET_OF, getMap, type GameMap, type MapExit } from "../../shared/map";
 import { forestTrees, FOREST_KINDS } from "./forest";
 import { renderGround, TILE_URLS } from "./mapRender";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
@@ -86,7 +86,7 @@ function dirOf(dx: number, dy: number): Dir {
 // พื้นหญ้าใช้ภาพ sprites/tiles/grass.png / หิน ต้นไม้ วงเป้าหมาย ยังเป็นภาพ placeholder วาดด้วยโค้ดใน makeTextures() / drawMap()
 export class GameScene extends Phaser.Scene {
   private views = new Map<string, View>();
-  private exitLabels: { t: Phaser.GameObjects.Text; e: (typeof EXITS)[number] }[] = [];
+  private exitLabels: { t: Phaser.GameObjects.Text; e: MapExit }[] = [];
   private groundViews = new Map<string, Phaser.GameObjects.Image>(); // ของบนพื้น
   private sheets = new Map<string, SheetMeta & { name: string }>();
   private animOrigin = new Map<string, [number, number]>(); // key animation → origin ของจุดยึดเท้า
@@ -129,8 +129,37 @@ export class GameScene extends Phaser.Scene {
   /** เราใช้สกิลโดน → main.ts เริ่มนับคูลดาวน์ที่ปุ่ม */
   onSkillCast: ((id: string) => void) | null = null;
 
-  constructor(private net: Net) {
+  /** แมพที่แสดงอยู่ (shared/map.ts) เปลี่ยนตอนวาป */
+  private gm: GameMap;
+  private resizeBound = false;
+  /** เดินเข้าทางออกแล้ว server สั่งย้ายแมพ → main.ts ต่อ server ใหม่แล้วเรียก warpTo */
+  onWarp: ((map: string, name: string) => void) | null = null;
+  /** เข้าแมพแล้ว (ชื่อแมพ) → main.ts อัปเดตป้ายมินิแมพ/จุดบนแผนที่โลก */
+  onMapReady: ((id: string, name: string) => void) | null = null;
+
+  constructor(private net: Net, mapId: string) {
     super("game");
+    this.gm = getMap(mapId);
+  }
+
+  /** วาป: ใช้การเชื่อมต่อใหม่กับห้องของแมพปลายทาง แล้วโหลดฉากใหม่ทั้งหมด */
+  warpTo(mapId: string, net: Net) {
+    this.net = net;
+    this.gm = getMap(mapId);
+    this.scene.restart();
+  }
+
+  /** เริ่มฉากใหม่ (ครั้งแรกและทุกครั้งที่วาป): ล้างสถานะของแมพเดิม (วัตถุในฉาก Phaser ลบให้เองตอน restart) */
+  init() {
+    this.views.clear();
+    this.groundViews.clear();
+    this.exitLabels = [];
+    this.npcMarks.clear();
+    this.mini = null;
+    this.me = null;
+    this.targetId = null;
+    this.guideNpc = null;
+    this.joyDir = null;
   }
 
   preload() {
@@ -146,11 +175,11 @@ export class GameScene extends Phaser.Scene {
     // พื้นหญ้า 64×64 ปูซ้ำทั้งแมพ (ขนาดเดิม ไม่ย่อ/ขยาย)
     TILE_URLS.forEach((url, i) => this.load.image(`tile_${TERRAIN_NAMES[i]}`, url));
     // พื้นที่ bake แล้ว (npm run bake / npm run map) ถ้ามี ใช้แทนพื้นที่วาดด้วยโค้ด ไม่มี = วาดเอง (renderGround)
-    this.load.image("baked_ground", `maps/${MAP_LAYOUT_ID}/ground.webp`);
+    this.load.image(`baked_${this.gm.id}`, `maps/${this.gm.id}/ground.webp`);
     // ของประดับในแมพ: props.json (ขนาด, จุดยึด, ความกว้างเงา) + รูปแต่ละชิ้น
     for (const set of Object.keys(PROP_SETS)) this.load.json(`props_${set}`, `sprites/props/${set}/props.json`);
     // สะพานโค้งใช้ภาพสองชั้น (-back/-front) ของที่ยังไม่มีภาพ (ไม่อยู่ในชุดไหน) ข้าม
-    const kinds = new Set([...PROPS.flatMap((p) => ARCH_BRIDGES.has(p.kind) ? [`${p.kind}-back`, `${p.kind}-front`] : [p.kind]), ...FOREST_KINDS]);
+    const kinds = new Set([...this.gm.props.flatMap((p) => ARCH_BRIDGES.has(p.kind) ? [`${p.kind}-back`, `${p.kind}-front`] : [p.kind]), ...FOREST_KINDS]);
     for (const kind of kinds) if (PROP_SET_OF[kind]) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
@@ -163,7 +192,7 @@ export class GameScene extends Phaser.Scene {
       this.load.json(key, `sprites/fx/${name}/sheet.json`);
     }
     // NPC: client/public/sprites/<sprite>/sheet.json (ท่ายืน) ยังไม่มีภาพ = โหลดไม่เจอ ใช้ภาพชั่วคราว (drawNpcs)
-    for (const n of Object.values(NPCS)) {
+    for (const n of Object.values(NPCS).filter((n) => n.map === this.gm.id)) {
       const dir = `sprites/${n.sprite}`, key = `npcsheet_${n.id}`;
       this.load.once(`filecomplete-json-${key}`, (_key: string, _type: string, data: SheetMeta) => {
         for (const a of Object.values(data.animations))
@@ -225,10 +254,10 @@ export class GameScene extends Phaser.Scene {
     this.drawNpcs();
 
     const cam = this.cameras.main;
-    cam.setBounds(0, 0, MAP_W * TILE, MAP_H * TILE);
+    cam.setBounds(0, 0, this.gm.W * TILE, this.gm.H * TILE);
     cam.setRoundPixels(true);
     this.fitZoom();
-    this.scale.on("resize", () => this.fitZoom());
+    if (!this.resizeBound) { this.resizeBound = true; this.scale.on("resize", () => this.fitZoom()); }
 
     this.targetRing = this.add.image(0, 0, "ring").setVisible(false);
     this.tapMarker = this.add.image(0, 0, "marker").setVisible(false).setDepth(1);
@@ -242,6 +271,7 @@ export class GameScene extends Phaser.Scene {
     this.autoBtn.onclick = () => this.net.send({ t: "auto", on: !this.autoOn });
 
     this.net.listen((m) => this.onMsg(m));
+    this.onMapReady?.(this.gm.id, this.gm.name);
   }
 
   private fitZoom() {
@@ -275,7 +305,7 @@ export class GameScene extends Phaser.Scene {
     }
     const x = Math.floor(pointer.worldX / TILE);
     const y = Math.floor(pointer.worldY / TILE);
-    if (!isWalkable(x, y)) return;
+    if (!this.gm.isWalkable(x, y)) return;
     this.net.send({ t: "move", x, y });
 
     this.tapMarker.setPosition(center(x), center(y)).setVisible(true).setAlpha(1).setScale(1);
@@ -307,7 +337,7 @@ export class GameScene extends Phaser.Scene {
     for (const d of [this.joyDir, (this.joyDir + 1) % 8, (this.joyDir + 7) % 8]) {
       const [sx, sy] = STEPS[d];
       let k = 0;
-      while (k < JOY_AHEAD && isWalkable(cx + sx * (k + 1), cy + sy * (k + 1))) k++;
+      while (k < JOY_AHEAD && this.gm.isWalkable(cx + sx * (k + 1), cy + sy * (k + 1))) k++;
       if (!k) continue;
       const x = cx + sx * k, y = cy + sy * k;
       // ส่งปลายทางเดิมซ้ำเฉพาะเมื่อผ่านไปนานพอ (กันส่งรัวตอนเดินไม่ได้)
@@ -510,6 +540,9 @@ export class GameScene extends Phaser.Scene {
         if (m.sp) this.floatText(v.c.x + (m.hp ? 10 : 0), y, `+${m.sp}`, "#6cc8ff", 900);
         break;
       }
+      case "warp":
+        this.onWarp?.(m.map, m.name);
+        break;
       case "skill_hit":
         this.skillFx(m);
         break;
@@ -987,12 +1020,12 @@ export class GameScene extends Phaser.Scene {
       ctx.lineWidth = Math.max(1, r * 0.4); ctx.strokeStyle = "rgba(0,0,0,0.7)"; ctx.stroke();
     };
     const r = Math.max(2, W / 60);
-    for (const e of EXITS) {
+    for (const e of this.gm.exits) {
       const [x0, y0] = at(e.x0 * TILE, e.y0 * TILE), [x1, y1] = at((e.x1 + 1) * TILE, (e.y1 + 1) * TILE);
       ctx.fillStyle = "rgba(126, 224, 138, 0.8)";
       ctx.fillRect(x0, y0, Math.max(r, x1 - x0), Math.max(r, y1 - y0));
     }
-    for (const n of Object.values(NPCS)) dot(center(n.x), center(n.y), r * 1.1, "#ffd84a");
+    for (const n of Object.values(NPCS)) if (n.map === this.gm.id) dot(center(n.x), center(n.y), r * 1.1, "#ffd84a");
     for (const v of this.views.values()) {
       if (v.id === this.me) continue;
       dot(v.c.x, v.c.y, r * (v.kind === "mob" ? 0.9 : 1.1), v.kind === "mob" ? "#ff5a5a" : "#6cc8ff");
@@ -1217,7 +1250,7 @@ export class GameScene extends Phaser.Scene {
   private updateGuideArrow(time: number) {
     const me = this.me ? this.views.get(this.me) : undefined;
     const n = this.guideNpc ? NPCS[this.guideNpc] : undefined;
-    if (!me || !n) { this.guideArrow.setVisible(false); return; }
+    if (!me || !n || n.map !== this.gm.id) { this.guideArrow.setVisible(false); return; }
     const dx = center(n.x) - me.c.x, dy = center(n.y) - me.c.y;
     const d = Math.hypot(dx, dy);
     if (d < TILE * 3) { this.guideArrow.setVisible(false); return; }
@@ -1228,7 +1261,7 @@ export class GameScene extends Phaser.Scene {
 
   /** NPC ยืนนิ่งตามตำแหน่งใน layout แมพ: ชื่อสีทอง + เครื่องหมายเควสเหนือหัว กดแล้วเดินไปคุย */
   private drawNpcs() {
-    for (const n of Object.values(NPCS)) {
+    for (const n of Object.values(NPCS).filter((n) => n.map === this.gm.id)) {
       const x = center(n.x), y = center(n.y);
       const data = this.cache.json.get(`npcsheet_${n.id}`) as SheetMeta | undefined;
       let body: Phaser.GameObjects.Sprite;
@@ -1284,7 +1317,7 @@ export class GameScene extends Phaser.Scene {
       }
       this.updatePose(v);
       v.c.setDepth(v.c.y);
-      const lift = bridgeLift(v.c.x, v.c.y);
+      const lift = this.gm.bridgeLift(v.c.x, v.c.y);
       if (lift !== v.lift) { v.lift = lift; v.inner.y = -lift; }
       v.oc.setPosition(v.c.x, v.c.y - v.lift);
     }
@@ -1321,16 +1354,16 @@ export class GameScene extends Phaser.Scene {
     const tiles = TERRAIN_NAMES.map((n) => this.textures.get(`tile_${n}`).getSourceImage() as HTMLImageElement);
     const meta0 = Object.assign({}, ...Object.keys(PROP_SETS).map((set) => this.cache.json.get(`props_${set}`) ?? {})) as Record<string, { width: number; height: number; anchor: { x: number; y: number }; shadowWidth: number }>;
     let ground: HTMLCanvasElement;
-    if (this.textures.exists("baked_ground")) {
+    if (this.textures.exists(`baked_${this.gm.id}`)) {
       ground = document.createElement("canvas");
-      ground.width = MAP_W * TILE; ground.height = MAP_H * TILE;
-      ground.getContext("2d")!.drawImage(this.textures.get("baked_ground").getSourceImage() as HTMLImageElement, 0, 0, ground.width, ground.height);
-    } else ground = renderGround(tiles);
+      ground.width = this.gm.W * TILE; ground.height = this.gm.H * TILE;
+      ground.getContext("2d")!.drawImage(this.textures.get(`baked_${this.gm.id}`).getSourceImage() as HTMLImageElement, 0, 0, ground.width, ground.height);
+    } else ground = renderGround(this.gm, tiles);
 
     // ป่า: ต้นไม้ด้านในวาดรวมกับพื้น (ประหยัดเครื่อง) ต้นริมป่าเป็น sprite เรียงความลึกตาม y
     const gctx = ground.getContext("2d")!;
     gctx.imageSmoothingEnabled = false;
-    for (const t of forestTrees()) {
+    for (const t of forestTrees(this.gm)) {
       const m = meta0[t.kind];
       if (!m) continue;
       const ox = m.anchor.x, oy = m.anchor.y + 1;
@@ -1348,12 +1381,13 @@ export class GameScene extends Phaser.Scene {
       gctx.drawImage(img, -ox, -oy);
       gctx.restore();
     }
+    if (this.textures.exists("map_ground")) this.textures.remove("map_ground"); // วาปมาแมพใหม่: พื้นของแมพเดิมทิ้ง
     this.textures.addCanvas("map_ground", ground);
     this.setupMinimap(ground);
     this.add.image(0, 0, "map_ground").setOrigin(0, 0).setDepth(-3);
 
     // ทางออก: ชื่อแมพปลายทางลอยเหนือทางออก เห็นเมื่อผู้เล่นเข้าใกล้ (ดู update)
-    for (const e of EXITS) {
+    for (const e of this.gm.exits) {
       const t = this.add.text(((e.x0 + e.x1 + 1) / 2) * TILE, e.y0 * TILE + ((e.y1 - e.y0 + 1) * TILE) / 2, `➜ ${e.label}`, {
         fontFamily: "Mitr, sans-serif", fontSize: "11px", color: "#ffe39a", stroke: "#10192a", strokeThickness: 3,
       }).setOrigin(0.5).setDepth(90001).setResolution(2).setVisible(false);
@@ -1363,7 +1397,7 @@ export class GameScene extends Phaser.Scene {
     // ของประดับ: จุดยึดกึ่งกลางฐานวางใกล้ขอบล่างของช่อง พร้อมเงาวงรี
     // ชิ้นที่ขวางทางเรียงลำดับตามแกน y กับตัวละคร/มอน ชิ้นเล็กเดินผ่านได้อยู่ระดับพื้น (ใต้ตัวละครเสมอ)
     const meta = Object.assign({}, ...Object.keys(PROP_SETS).map((set) => this.cache.json.get(`props_${set}`) ?? {})) as Record<string, { width: number; height: number; anchor: { x: number; y: number }; shadowWidth: number }>;
-    for (const p of PROPS) {
+    for (const p of this.gm.props) {
       if (ARCH_BRIDGES.has(p.kind)) {
         // สะพานโค้ง: ชั้นหลัง (พื้น+ราวไกล) ใต้ตัวละครทุกตัว, ชั้นหน้า (ราวใกล้+เสา) เรียงความลึกตามขอบล่างของภาพ
         for (const [part, depth] of [["back", -1], ["front", p.py - 8]] as const) {

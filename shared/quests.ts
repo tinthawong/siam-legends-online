@@ -1,8 +1,8 @@
-// NPC และเควส อ่านจาก shared/data/npcs.json + quests.json (ตำแหน่ง NPC มาจาก layout แมพ: NPC_POS)
+// NPC และเควส อ่านจาก shared/data/npcs.json + quests.json (ตำแหน่ง NPC มาจาก layout แมพ: npcs ใน shared/data/maps)
 // ใช้ร่วมกัน: server ตัดสินทุกอย่าง (รับเควส นับมอน ส่งเควส ให้รางวัล) client ใช้แสดงผล (! ? เหนือหัว, รายการเควส)
 import NPC_DATA from "./data/npcs.json";
 import QUEST_DATA from "./data/quests.json";
-import { MOB_ID, NPC_POS } from "./map";
+import { MOB_ID, MAPS } from "./map";
 import { ITEMS } from "./items";
 
 export interface NpcDef {
@@ -10,6 +10,7 @@ export interface NpcDef {
   name: string;
   sprite: string; // โฟลเดอร์ภาพใน client/public/sprites/ (ยังไม่มีภาพ = ใช้ภาพชั่วคราว)
   quests: string[];
+  map: string; // แมพที่ NPC ยืนอยู่ (แมพแรกที่มีตำแหน่งของ NPC นี้)
   x: number; // ช่อง
   y: number;
 }
@@ -34,7 +35,10 @@ export interface QuestDef {
 const itemId = (s: string) => s.replace(/-/g, "_");
 
 export const NPCS: Record<string, NpcDef> = Object.fromEntries(
-  NPC_DATA.filter((n) => NPC_POS[n.id]).map((n) => [n.id, { id: n.id, name: n.name, sprite: n.sprite, quests: n.quests, ...NPC_POS[n.id] }]),
+  NPC_DATA.flatMap((n) => {
+    const m = Object.values(MAPS).find((g) => g.npcPos[n.id]);
+    return m ? [[n.id, { id: n.id, name: n.name, sprite: n.sprite, quests: n.quests, map: m.id, ...m.npcPos[n.id] }]] : [];
+  }),
 );
 
 export const QUESTS: Record<string, QuestDef> = Object.fromEntries(

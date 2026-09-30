@@ -6,14 +6,14 @@ import {
   POTION_COOLDOWN_MS, MAX_BUY, REGEN_MS, REGEN_PCT, REGEN_MOVING,
   stepMs, cheb,
 } from "../../shared/constants";
-import { MAP_W, MAP_H, SPAWN, ZONES, isWalkable, inZone, exitAt } from "../../shared/map";
+import { MAPS, getMap, type GameMap } from "../../shared/map";
 import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
 import { MOBS, expToNext, MAX_LEVEL, STAT_KEYS, STAT_MAX, statCostN, statPointsForLevel, derive, physicalAttack, type Stats, type Derived } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import { NPCS, QUESTS, canAccept, isComplete, talkTo, type QuestLog } from "../../shared/quests";
 import { SLOTS, gearOf, slotsFor, type Equipped, type Gear } from "../../shared/equipment";
 import { SKILLS } from "../../shared/skills";
-import { CLOSE_KICKED } from "../../shared/protocol";
+import { CLOSE_KICKED, CLOSE_WARP } from "../../shared/protocol";
 import type { ClientMsg, ServerMsg, EntityState, PlayerStats, JoinCharacter, GroundItem, InvItem } from "../../shared/protocol";
 import type { Look } from "../../shared/appearance";
 
@@ -61,6 +61,7 @@ interface Player extends Ent {
   quests: QuestLog;         // เควสที่รับอยู่ / ทำเสร็จแล้ว
   talk: string | null;      // NPC ที่กำลังเดินไปคุย
   equip: Equipped;          // ของที่ใส่อยู่ (ไม่อยู่ในกระเป๋า)
+  mapId: string;            // แมพที่บันทึกลง D1 (เปลี่ยนตอนวาป)
   gear: Gear;               // ค่ารวมจากของที่ใส่อยู่
 }
 
@@ -91,6 +92,8 @@ export class MapRoom extends DurableObject<Env> {
   private groundSeq = 0;
   private loop: ReturnType<typeof setInterval> | null = null;
   private nextSaveAt = 0;
+  /** แมพของห้องนี้ (รู้ตอนผู้เล่นคนแรกเข้า: Worker ส่ง id แมพมากับ X-Character) */
+  private map!: GameMap;
 
   constructor(ctx: DurableObjectState, env: Env) {
     super(ctx, env);
@@ -98,7 +101,6 @@ export class MapRoom extends DurableObject<Env> {
     for (const ws of ctx.getWebSockets()) {
       try { ws.close(4000, "server restarted"); } catch { /* ignore */ }
     }
-    this.spawnMobs();
   }
 
   // ---------- การเชื่อมต่อ ----------
@@ -108,6 +110,7 @@ export class MapRoom extends DurableObject<Env> {
     let ch: JoinCharacter;
     try { ch = JSON.parse(req.headers.get("X-Character") ?? ""); }
     catch { return new Response("bad request", { status: 400 }); }
+    if (!this.map) { this.map = getMap(ch.map); this.spawnMobs(); }
 
     // บัญชีเดียวกันเข้าซ้ำ → เตะตัวเก่า และใช้ค่าล่าสุดในหน่วยความจำ (ใหม่กว่าใน D1)
     for (const old of this.players.values()) {
@@ -118,7 +121,7 @@ export class MapRoom extends DurableObject<Env> {
       this.send(old, { t: "kicked" }); // แจ้งก่อน เพราะ close event อาจมาช้า
       try { old.ws.close(CLOSE_KICKED, "logged in elsewhere"); } catch { /* ignore */ }
     }
-    const pos = isWalkable(ch.x, ch.y) ? { x: ch.x, y: ch.y } : SPAWN;
+    const pos = this.map.isWalkable(ch.x, ch.y) ? { x: ch.x, y: ch.y } : this.map.spawn;
 
     const pair = new WebSocketPair();
     const [client, server] = Object.values(pair);
@@ -139,12 +142,12 @@ export class MapRoom extends DurableObject<Env> {
       target: null, auto: false, nextAttackAt: 0, chaseKey: null,
       nextHpRegenAt: 0, nextSpRegenAt: 0,
       pickup: null, dead: false, money: ch.money ?? 0, st: { ...ch.stats }, points: ch.points, der: der0, potionAt: 0, nextPotionAt: 0, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
-      quests: ch.quests ?? { active: {}, done: [] }, talk: null, equip: { ...(ch.equip ?? {}) }, gear, skill: null, skillReady: {},
+      quests: ch.quests ?? { active: {}, done: [] }, talk: null, equip: { ...(ch.equip ?? {}) }, gear, skill: null, skillReady: {}, mapId: this.map.id,
     };
     this.players.set(id, p);
 
     this.send(p, {
-      t: "welcome", you: id, entities: this.snapshot(), self: this.stats(p),
+      t: "welcome", map: this.map.id, you: id, entities: this.snapshot(), self: this.stats(p),
       ground: [...this.ground.values()], inv: invList(p.inv), quests: p.quests,
     });
     this.broadcast({ t: "spawn", e: this.view(p) }, id);
@@ -170,8 +173,8 @@ export class MapRoom extends DurableObject<Env> {
     switch (msg.t) {
       case "move": {
         const x = Math.floor(Number(msg.x)), y = Math.floor(Number(msg.y));
-        if (!isWalkable(x, y)) return;
-        const path = pathTo(p.x, p.y, x, y);
+        if (!this.map.isWalkable(x, y)) return;
+        const path = pathTo(this.map, p.x, p.y, x, y);
         if (!path) return;
         // เดินเองแปลว่ายกเลิกการตีและ auto
         if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
@@ -250,7 +253,7 @@ export class MapRoom extends DurableObject<Env> {
       case "talk": {
         // กดที่ NPC = เดินไปหา (ยกเลิกการตีและ auto เหมือนเดินเอง) ถึงแล้วเปิดหน้าคุย
         const npc = NPCS[String(msg.npc)];
-        if (!npc) return;
+        if (!npc || npc.map !== this.map.id) return;
         if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
         if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
         p.pickup = null;
@@ -312,6 +315,21 @@ export class MapRoom extends DurableObject<Env> {
     await this.drop(ws);
   }
 
+  /** วาปไปแมพอื่น (1 แมพ = 1 Durable Object): ออกจากห้องนี้ บันทึกแมพ+จุดเข้าลง D1 ก่อน แล้วบอก client ให้ต่อใหม่
+   *  (Worker อ่านแมพจาก D1 แล้วส่งไปห้องของแมพปลายทาง) */
+  private async warp(p: Player, to: string, entry: string | null) {
+    const dest = MAPS[to];
+    const pos = dest.entryCell(entry);
+    this.players.delete(p.id);
+    this.broadcast({ t: "despawn", id: p.id });
+    for (const m of this.mobs.values()) if (m.aggro === p.id) this.dropAggro(m, Date.now());
+    if (this.players.size === 0) this.stopLoop();
+    p.mapId = to; p.x = pos.x; p.y = pos.y;
+    await this.save([p]);
+    this.send(p, { t: "warp", map: to, name: dest.name });
+    try { p.ws.close(CLOSE_WARP, "warp"); } catch { /* ignore */ }
+  }
+
   /** หลุดการเชื่อมต่อ = ออกจากแมพทันที auto จึงหยุดไปด้วย แล้วบันทึกลง D1 */
   private async drop(ws: WebSocket) {
     const p = this.playerOf(ws);
@@ -319,7 +337,7 @@ export class MapRoom extends DurableObject<Env> {
     this.players.delete(p.id);
     this.broadcast({ t: "despawn", id: p.id });
     if (this.players.size === 0) this.stopLoop();
-    if (p.dead) { p.x = SPAWN.x; p.y = SPAWN.y; } // ออกเกมตอนสลบ = เข้าใหม่ที่จุดเกิด
+    if (p.dead) { p.x = this.map.spawn.x; p.y = this.map.spawn.y; } // ออกเกมตอนสลบ = เข้าใหม่ที่จุดเกิด
     await this.save([p]);
   }
 
@@ -329,14 +347,14 @@ export class MapRoom extends DurableObject<Env> {
     if (!list.length) return;
     const now = Date.now();
     const stmt = this.env.DB.prepare(
-      "UPDATE characters SET level = ?, exp = ?, x = ?, y = ?, money = ?, str = ?, agi = ?, vit = ?, int = ?, dex = ?, luk = ?, stat_points = ?, quests = ?, equip = ?, updated_at = ? WHERE user_id = ?",
+      "UPDATE characters SET level = ?, exp = ?, x = ?, y = ?, money = ?, str = ?, agi = ?, vit = ?, int = ?, dex = ?, luk = ?, stat_points = ?, quests = ?, equip = ?, map = ?, updated_at = ? WHERE user_id = ?",
     );
     const invStmt = this.env.DB.prepare(
       "INSERT INTO inventory (user_id, item, count) VALUES (?, ?, ?) ON CONFLICT (user_id, item) DO UPDATE SET count = excluded.count",
     );
     try {
       await this.env.DB.batch(list.flatMap((p) => [
-        stmt.bind(p.level, p.exp, p.x, p.y, p.money, p.st.str, p.st.agi, p.st.vit, p.st.int, p.st.dex, p.st.luk, p.points, JSON.stringify(p.quests), JSON.stringify(p.equip), now, p.userId),
+        stmt.bind(p.level, p.exp, p.x, p.y, p.money, p.st.str, p.st.agi, p.st.vit, p.st.int, p.st.dex, p.st.luk, p.points, JSON.stringify(p.quests), JSON.stringify(p.equip), p.mapId, now, p.userId),
         ...[...p.inv].map(([item, count]) => invStmt.bind(p.userId, item, count)),
       ]));
     } catch (e) {
@@ -391,10 +409,12 @@ export class MapRoom extends DurableObject<Env> {
   private advance(e: Entity, now: number) {
     while (e.path.length && now >= e.nextStepAt) {
       const c = e.path.shift()!;
-      // ผู้เล่นเดินเข้าทางออก: ยังไม่มีแมพอื่น → แจ้งแล้วดันถอยกลับช่องเดิม (ไม่เข้าช่องทางออก)
-      if (e.kind === "player" && exitAt(c.x, c.y)) {
+      // ผู้เล่นเดินเข้าทางออก: มีแมพปลายทาง = วาป, ยังไม่มี = แจ้งแล้วหยุดที่ช่องเดิม (ไม่เข้าช่องทางออก)
+      const exit = e.kind === "player" ? this.map.exitAt(c.x, c.y) : undefined;
+      if (e.kind === "player" && exit) {
         e.path = [];
         this.setPath(e, [], now);
+        if (MAPS[exit.to] && !e.dead) { void this.warp(e, exit.to, exit.entry); return; }
         this.send(e, { t: "notice", text: "เส้นทางนี้ยังไม่เปิด" });
         return;
       }
@@ -444,7 +464,7 @@ export class MapRoom extends DurableObject<Env> {
     const key = `${m.x},${m.y}`;
     if (p.chaseKey !== key || p.path.length === 0) {
       p.chaseKey = key;
-      const path = pathNear(p.x, p.y, m.x, m.y, PLAYER_RANGE);
+      const path = pathNear(this.map, p.x, p.y, m.x, m.y, PLAYER_RANGE);
       if (!path) { p.target = null; this.send(p, { t: "target", id: null }); return; }
       this.setPath(p, path, now);
     }
@@ -514,7 +534,7 @@ export class MapRoom extends DurableObject<Env> {
       return;
     }
     if (p.path.length === 0) {
-      const path = pathNear(p.x, p.y, g.x, g.y, 1);
+      const path = pathNear(this.map, p.x, p.y, g.x, g.y, 1);
       if (!path) { p.pickup = null; return; }
       this.setPath(p, path, now);
     }
@@ -524,7 +544,7 @@ export class MapRoom extends DurableObject<Env> {
 
   private nearNpc(p: Player, npc: string): boolean {
     const n = NPCS[npc];
-    return !!n && cheb(p.x, p.y, n.x, n.y) <= TALK_RANGE;
+    return !!n && n.map === this.map.id && cheb(p.x, p.y, n.x, n.y) <= TALK_RANGE;
   }
 
   /** เดินไปหา NPC ถึงระยะคุยแล้วเปิดหน้าคุย */
@@ -538,7 +558,7 @@ export class MapRoom extends DurableObject<Env> {
       return;
     }
     if (p.path.length === 0) {
-      const path = pathNear(p.x, p.y, n.x, n.y, TALK_RANGE);
+      const path = pathNear(this.map, p.x, p.y, n.x, n.y, TALK_RANGE);
       if (!path) { p.talk = null; return; }
       this.setPath(p, path, now);
     }
@@ -596,7 +616,7 @@ export class MapRoom extends DurableObject<Env> {
     const key = `${p.x},${p.y}`;
     if (m.chaseKey !== key || m.path.length === 0) {
       m.chaseKey = key;
-      const path = pathNear(m.x, m.y, p.x, p.y, MOB_RANGE);
+      const path = pathNear(this.map, m.x, m.y, p.x, p.y, MOB_RANGE);
       if (!path) { this.dropAggro(m, now); return; }
       this.setPath(m, path, now);
     }
@@ -642,7 +662,7 @@ export class MapRoom extends DurableObject<Env> {
   private revivePlayer(p: Player, now: number) {
     p.dead = false;
     p.path = [];
-    p.x = SPAWN.x; p.y = SPAWN.y;
+    p.x = this.map.spawn.x; p.y = this.map.spawn.y;
     p.hp = p.maxHp;
     p.sp = p.maxSp; // ฟื้นที่จุดเกิด: เลือดและ SP เต็ม
     this.broadcast({ t: "respawn", id: p.id, x: p.x, y: p.y });
@@ -760,11 +780,14 @@ export class MapRoom extends DurableObject<Env> {
 
   // ---------- มอนสเตอร์ ----------
 
+  /** มอนตามโซนเกิดในแมพนี้ (spawns ในผัง) — มอนที่ไม่มีใน MOBS ข้าม */
   private spawnMobs() {
     let n = 0;
-    for (const [type, def] of Object.entries(MOBS)) {
-      for (let i = 0; i < def.count; i++) {
-        const c = this.randomCell(def.zone);
+    for (const [type, z] of Object.entries(this.map.zones)) {
+      const def = MOBS[type];
+      if (!def) continue;
+      for (let i = 0; i < z.count; i++) {
+        const c = this.randomCell(type);
         const id = "m" + ++n;
         this.mobs.set(id, {
           id, kind: "mob", type, name: def.name,
@@ -778,7 +801,7 @@ export class MapRoom extends DurableObject<Env> {
   }
 
   private respawnMob(m: Mob, now: number) {
-    const c = this.randomCell(MOBS[m.type].zone);
+    const c = this.randomCell(m.type);
     m.x = c.x; m.y = c.y;
     m.hp = m.maxHp;
     m.alive = true;
@@ -793,20 +816,20 @@ export class MapRoom extends DurableObject<Env> {
     for (let i = 0; i < 6; i++) {
       const x = m.x + Math.floor(Math.random() * 7) - 3;
       const y = m.y + Math.floor(Math.random() * 7) - 3;
-      const zone = MOBS[m.type].zone;
-      if ((x === m.x && y === m.y) || !isWalkable(x, y) || (zone && !inZone(zone, x, y))) continue;
-      const path = pathTo(m.x, m.y, x, y);
+      if ((x === m.x && y === m.y) || !this.map.isWalkable(x, y) || !this.map.inZone(m.type, x, y)) continue;
+      const path = pathTo(this.map, m.x, m.y, x, y);
       if (path && path.length <= 8) { this.setPath(m, path, now); return; }
     }
   }
 
   private randomCell(zone?: string): Cell {
-    const z = zone ? ZONES[zone] : undefined;
-    for (;;) {
-      const x = z ? z.x0 + Math.floor(Math.random() * (z.x1 - z.x0 + 1)) : Math.floor(Math.random() * MAP_W);
-      const y = z ? z.y0 + Math.floor(Math.random() * (z.y1 - z.y0 + 1)) : Math.floor(Math.random() * MAP_H);
-      if (isWalkable(x, y) && cheb(x, y, SPAWN.x, SPAWN.y) > 4) return { x, y };
+    const z = zone ? this.map.zones[zone] : undefined;
+    for (let i = 0; i < 2000; i++) {
+      const x = z ? z.x0 + Math.floor(Math.random() * (z.x1 - z.x0 + 1)) : Math.floor(Math.random() * this.map.W);
+      const y = z ? z.y0 + Math.floor(Math.random() * (z.y1 - z.y0 + 1)) : Math.floor(Math.random() * this.map.H);
+      if (this.map.isWalkable(x, y) && cheb(x, y, this.map.spawn.x, this.map.spawn.y) > 4) return { x, y };
     }
+    return { ...this.map.spawn }; // โซนไม่มีช่องเดินได้ (ผังผิด) กันวนไม่รู้จบ
   }
 
   // ---------- ส่งข้อมูล ----------
