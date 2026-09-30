@@ -387,6 +387,8 @@ export class GameScene extends Phaser.Scene {
         }
         const src = this.views.get(m.src);
         if (src && dst) this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
+        // ผู้เล่นตี: พุ่งตัว + รอยฟัน (ตีพลาดก็เห็นท่าเหวี่ยง)
+        if (src?.kind === "player" && dst) this.swingFx(src, dst, m.crit);
         // มอนจาก sheet ตีผู้เล่น: เล่นท่า attack จนจบแล้วกลับท่าเดิม
         if (src?.sheet && this.anims.exists(`${src.sheet}_attack`)) {
           src.pose = "attack";
@@ -624,6 +626,42 @@ export class GameScene extends Phaser.Scene {
         { x: t.x + drift, y: t.y - (crit ? 30 : 22), alpha: 0, duration: crit ? 750 : 600, ease: "Cubic.easeIn" },
       ],
       onComplete: () => t.destroy(),
+    });
+  }
+
+  /** ท่าตีของผู้เล่น (โค้ดล้วน ยังไม่มีภาพท่าตี): พุ่งเข้าหาเป้านิดหนึ่งแล้วดีดกลับ + รอยฟันโค้งกวาดไปทางเป้า
+   *  มุมมองเอียงจากด้านบน จึงบีบแกนตั้งของรอยฟันให้แบนลง */
+  private swingFx(src: View, dst: View, crit: boolean) {
+    const dx = dst.c.x - src.c.x, dy = dst.c.y - src.c.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const a = Math.atan2(dy, dx);
+    const cx = src.c.x + ux * 10, cy = src.c.y - 14 + uy * 8;
+    const depth = Math.max(src.c.y, dst.c.y) + 2;
+    const sweep = 1.3; // ครึ่งมุมกวาด (เรเดียน)
+    const dirSign = Math.random() < 0.5 ? 1 : -1; // ฟันสลับซ้าย-ขวา
+    const layers = crit
+      ? [{ r: 18, w: 4, c: 0xffd84a, a: 1 }, { r: 23, w: 2, c: 0xfff2b0, a: 0.8 }]
+      : [{ r: 15, w: 3, c: 0xffffff, a: 0.9 }, { r: 19, w: 1.5, c: 0xbfe3ff, a: 0.6 }];
+    for (const [i, l] of layers.entries()) {
+      const g = this.add.graphics({ x: cx, y: cy }).setDepth(depth).setBlendMode(Phaser.BlendModes.ADD).setScale(1, 0.62);
+      g.lineStyle(l.w, l.c, l.a);
+      g.beginPath();
+      g.arc(0, 0, l.r, -0.9, 0.9);
+      g.strokePath();
+      g.rotation = a - dirSign * sweep;
+      this.tweens.add({
+        targets: g, rotation: a + dirSign * sweep * 0.6, alpha: { from: 1, to: 0 },
+        delay: i * 25, duration: crit ? 220 : 170, ease: "Cubic.easeOut", onComplete: () => g.destroy(),
+      });
+    }
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    // พุ่งตัว: ขยับภาพตัวไปทางเป้าแล้วกลับที่เดิม (ตัวจริงบน server ไม่ได้ขยับ)
+    const bx = src.body.x, by = src.body.y;
+    const push = crit ? 5 : 3;
+    this.tweens.add({
+      targets: src.body, x: bx + ux * push, y: by + uy * push * 0.7, duration: 60, yoyo: true, ease: "Quad.easeOut",
+      onComplete: () => { src.body.x = bx; src.body.y = by; },
     });
   }
 
