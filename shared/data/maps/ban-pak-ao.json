@@ -1,5 +1,6 @@
 {
  "id": "ban-pak-ao",
+ "name": "บ้านปากอ่าว",
  "width": 60,
  "height": 44,
  "tile": 32,
@@ -12,44 +13,44 @@
   "F": "forest"
  },
  "terrain": [
-  "FFFFFFFFFFFFFFFFFFFFFFFFFFGGGDDGGGFFFFFFFFFFFFFFFFFFFFFFFFFF",
-  "FFFFFFFFFFFFFFFFFFFFFFFFFFGGGDDGGGFFFFFFFFFFFFFFFFFFFFFFFFFF",
-  "FFFFFFFFFFFFFFFFFFFFFFFFFFGGDDDGGGFFFFFFFFFFFFFFFFFFFFFFFFFF",
-  "FFFFFFFFFGGGGGFFGGGGGFFGGGGGDDDGGGGFFGGGGGFFGGGGFFFFFFFFFFFF",
-  "FFFFFFFFFGGGGGGGGGGGGGGGGGGGDDDGGGGFFGGPPPPPGPPPPPFPPPPPFFFF",
-  "FFFGGGFFFGGGGGGGGGGFFFFGGGGGDDDGGGFFFFFPPPPPGPPPPPFPPPPPFFFF",
-  "FFFGGGFFFGGGGGGFFFFFFFFFFFGGDDDGGGFFFFFPPPPPGPPPPPFPPPPPFFFF",
-  "FFFGGGGFGGGGGFFFFFFFFFFFFFFDDDDGGGGFFFFPPPPPGPPPPPGPPPPPFFFF",
-  "FFFFGGGGGGGGGGFFFFFFFFFFFFGDDDDGGGGFFGGGGGGGGGGGGGGGGGGFFFFF",
-  "FFFGGGGGGGGGGGGGGGFFFFFFGGGDDDGGGGGGGGGPPPPPGPPPPPGPPPPPFFFF",
-  "FFFGGGGGGGGGGGGGGGGGGGGGGGGDDDGGGGGGGGGPPPPPGPPPPPGPPPPPFFFF",
-  "FFFGGGGGGGGGGGGGGGGGGGGGGGGDDDGGGGGDDDDDPPPPGPPPPPGPPPPPFFFF",
-  "FFFGGGGGGGGGGGGGGGGGGGGGGGGDDDGGGGDDDDDDPPPPGPPPPPGPPPPPFFFF",
-  "FFFGGGGGGGGGGGGGGGGGGGGGGGGDDDGGGGDDDDGGGGGGGGGGGGGGGGGGFFFF",
-  "FFFGGGGGGGDDDDDDGGGGGGGGGGGGDDGGGDDDDGGPPPPPGPPPPPGPPPPPFFFF",
-  "FFFGGGGGGDDDDDDDDDGGGGGGGGGGDDGGGDDDGGGPPPPPGPPPPPGPPPPPFFFF",
-  "FFFGGGGGDDGGGDDDDDDDGGGGGGGGDDDGDDDDGGGPPPPPGPPPPPGPPPPPFFFF",
-  "FFFFGGGGDDGGGGGGGGDDDDGGGDDDDDDDDDDGGGGPPPPPGPPPPPGPPPPPFFFF",
-  "FFFGGGGGDDGGGGGGGGGDDDDGDDDDDDDDDDDGGGGGDDGGGGGDGGGGGGGFFFFF",
-  "FFFFGGGDDDGGGGGGGGGGDDDDDDDDDDDDDDDDDGDDDDGGGGGDDDDGGGGGFFFF",
-  "FFFFGGGDDDGGGGGGGGGGGGDGDDDDDDDDDDDDDDDDDDGWWWWGDDDDDGGGGGGG",
-  "FFFFGGGDDDGGGGGGGGGGGGGDDDDDDDDDDDDDDDDGGGWWWWWWGDDDDDDDDDDD",
-  "FFFFGGGDDDGGGGGGGGGGGGGDDDDDDDDDDDDDDDDGGWWWWWWWWGGDDDDDDDDD",
-  "FFFFGGGDDDGGGGGGGGGGGGGDDDDDDDDDDDDDDDDGWWWWWWWWWGGGGGGGGGDD",
-  "FFFFGGGDDDGGGGGGGGGGGGGDDDDDDDDDDDDDDDGGWWWWWWWWWGGGGGGGGGGG",
-  "FFFFFGGDDDGGGGGGGGGDDDDDDDDDDDDDDDDGGGGGGGGWWWWWGGGGGGGFFFFF",
-  "FFFFFGGDDGGGGGGGDDDDDDGGGDDGGGGGGDDDGGGGGGGGGGGGGGGGGGGFFFFF",
-  "FFFFFGGGGGGGGGDDDDDDGGGGGGGGGGGGGGDDDGGGGGGGGGGGGFFFGFFFFFFF",
-  "FFFGGGGGGGGGGDDDDDGGGGGFGGGFFGGGGGDDDGGGGGGGGGGGFFFFFFFFFFFF",
-  "FFFGGGGGGGGGDDDDGGGGGFFFFFFFFFGGGGSDDDGGGGGGGGGGGFFFFFFFSFFF",
-  "FFFGGGGGGGGGDDDGGGGGFFFFFFFFFFFGSSSDDDSSSGGGGGSSSSSSSFSSSSSS",
-  "FFFGGGGGGGGGDDDGGGGGFFFFFFFFFFFSSSSSSDSSSSSSSSSSSSSSSSSSSSSS",
-  "FFFGGGGGGGSDDDSGGGGGGGGGFFFGGSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
-  "FFFGGSSSSSSDDDSSSSSSSGGGGFSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
-  "SSSSSSSSSSSSDDSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
-  "SSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSSS",
-  "SSSSSSSSSSSSSSSSSSSSWWWWWWWWWSSSSSSSSSSSSSSSSSSSSSSWWWWWWWWW",
-  "WWWWSSSSSSSSSWWWWWWWWWWWWWWWWWWWWWWSSSSSSSSSWWWWWWWWWWWWWWWW",
+  "FFFFFFFFFFFFFFFFFFFFGGGDDGWWWWGGGGFFFFFFFFFFFFFFFFFFFFFFFFFF",
+  "FFFFFFFFFFFFFFFFFFFFGGGDDGWWWWGGGGFFFFFFFFFFFFFFFFFFFFFFFFFF",
+  "FFFGGFFFFGGGFFFFGGGFGGGDDGWWWGGGGGFFFGGGFFFFGGGFFFFGGGFFFFFF",
+  "FFFGGGGGGGFFFFFGGGGGGGGDDGWWWGGGGGFFFFFGGGGGGGGGGGGGGGGGGFFF",
+  "FFFGGGGGGGFFFFFFFGGGGGGDDGWWWGGGGGFFFFFFPPPPPGPPPPPGPPPPFFFF",
+  "FFFFGGGGGGFFFFFFFFGGGGGDDGWWWGGGGGGFFFFGPPPPPGPPPPPGPPPPFFFF",
+  "FFFFGGGGGGFFFFFFFGGGGGGDDGWWWWGGGGGGFGGGPPPPPGPPPPPGPPPPFFFF",
+  "FFFFGGGGGGGFGGGGGGGGGGDDDGGWWWGGGGGGGGGGPPPPPGPPPPPGPPPFFFFF",
+  "FFFFGGGGGGGGGGGGGGDGGGDDDGDGWWWGGGGGGGGGGGGGGGGGGGGGGGGGFFFF",
+  "FFFFFFGGGGGGGGGGGGDDDDDDDDDGGWWGGGGGGGDGPPPPPGPPPPPGPPPPFFFF",
+  "FFFFFGGGGGGGGGGGGGGGGGDDGGGGGWWWGGGGGGDGPPPPPGPPPPPGPPPPFFFF",
+  "FFFFFGGGDGGGGGGGGGGGGDDDGGGGGWWWGGGGGGDGPPPPPGPPPPPGPPPPGFFF",
+  "FFFFFGGGDDGGGGGGGGGGGDDDGGGGGWWWGGGGGGDGPPPPPGPPPPPGPPPPGFFF",
+  "FFFFFGGGGDGGGGDGGGGGGDDDGGGGWWWGGGGGGGDGGGGGGGGGGGGGGGGGFFFF",
+  "FFFFFFGDGDGGGGDGGGGGGDDDGGGGWWWGGDGGGGDGPPPPPGPPPPPGPPPPFFFF",
+  "FFFFFFFDDDGGGGDGGGGDGGDDGGGWWWWGGDGGGGDGPPPPPGPPPPPGPPPPFFFF",
+  "FFFFFFFGDDDDDGDDDDDDDDDDGGGWWWGGDDGGGGDGPPPPPGPPPPPGPPPFFFFF",
+  "FFFFFFFGGGGGDDDDDDDDDDDDDDDWWWGDDDGGGDDGPPPPPGPPPPPGPPPPFFFF",
+  "FFFFFFGGGGGGGGGDDDDGGGDDGGGWWWWGGDDDGDDGGGGGGGGGGGDGGGDGFFFF",
+  "FFFFFGGGDGGGGGGGGGGGGGDDGGGWWWWGGGGDDDDGGGGGGWWWWWDGGGDGGGGG",
+  "FFFFFGGGDGGGDGGGGGGGGGDDGGGGWWWWGGGGDDGGGGGGWWWWWWDGGGDGGGGG",
+  "FFFFFGGDDGGGDGGDGGGGGGDDGGGGWWWWGGGGDDGGGGGWWWWWWWDGGDDDDDDD",
+  "FFFGGGGDGGGGDGGDGGGDGGDGGGGGGWWWGGGDDDDDGGGWWWWWWWDDDDDDDDDG",
+  "FFFFGGGDGDGGDGGDGGGDGDDGGGGGGWWWGGDDDDDDDGGGGGDDDDDDDDGGGGGG",
+  "GGGGGGGDGDGDDDDDDDDDDDDGGGGGGWWWGGDDDDDDDDDDDDDDDDDDGGGGGGGG",
+  "DDDDDDDDDDDDDDDDDDDDGDDGGGGGGWWGGDDDDDDDDDDDGGGGGGGDGGGFFFFF",
+  "DDDDDDDDDDDDDDDGGGGGGDDGGGGGWWWGGDDDDDDDDDDDGGGGGGGDGGGGFFFF",
+  "DGGGGGGGGGGGGDGGGGGGGDDDGGGGWWWGGDDDDDDDDDDDGGGGGGGDGGGGFFFF",
+  "GGGGGGGGGGGGGDGDGGGGGDDDGGGGWWGGGGDDDDDDDDGGGGGGGGGDGGGGFFFF",
+  "FFFGGGGGDGGGGDDDGGGGDGDDDGGGWWGGGGDDDGGGGGGGGGGGGGGDGGGGGFFF",
+  "FFFGGFGGDDDDDDGGGGGGDDDDDGGGWWGGGDDDDGGGGGGGGGGGGSSDSGGGGFFF",
+  "FFFFFFFFGGGGGDGGGGGGGGGDDDGGWWGGGDDDGGGGGGGSSSSSSSSDSSSSSSSF",
+  "FFFFFFFFGGSSSDGGGGGGGGGGDDDGWWGGDDDGGGGSSSSSSSSSSSSDSSSSSSSS",
+  "FFFFFFFSSSSDSDSDSSSSGGDDDDDGWWWDDDGGGGGDSSSSDSSSSDSDSSSSSSSS",
+  "SSSSSFSSSSSDDDDDSSSSDGDGSSSSWWWDDDDDDDDDSSSSDDDDDDDDSSSSSSSS",
+  "SSSSSSSSSSSSSSSSSSSSDDDSSSSWWWWWWSSSSSSSSSSSSSSSSSSSSSSSSSSS",
+  "SSSSSSSSSSSSSSSSSSSSWWWWWWWWWWWWWWSSSSSSSSSSSSSSSSSSWWWWWWWS",
+  "WWWWSSSSSSSSWWWWWWWWWWWWWWWWWWWWWWWWSSSSSSSSWWWWWWWWWWWWWWWW",
   "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
   "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
   "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
@@ -60,698 +61,410 @@
  "props": [
   {
    "name": "village-gate",
-   "x": 953,
-   "y": 137
+   "x": 755,
+   "y": 115
   },
   {
-   "name": "bush",
-   "x": 870,
-   "y": 140
+   "name": "school",
+   "x": 604,
+   "y": 286
   },
   {
-   "name": "bush",
-   "x": 1036,
-   "y": 140
+   "name": "water-tower",
+   "x": 644,
+   "y": 364
   },
   {
-   "name": "hibiscus-bush",
-   "x": 876,
-   "y": 202
+   "name": "rest-pavilion",
+   "x": 850,
+   "y": 267
   },
   {
-   "name": "hibiscus-bush",
-   "x": 855,
-   "y": 202
+   "name": "panya-house",
+   "x": 275,
+   "y": 358
   },
   {
-   "name": "flowers-pink",
-   "x": 1033,
-   "y": 192
+   "name": "two-storey-house",
+   "x": 473,
+   "y": 422
   },
   {
-   "name": "flowers-pink",
-   "x": 1028,
-   "y": 185
-  },
-  {
-   "name": "signpost",
-   "x": 1001,
-   "y": 345
-  },
-  {
-   "name": "lantern-pole",
-   "x": 892,
-   "y": 262
-  },
-  {
-   "name": "lantern-pole",
-   "x": 1001,
-   "y": 262
-  },
-  {
-   "name": "stilt-house",
-   "x": 166,
-   "y": 400
-  },
-  {
-   "name": "stilt-house",
-   "x": 441,
-   "y": 416
-  },
-  {
-   "name": "stilt-hut",
-   "x": 166,
-   "y": 649
-  },
-  {
-   "name": "stilt-house",
-   "x": 464,
-   "y": 704
-  },
-  {
-   "name": "stilt-hut",
-   "x": 169,
-   "y": 864
-  },
-  {
-   "name": "dragon-jars",
-   "x": 249,
-   "y": 409
-  },
-  {
-   "name": "clay-jar",
-   "x": 553,
-   "y": 425
-  },
-  {
-   "name": "well",
-   "x": 377,
-   "y": 617
-  },
-  {
-   "name": "clothesline",
-   "x": 518,
-   "y": 585
-  },
-  {
-   "name": "potted-plant",
-   "x": 230,
-   "y": 662
-  },
-  {
-   "name": "rattan-baskets",
-   "x": 560,
-   "y": 710
-  },
-  {
-   "name": "hammock",
-   "x": 140,
-   "y": 748
-  },
-  {
-   "name": "papaya-tree",
-   "x": 352,
-   "y": 377
-  },
-  {
-   "name": "mango-tree",
-   "x": 601,
-   "y": 656
-  },
-  {
-   "name": "banana-tree",
+   "name": "spirit-house",
    "x": 358,
-   "y": 761
+   "y": 396
   },
   {
-   "name": "fence-bamboo",
-   "x": 166,
-   "y": 297
+   "name": "stilt-house",
+   "x": 608,
+   "y": 486
   },
   {
-   "name": "fence-bamboo",
-   "x": 206,
-   "y": 297
-  },
-  {
-   "name": "fence-bamboo",
-   "x": 246,
-   "y": 297
-  },
-  {
-   "name": "fence-bamboo",
-   "x": 286,
-   "y": 297
-  },
-  {
-   "name": "fence-bamboo",
-   "x": 326,
-   "y": 297
-  },
-  {
-   "name": "fence-bamboo",
-   "x": 366,
-   "y": 297
-  },
-  {
-   "name": "flowers-pink",
-   "x": 322,
-   "y": 376
-  },
-  {
-   "name": "fern",
-   "x": 284,
-   "y": 380
-  },
-  {
-   "name": "flowers-yellow",
-   "x": 331,
-   "y": 363
-  },
-  {
-   "name": "flowers-yellow",
-   "x": 598,
-   "y": 573
-  },
-  {
-   "name": "flowers-yellow",
-   "x": 569,
-   "y": 553
-  },
-  {
-   "name": "banyan",
-   "x": 809,
-   "y": 704
-  },
-  {
-   "name": "sala",
-   "x": 1075,
+   "name": "blue-house",
+   "x": 272,
    "y": 633
   },
   {
-   "name": "frangipani",
-   "x": 1158,
-   "y": 627
+   "name": "chicken-coop",
+   "x": 384,
+   "y": 652
   },
   {
-   "name": "frangipani",
-   "x": 998,
-   "y": 604
+   "name": "outdoor-kitchen",
+   "x": 486,
+   "y": 684
   },
   {
-   "name": "bench",
-   "x": 937,
-   "y": 691
+   "name": "green-roof-house",
+   "x": 608,
+   "y": 729
   },
   {
-   "name": "bench",
-   "x": 1004,
-   "y": 787
+   "name": "porch-house",
+   "x": 307,
+   "y": 748
   },
   {
-   "name": "market-stall",
-   "x": 761,
-   "y": 825
+   "name": "rubber-smokehouse",
+   "x": 240,
+   "y": 474
   },
   {
-   "name": "market-stall",
-   "x": 848,
-   "y": 825
+   "name": "repair-shop",
+   "x": 499,
+   "y": 908
   },
   {
-   "name": "crate",
-   "x": 710,
-   "y": 812
+   "name": "swiftlet-house",
+   "x": 281,
+   "y": 953
   },
   {
-   "name": "barrel",
-   "x": 902,
-   "y": 828
+   "name": "stilt-hut",
+   "x": 640,
+   "y": 953
   },
   {
-   "name": "notice-board",
-   "x": 883,
-   "y": 569
+   "name": "fisherman-hut",
+   "x": 726,
+   "y": 1056
   },
   {
-   "name": "lantern-pole",
-   "x": 716,
-   "y": 582
+   "name": "net-pavilion",
+   "x": 659,
+   "y": 1107
   },
   {
-   "name": "lantern-pole",
-   "x": 1171,
-   "y": 742
+   "name": "boat-shed",
+   "x": 505,
+   "y": 1081
   },
   {
-   "name": "dragon-jars",
-   "x": 697,
-   "y": 713
+   "name": "ice-house",
+   "x": 364,
+   "y": 1068
   },
   {
-   "name": "flowers-pink",
-   "x": 1150,
-   "y": 801
+   "name": "headman-house",
+   "x": 1276,
+   "y": 697
   },
   {
-   "name": "hibiscus-bush",
-   "x": 1142,
-   "y": 802
+   "name": "sala",
+   "x": 1371,
+   "y": 766
   },
   {
-   "name": "sugar-palm",
-   "x": 1408,
-   "y": 278
+   "name": "coffee-shop",
+   "x": 1033,
+   "y": 917
   },
   {
-   "name": "sugar-palm",
-   "x": 1600,
-   "y": 278
+   "name": "grocery-shop",
+   "x": 1228,
+   "y": 960
   },
   {
-   "name": "sugar-palm",
-   "x": 1408,
-   "y": 438
+   "name": "row-house",
+   "x": 1324,
+   "y": 966
   },
   {
-   "name": "sugar-palm",
-   "x": 1600,
-   "y": 438
+   "name": "noodle-shop",
+   "x": 1428,
+   "y": 934
   },
   {
-   "name": "sugar-palm",
-   "x": 1232,
-   "y": 480
+   "name": "community-hall",
+   "x": 1094,
+   "y": 684
   },
   {
-   "name": "ox-cart",
-   "x": 1177,
-   "y": 473
+   "name": "health-station",
+   "x": 1081,
+   "y": 467
   },
   {
-   "name": "water-wheel",
-   "x": 1561,
-   "y": 656
+   "name": "boat-workshop",
+   "x": 1260,
+   "y": 1075
   },
   {
-   "name": "rice-straw",
-   "x": 1344,
-   "y": 281
+   "name": "shrimp-drying-yard",
+   "x": 1414,
+   "y": 1075
   },
   {
-   "name": "rice-straw",
-   "x": 1520,
-   "y": 441
+   "name": "shrimp-paste-shed",
+   "x": 1568,
+   "y": 1062
   },
   {
-   "name": "rice-straw",
-   "x": 1696,
-   "y": 281
+   "name": "rice-granary",
+   "x": 1222,
+   "y": 288
   },
   {
-   "name": "rice-straw",
-   "x": 1296,
+   "name": "bamboo-hut",
+   "x": 1747,
+   "y": 600
+  },
+  {
+   "name": "field-hut",
+   "x": 1619,
    "y": 595
   },
   {
+   "name": "sea-stilt-house",
+   "x": 755,
+   "y": 1235
+  },
+  {
+   "name": "water-net-hut",
+   "x": 1280,
+   "y": 1241
+  },
+  {
+   "name": "banyan",
+   "x": 1228,
+   "y": 857
+  },
+  {
+   "name": "frangipani",
+   "x": 1337,
+   "y": 787
+  },
+  {
+   "name": "longtail-boat",
+   "x": 864,
+   "y": 1273
+  },
+  {
+   "name": "longtail-boat",
+   "x": 1043,
+   "y": 1235
+  },
+  {
+   "name": "rowboat-upturned",
+   "x": 697,
+   "y": 1145
+  },
+  {
+   "name": "coconut-palm",
+   "x": 153,
+   "y": 736
+  },
+  {
+   "name": "coconut-palm",
+   "x": 198,
+   "y": 896
+  },
+  {
+   "name": "coconut-palm",
+   "x": 576,
+   "y": 1011
+  },
+  {
+   "name": "coconut-palm",
+   "x": 806,
+   "y": 752
+  },
+  {
+   "name": "coconut-palm",
+   "x": 851,
+   "y": 390
+  },
+  {
+   "name": "coconut-palm",
+   "x": 1056,
+   "y": 1011
+  },
+  {
+   "name": "coconut-palm",
+   "x": 1523,
+   "y": 998
+  },
+  {
+   "name": "coconut-palm",
+   "x": 1728,
+   "y": 1017
+  },
+  {
+   "name": "coconut-palm",
+   "x": 1843,
+   "y": 1120
+  },
+  {
+   "name": "coconut-palm",
+   "x": 112,
+   "y": 1136
+  },
+  {
+   "name": "coconut-palm-leaning",
+   "x": 1424,
+   "y": 1145
+  },
+  {
+   "name": "coconut-palm-leaning",
+   "x": 441,
+   "y": 1158
+  },
+  {
+   "name": "sugar-palm",
+   "x": 1440,
+   "y": 278
+  },
+  {
+   "name": "sugar-palm",
+   "x": 1632,
+   "y": 278
+  },
+  {
+   "name": "sugar-palm",
+   "x": 1440,
+   "y": 438
+  },
+  {
+   "name": "sugar-palm",
+   "x": 1632,
+   "y": 438
+  },
+  {
    "name": "scarecrow",
-   "x": 1705,
+   "x": 1708,
    "y": 217
   },
   {
    "name": "scarecrow",
-   "x": 1510,
+   "x": 1516,
    "y": 374
   },
   {
-   "name": "lotus",
-   "x": 1286,
-   "y": 691
-  },
-  {
-   "name": "lotus",
-   "x": 1548,
-   "y": 697
-  },
-  {
-   "name": "lotus",
-   "x": 1331,
-   "y": 819
-  },
-  {
-   "name": "lotus",
-   "x": 1513,
-   "y": 812
-  },
-  {
-   "name": "lotus",
-   "x": 1414,
-   "y": 636
-  },
-  {
-   "name": "tall-grass",
-   "x": 1278,
-   "y": 761
-  },
-  {
-   "name": "tall-grass",
-   "x": 1272,
-   "y": 757
-  },
-  {
-   "name": "tall-grass",
-   "x": 1581,
-   "y": 764
-  },
-  {
-   "name": "tall-grass",
-   "x": 1574,
-   "y": 758
-  },
-  {
-   "name": "tall-grass",
-   "x": 1651,
-   "y": 820
-  },
-  {
-   "name": "dense-shrub",
-   "x": 1608,
-   "y": 756
-  },
-  {
-   "name": "tall-grass",
-   "x": 1627,
-   "y": 826
-  },
-  {
-   "name": "tall-grass",
-   "x": 1660,
-   "y": 830
-  },
-  {
-   "name": "dense-shrub",
-   "x": 1653,
-   "y": 798
-  },
-  {
-   "name": "tall-grass",
-   "x": 1699,
-   "y": 775
-  },
-  {
    "name": "flame-tree",
-   "x": 1744,
-   "y": 633
+   "x": 1766,
+   "y": 876
   },
   {
-   "name": "young-tree",
-   "x": 1619,
-   "y": 825
+   "name": "mango-tree",
+   "x": 812,
+   "y": 627
   },
   {
-   "name": "pier-plank",
-   "x": 403,
-   "y": 1107
+   "name": "mango-tree",
+   "x": 1107,
+   "y": 332
   },
   {
-   "name": "pier-plank",
-   "x": 403,
-   "y": 1147
+   "name": "jackfruit-tree",
+   "x": 377,
+   "y": 870
   },
   {
-   "name": "pier-plank",
-   "x": 403,
-   "y": 1187
+   "name": "bridge-main",
+   "x": 944,
+   "y": 1154
   },
   {
-   "name": "pier-plank",
-   "x": 403,
-   "y": 1227
+   "name": "bridge-foot",
+   "x": 918,
+   "y": 629
   },
   {
-   "name": "pier-plank",
-   "x": 403,
-   "y": 1267
-  },
-  {
-   "name": "pier-plank",
-   "x": 403,
-   "y": 1307
-  },
-  {
-   "name": "longtail-boat",
-   "x": 492,
-   "y": 1264
-  },
-  {
-   "name": "rowboat-upturned",
-   "x": 208,
-   "y": 1094
-  },
-  {
-   "name": "fish-rack",
-   "x": 569,
-   "y": 1020
-  },
-  {
-   "name": "fish-rack",
-   "x": 256,
-   "y": 969
-  },
-  {
-   "name": "net-rack",
-   "x": 147,
-   "y": 1030
-  },
-  {
-   "name": "net-pile",
-   "x": 320,
-   "y": 1075
-  },
-  {
-   "name": "fish-trap",
-   "x": 486,
-   "y": 1068
-  },
-  {
-   "name": "fish-trap",
-   "x": 512,
-   "y": 1084
-  },
-  {
-   "name": "buoys",
-   "x": 569,
-   "y": 1075
-  },
-  {
-   "name": "anchor",
-   "x": 310,
-   "y": 1008
-  },
-  {
-   "name": "rope-coil",
-   "x": 476,
-   "y": 1011
-  },
-  {
-   "name": "oars",
-   "x": 252,
-   "y": 1084
-  },
-  {
-   "name": "coconut-palm-leaning",
-   "x": 102,
-   "y": 1084
-  },
-  {
-   "name": "coconut-palm",
-   "x": 624,
-   "y": 1036
-  },
-  {
-   "name": "coconut-palm",
-   "x": 1216,
-   "y": 979
-  },
-  {
-   "name": "coconut-palm",
-   "x": 1408,
-   "y": 960
-  },
-  {
-   "name": "coconut-palm",
-   "x": 1536,
-   "y": 1001
-  },
-  {
-   "name": "coconut-palm",
-   "x": 1836,
-   "y": 1008
-  },
-  {
-   "name": "coconut-palm-leaning",
-   "x": 1664,
-   "y": 1081
-  },
-  {
-   "name": "coconut",
-   "x": 1238,
-   "y": 985
-  },
-  {
-   "name": "coconut",
-   "x": 1427,
-   "y": 966
-  },
-  {
-   "name": "driftwood",
-   "x": 1312,
-   "y": 1104
-  },
-  {
-   "name": "driftwood",
-   "x": 1744,
-   "y": 1132
-  },
-  {
-   "name": "shore-rocks",
-   "x": 1824,
-   "y": 1158
-  },
-  {
-   "name": "tide-pool",
-   "x": 1616,
-   "y": 1161
-  },
-  {
-   "name": "hammock",
-   "x": 1321,
-   "y": 972
-  },
-  {
-   "name": "seashell",
-   "x": 1441,
-   "y": 1089
-  },
-  {
-   "name": "starfish",
-   "x": 1513,
-   "y": 1099
-  },
-  {
-   "name": "seashell",
-   "x": 1505,
-   "y": 1089
-  },
-  {
-   "name": "starfish",
-   "x": 1519,
-   "y": 1105
-  },
-  {
-   "name": "seashell",
-   "x": 1463,
-   "y": 1106
-  },
-  {
-   "name": "seashell",
-   "x": 1459,
-   "y": 1124
-  },
-  {
-   "name": "beach-grass",
-   "x": 1267,
-   "y": 996
-  },
-  {
-   "name": "beach-grass",
-   "x": 1338,
-   "y": 1069
-  },
-  {
-   "name": "beach-grass",
-   "x": 1359,
-   "y": 977
-  },
-  {
-   "name": "beach-grass",
-   "x": 1263,
-   "y": 1058
-  },
-  {
-   "name": "beach-grass",
-   "x": 1716,
-   "y": 1019
-  },
-  {
-   "name": "beach-grass",
-   "x": 1736,
-   "y": 1055
-  },
-  {
-   "name": "beach-grass",
-   "x": 1791,
-   "y": 1033
+   "name": "pier",
+   "x": 944,
+   "y": 1260
   }
  ],
  "start": {
-  "x": 947.2,
-  "y": 217.6
+  "x": 944,
+  "y": 1246
  },
- "npcs": [
+ "entries": [
   {
-   "npc": "npc_monk",
-   "x": 1075.2,
-   "y": 668.8
+   "name": "north",
+   "x": 761,
+   "y": 198
   },
   {
-   "npc": "npc_headman",
-   "x": 908.8,
-   "y": 598.4
+   "name": "east",
+   "x": 1808,
+   "y": 700
+  },
+  {
+   "name": "west",
+   "x": 112,
+   "y": 838
   }
  ],
  "exits": [
   {
-   "to": "thung-na",
-   "label": "ทุ่งนาริมคลอง",
-   "x": 832,
+   "to": "todo-nakhon",
+   "entry": "south",
+   "label": "นครสุวรรณ (ยังไม่เปิด)",
+   "x": 640,
    "y": 0,
-   "w": 256,
+   "w": 192,
    "h": 32
   },
   {
-   "to": "todo-east",
-   "label": "(ยังไม่มีแมพ)",
+   "to": "thung-na",
+   "entry": "west",
+   "label": "ทุ่งนาริมคลอง",
    "x": 1888,
-   "y": 640,
+   "y": 608,
+   "w": 32,
+   "h": 192
+  },
+  {
+   "to": "todo-pa-phru",
+   "entry": "east",
+   "label": "ป่าพรุสวนยาง (ยังไม่เปิด)",
+   "x": 0,
+   "y": 768,
    "w": 32,
    "h": 160
+  }
+ ],
+ "npcs": [
+  {
+   "npc": "npc_monk",
+   "x": 1371,
+   "y": 788
+  },
+  {
+   "npc": "npc_headman",
+   "x": 1276,
+   "y": 719
   }
  ],
  "spawns": [
   {
    "monster": "rice-crab",
    "count": 10,
-   "x": 1248,
+   "x": 1280,
    "y": 128,
    "w": 352,
    "h": 448
-  },
-  {
-   "monster": "red-crab",
-   "count": 8,
-   "x": 1184,
-   "y": 992,
-   "w": 640,
-   "h": 160
-  },
-  {
-   "monster": "lotus-frog",
-   "count": 6,
-   "x": 1216,
-   "y": 608,
-   "w": 384,
-   "h": 256
   },
   {
    "monster": "scarecrow",
@@ -759,23 +472,39 @@
    "x": 1632,
    "y": 128,
    "w": 160,
-   "h": 448
+   "h": 320
+  },
+  {
+   "monster": "lotus-frog",
+   "count": 6,
+   "x": 1344,
+   "y": 576,
+   "w": 320,
+   "h": 192
   },
   {
    "monster": "grasshopper",
    "count": 5,
    "x": 1600,
-   "y": 640,
+   "y": 768,
    "w": 192,
-   "h": 224
+   "h": 192
+  },
+  {
+   "monster": "red-crab",
+   "count": 8,
+   "x": 1344,
+   "y": 1088,
+   "w": 480,
+   "h": 96
   },
   {
    "monster": "octopus",
    "count": 5,
    "x": 32,
-   "y": 1056,
-   "w": 640,
-   "h": 128
+   "y": 1120,
+   "w": 320,
+   "h": 64
   }
  ]
 }
