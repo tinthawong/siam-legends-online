@@ -27,6 +27,8 @@ interface View {
   moveMs: number;
   sprite: string | null; // มี = ภาพ 8 ทิศ (ผู้เล่น หรือมอนที่มีภาพ)
   look: Look | null;     // ผู้เล่น: เพศใช้เลือกทิศที่มีท่ายืน
+  dead: boolean;         // ผู้เล่นสลบ (นิ่ง ไม่ขยับ)
+  motion: { mode: "breath" | "step"; tween: Phaser.Tweens.Tween } | null; // ผู้เล่นที่ไม่มีภาพท่านั้น: ขยับด้วยโค้ด
   sheet: string | null;  // มี = มอนจาก sheet (ทิศเดียว มีท่า walk/attack/death)
   bob: Phaser.Tweens.Tween | null; // ท่ายืนของมอนจาก sheet (ขยับขึ้นลงด้วยโค้ด)
   topY: number;          // ขอบบนของตัว (ใช้วางแถบ HP / ตัวเลขดาเมจ)
@@ -510,7 +512,7 @@ export class GameScene extends Phaser.Scene {
 
     const v: View = {
       id: e.id, kind: e.kind, c, oc, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
-      sprite, look: e.look ?? null, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
+      sprite, look: e.look ?? null, dead: !!e.dead, motion: null, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
     if (e.dead) this.setDead(v, true);
@@ -577,6 +579,8 @@ export class GameScene extends Phaser.Scene {
   /** สลบ: ตัวเป็นสีเทาและโปร่งลง (ทุกคนเห็น) */
   private setDead(v: View, dead: boolean) {
     v.path = [];
+    v.dead = dead;
+    v.pose = ""; // ให้ updatePose ตั้งท่าใหม่ (สลบ = นิ่ง)
     if (dead) v.body.setTint(0x6b6b6b).setAlpha(0.7);
     else v.body.clearTint().setAlpha(1);
   }
@@ -715,15 +719,33 @@ export class GameScene extends Phaser.Scene {
     if (!v.sprite) return;
     const src = v.kind === "player" && !v.path.length && v.look ? animSource(idleDirs(v.look.gender), v.dir) : null;
     const idle = src && this.anims.exists(`${v.sprite}_idle_${src.dir}`) ? `${v.sprite}_idle_${src.dir}` : null;
-    const pose = idle ? `${idle}${src!.flip ? ":flip" : ""}` : `${v.sprite}_${v.dir}`;
+    // ไม่มีภาพท่าของทิศนี้: ภาพนิ่ง + ขยับด้วยโค้ด (ยืน = หายใจ, เดิน = เด้งตามก้าว, สลบ = นิ่ง)
+    const motion = v.kind !== "player" || v.dead ? null : v.path.length ? "step" : "breath";
+    const pose = idle ? `${idle}${src!.flip ? ":flip" : ""}` : `${v.sprite}_${v.dir}:${motion}`;
     if (pose === v.pose) return;
     v.pose = pose;
     if (idle) {
+      this.setMotion(v, null);
       v.body.setFlipX(src!.flip).setOrigin(0.5, (45 + IDLE_OFFSET) / 64).play(idle, true);
     } else {
       v.body.stop();
-      v.body.setFlipX(false).setTexture(pose).setOrigin(0.5, 45 / 48);
+      v.body.setFlipX(false).setTexture(`${v.sprite}_${v.dir}`).setOrigin(0.5, 45 / 48);
+      this.setMotion(v, motion);
     }
+  }
+
+  /** ท่าขยับด้วยโค้ดของผู้เล่นที่ยังไม่มีภาพท่านั้นจาก PixelLab (ยืดจากเท้า เพราะจุดยึดอยู่ที่เท้า) */
+  private setMotion(v: View, mode: "breath" | "step" | null) {
+    if ((v.motion?.mode ?? null) === mode) return;
+    v.motion?.tween.remove();
+    v.motion = null;
+    v.body.setScale(1);
+    v.body.y = 8; // ตำแหน่งเท้าผู้เล่น (addView)
+    if (!mode || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const tween = mode === "breath"
+      ? this.tweens.add({ targets: v.body, scaleY: 1.035, scaleX: 0.985, yoyo: true, repeat: -1, duration: 900 + Math.random() * 200, ease: "Sine.easeInOut" })
+      : this.tweens.add({ targets: v.body, y: 6, yoyo: true, repeat: -1, duration: v.moveMs / 2, ease: "Sine.easeOut" });
+    v.motion = { mode, tween };
   }
 
   private setTarget(id: string | null) {
