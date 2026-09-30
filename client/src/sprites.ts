@@ -30,10 +30,11 @@ export const IDLE_OFFSET = 8;
 export const idleFrameUrl = (gender: string, dir: string, i: number) => `sprites/base-${gender}/idle-${dir}/${i}.png`;
 
 // ท่าเดิน (walk): เฟรม 64×64 จาก PixelLab ตัวละครเลื่อน +3px จากภาพ base (เท้าบรรทัด 48 วางให้เท้าติดพื้น)
+// ไฟล์ที่ได้มาเป็นกรอบ 48×48 ให้เติมขอบเป็น 64×64 โดยวางเท้าที่บรรทัด 48
 // ได้ทิศใหม่มา: วางไฟล์ที่ sprites/base-<เพศ>/walk-<ทิศ>/0..5.png แล้วเพิ่มทิศในลิสต์ของเพศนั้น
 // ทิศที่ยังไม่มีท่าเดิน ใช้ภาพนิ่ง + เด้งตามก้าวด้วยโค้ด (GameScene.setMotion)
 export const WALK_DIRS: Record<string, readonly string[]> = {
-  male: ["south"],
+  male: ["south", "west"],
   female: [],
 };
 export const walkDirs = (gender: string) => WALK_DIRS[gender] ?? [];
