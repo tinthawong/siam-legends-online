@@ -1,0 +1,13 @@
+{
+ "frameWidth": 49,
+ "frameHeight": 48,
+ "frames": [
+  "0.png",
+  "1.png",
+  "2.png",
+  "3.png",
+  "4.png",
+  "5.png"
+ ],
+ "frameMs": 80
+}

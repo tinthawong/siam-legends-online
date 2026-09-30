@@ -67,7 +67,8 @@ export type ClientMsg =
   | { t: "quest_accept"; id: string }  // รับเควส (ต้องอยู่ใกล้ NPC)
   | { t: "quest_done"; id: string }    // ส่งเควส รับรางวัล (ต้องอยู่ใกล้ NPC ที่ส่ง)
   | { t: "equip"; item: string }       // ใส่อุปกรณ์จากกระเป๋า (ช่องว่างช่องแรกที่ใส่ได้ เต็มแล้วสลับกับช่องแรก)
-  | { t: "unequip"; slot: SlotKey };   // ถอดอุปกรณ์กลับเข้ากระเป๋า
+  | { t: "unequip"; slot: SlotKey }    // ถอดอุปกรณ์กลับเข้ากระเป๋า
+  | { t: "skill"; id: string; target: string }; // ใช้สกิล (shared/skills.ts) กับมอน: เดินเข้าระยะแล้วใช้ server ตรวจ SP/คูลดาวน์
 
 // server → client
 export type ServerMsg =
@@ -94,6 +95,7 @@ export type ServerMsg =
   | { t: "quest_reward"; id: string; exp: number; money: number; items: InvItem[] } // ส่งเควสสำเร็จ
   | { t: "exp_gain"; amount: number; exp: number; expNext: number; level: number } // ได้ EXP (ค่าหลังได้แล้ว) ส่งให้เจ้าตัว
   | { t: "level_up"; id: string; level: number }    // เลเวลขึ้น ส่งทุกคนในแมพ (เห็นแสงรอบตัว)
+  | { t: "skill_hit"; src: string; dst: string; skill: string; hits: { dmg: number; crit: boolean; miss: boolean }[]; hp: number } // ใช้สกิลโดน (ทุกคนเห็น)
   | { t: "kicked" };
 
 /** ข้อมูลตัวละครที่ Worker โหลดจาก D1 แล้วส่งต่อให้ MapRoom */

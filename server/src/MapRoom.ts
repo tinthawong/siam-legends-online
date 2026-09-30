@@ -12,6 +12,7 @@ import { MOBS, expToNext, MAX_LEVEL, STAT_KEYS, STAT_MAX, statCostN, statPointsF
 import { ITEMS } from "../../shared/items";
 import { NPCS, QUESTS, canAccept, isComplete, talkTo, type QuestLog } from "../../shared/quests";
 import { SLOTS, gearOf, slotsFor, type Equipped, type Gear } from "../../shared/equipment";
+import { SKILLS } from "../../shared/skills";
 import { CLOSE_KICKED } from "../../shared/protocol";
 import type { ClientMsg, ServerMsg, EntityState, PlayerStats, JoinCharacter, GroundItem, InvItem } from "../../shared/protocol";
 import type { Look } from "../../shared/appearance";
@@ -54,6 +55,8 @@ interface Player extends Ent {
   der: Derived;            // ค่าที่คำนวณจากค่าหลัก (คิดใหม่ทุกครั้งที่ค่าหลัก/เลเวลเปลี่ยน)
   potionAt: number;        // กินยาอัตโนมัติเมื่อเลือดต่ำกว่ากี่ % (0 = ปิด)
   nextPotionAt: number;
+  skill: string | null;               // สกิลที่รอใช้กับเป้าหมาย (ใช้เมื่อเข้าระยะ)
+  skillReady: Record<string, number>; // สกิล → เวลาที่ใช้ได้อีกครั้ง
   inv: Map<string, number>; // กระเป๋า: item → จำนวน
   quests: QuestLog;         // เควสที่รับอยู่ / ทำเสร็จแล้ว
   talk: string | null;      // NPC ที่กำลังเดินไปคุย
@@ -136,7 +139,7 @@ export class MapRoom extends DurableObject<Env> {
       target: null, auto: false, nextAttackAt: 0, chaseKey: null,
       nextHpRegenAt: 0, nextSpRegenAt: 0,
       pickup: null, dead: false, money: ch.money ?? 0, st: { ...ch.stats }, points: ch.points, der: der0, potionAt: 0, nextPotionAt: 0, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
-      quests: ch.quests ?? { active: {}, done: [] }, talk: null, equip: { ...(ch.equip ?? {}) }, gear,
+      quests: ch.quests ?? { active: {}, done: [] }, talk: null, equip: { ...(ch.equip ?? {}) }, gear, skill: null, skillReady: {},
     };
     this.players.set(id, p);
 
@@ -176,6 +179,7 @@ export class MapRoom extends DurableObject<Env> {
         p.chaseKey = null;
         p.pickup = null;
         p.talk = null;
+        p.skill = null;
         this.setPath(p, path, now);
         break;
       }
@@ -188,11 +192,23 @@ export class MapRoom extends DurableObject<Env> {
         p.pickup = g.id;
         p.chaseKey = null;
         p.talk = null;
+        p.skill = null;
+        break;
+      }
+      case "skill": {
+        const sk = SKILLS[String(msg.id)];
+        const m = this.mobs.get(String(msg.target));
+        if (!sk || !m || !m.alive || p.sp < sk.sp || now < (p.skillReady[sk.id] ?? 0)) return;
+        p.pickup = null;
+        p.talk = null;
+        p.skill = sk.id;
+        if (p.target !== m.id) { p.target = m.id; p.chaseKey = null; this.send(p, { t: "target", id: m.id }); }
         break;
       }
       case "attack": {
         const m = this.mobs.get(String(msg.target));
         if (!m || !m.alive) return;
+        p.skill = null;
         p.pickup = null;
         p.talk = null;
         p.target = m.id;
@@ -412,7 +428,7 @@ export class MapRoom extends DurableObject<Env> {
         this.send(p, { t: "target", id: t });
       }
     }
-    if (!p.target) return;
+    if (!p.target) { p.skill = null; return; }
 
     const m = this.aliveMob(p.target);
     if (!m) { p.target = null; this.send(p, { t: "target", id: null }); return; }
@@ -420,7 +436,7 @@ export class MapRoom extends DurableObject<Env> {
     // อยู่ในระยะ → หยุดเดินแล้วตีตาม ASPD
     if (cheb(p.x, p.y, m.x, m.y) <= PLAYER_RANGE) {
       if (p.path.length) this.setPath(p, [], now);
-      if (now >= p.nextAttackAt) this.attack(p, m, now);
+      if (now >= p.nextAttackAt) { if (p.skill) this.castSkill(p, m, now); else this.attack(p, m, now); }
       return;
     }
 
@@ -446,7 +462,32 @@ export class MapRoom extends DurableObject<Env> {
     m.hp = Math.max(0, m.hp - dmg);
     this.broadcast({ t: "hit", src: p.id, dst: m.id, dmg, crit, hp: m.hp, miss });
     if (m.hp === 0) { this.killMob(m, p, now); return; }
-    // มอนที่ตีกลับ: จำคนที่ตีมันคนแรก และจุดที่โดนตี แล้วเริ่มไล่ (ตีกลับหลังโดนตีครู่หนึ่ง ไม่ใช่ทันที)
+    this.provoke(m, p, now);
+  }
+
+  /** ใช้สกิล (ในระยะแล้ว): ตรวจ SP/คูลดาวน์อีกครั้ง, ตีหลายครั้ง ATK × power ต่อครั้ง (สูตรเดียวกับตีปกติ) */
+  private castSkill(p: Player, m: Mob, now: number) {
+    const sk = SKILLS[p.skill!];
+    p.skill = null;
+    if (!sk || p.sp < sk.sp || now < (p.skillReady[sk.id] ?? 0)) { this.attack(p, m, now); return; }
+    p.sp -= sk.sp;
+    p.skillReady[sk.id] = now + sk.cooldownMs;
+    p.nextAttackAt = now + p.der.aspdMs;
+    const def = MOBS[m.type];
+    const noMiss = (def.level ?? 0) - p.level < MISS_LEVEL_GAP;
+    const hits = Array.from({ length: sk.hits }, () => physicalAttack(
+      { atk: Math.max(1, Math.round(p.der.atk * sk.power)), hit: p.der.hit, crit: p.der.crit, noMiss },
+      { flee: def.flee ?? 0, defPct: def.defPct ?? 0, defBonus: def.defBonus ?? 0 },
+    ));
+    m.hp = Math.max(0, m.hp - hits.reduce((a, h) => a + h.dmg, 0));
+    this.broadcast({ t: "skill_hit", src: p.id, dst: m.id, skill: sk.id, hits, hp: m.hp });
+    this.send(p, { t: "stats", self: this.stats(p) });
+    if (m.hp === 0) { this.killMob(m, p, now); return; }
+    this.provoke(m, p, now);
+  }
+
+  /** มอนที่ตีกลับ: จำคนที่ตีมันคนแรก และจุดที่โดนตี แล้วเริ่มไล่ (ตีกลับหลังโดนตีครู่หนึ่ง ไม่ใช่ทันที) */
+  private provoke(m: Mob, p: Player, now: number) {
     if (MOBS[m.type].retaliate && !m.aggro) {
       m.aggro = p.id;
       m.aggroFrom = { x: m.x, y: m.y };

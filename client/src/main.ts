@@ -14,6 +14,7 @@ import { bindQuests } from "./quests";
 import { EQUIP, SLOTS } from "../../shared/equipment";
 import { bindWorldMap } from "./worldmap";
 import { createHud } from "./hud";
+import { SKILL_LIST } from "../../shared/skills";
 import { bindAttackButton, bindJoystick } from "./controls";
 
 interface Character { name: string; level: number; exp: number; look: Look }
@@ -139,6 +140,35 @@ function startGame(ch: Character, session: Session) {
   $("attack-btn").hidden = false;
   bindJoystick($("joystick"), (d) => scene.setJoystick(d));
   bindAttackButton($<HTMLButtonElement>("attack-btn"), () => scene.attackButton());
+  // ปุ่มสกิล + คีย์ 1 / 2: วงคูลดาวน์เริ่มเมื่อ server ตอบว่าใช้สกิลโดน, SP ไม่พอ = ปุ่มจาง
+  const skillUi = new Map<string, { btn: HTMLButtonElement; cd: HTMLElement; cdt: HTMLElement; until: number }>();
+  for (const sk of SKILL_LIST) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "skill-btn";
+    btn.title = `${sk.name} (${sk.key}) · SP ${sk.sp}`;
+    btn.innerHTML = `<img src="/sprites/fx/${sk.fx}/${sk.id === "flurry" ? 2 : 4}.png" alt="" draggable="false" /><span class="key">${sk.key}</span><span class="sp">SP ${sk.sp}</span><i class="cd"></i><b class="cdt"></b>`;
+    btn.addEventListener("pointerdown", (e) => { e.preventDefault(); scene.useSkill(sk.id); });
+    $("skill-bar").appendChild(btn);
+    skillUi.set(sk.id, { btn, cd: btn.querySelector(".cd")!, cdt: btn.querySelector(".cdt")!, until: 0 });
+  }
+  window.addEventListener("keydown", (e) => {
+    if ((e.target as HTMLElement).tagName === "INPUT" || e.altKey || e.ctrlKey) return;
+    const sk = SKILL_LIST.find((s) => s.key === e.key);
+    if (sk) scene.useSkill(sk.id);
+  });
+  scene.onSkillCast = (id) => {
+    const u = skillUi.get(id), sk = SKILL_LIST.find((s) => s.id === id);
+    if (!u || !sk) return;
+    u.until = performance.now() + sk.cooldownMs;
+    const tick = () => {
+      const left = u.until - performance.now();
+      u.cd.style.setProperty("--p", `${Math.max(0, (left / sk.cooldownMs) * 100)}%`);
+      u.cdt.textContent = left > 0 ? String(Math.ceil(left / 1000)) : "";
+      if (left > 0) requestAnimationFrame(tick);
+    };
+    tick();
+  };
   scene.onInventory = (items) => {
     invCount = new Map(items.map((i) => [i.item, i.count]));
     hud.inventory(items);
@@ -156,7 +186,10 @@ function startGame(ch: Character, session: Session) {
       $("quest-guide-sub").textContent = `แตะเพื่อไปรับของที่${g.npcName}`;
     }
   };
-  scene.onStats = (s) => { hud.stats(s); bars.stats(s); };
+  scene.onStats = (s) => {
+    hud.stats(s); bars.stats(s);
+    for (const sk of SKILL_LIST) skillUi.get(sk.id)?.btn.classList.toggle("nosp", s.sp < sk.sp);
+  };
   scene.onExpGain = bars.expGain;
   scene.onJoined = hud.joined;
   // สลบ: แสดงสาเหตุ กดกลับเมืองแล้ว server ฟื้นให้ที่จุดเกิด

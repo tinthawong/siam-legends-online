@@ -12,6 +12,7 @@ import { MOBS } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, QUESTS, emptyLog, isComplete, npcMark, type QuestLog } from "../../shared/quests";
+import { SKILLS } from "../../shared/skills";
 import { IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, WALK_FRAMES, WALK_FPS, WALK_OFFSET, WALK_SCALE, animSource, idleDirs, idleFrameUrl, walkDirs, walkFrameUrl } from "./sprites";
 
 interface View {
@@ -71,6 +72,7 @@ const STEPS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, 
 const JOY_AHEAD = 4;     // จอยสติ๊ก: สั่งเดินไปช่องข้างหน้ากี่ช่อง
 const JOY_RESEND_MS = 150;
 const PUNCH_WINDUP_MS = 80;
+const FX_NAMES = ["punch", "kick", "flurry", "golden-fist"];
 // มินิแมพ: ภาพพื้นแมพย่อเก็บไว้ที่สัดส่วนนี้ แสดงพื้นที่กว้าง MINI_VIEW px (โลก) รอบตัวเรา วาดใหม่ทุก 100 ms
 const MINI_SCALE = 0.25;
 const MINI_VIEW = 560; // ต่อย: ง้างก่อนกี่ ms แล้วค่อยแสดงผลที่เป้า (ตัวเลข/ประกาย)
@@ -124,6 +126,9 @@ export class GameScene extends Phaser.Scene {
   private level = 1;
   private invCount = new Map<string, number>();
   private myWeapon = false; // เราถืออาวุธอยู่ไหม (มือเปล่า = ต่อย)
+  private strikeSide = new Map<string, boolean>(); // ตีปกติสลับ ต่อย/เตะ ต่อผู้เล่น
+  /** เราใช้สกิลโดน → main.ts เริ่มนับคูลดาวน์ที่ปุ่ม */
+  onSkillCast: ((id: string) => void) | null = null;
 
   constructor(private net: Net) {
     super("game");
@@ -150,6 +155,14 @@ export class GameScene extends Phaser.Scene {
     for (const kind of kinds) if (PROP_SET_OF[kind]) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
+    // เอฟเฟกต์การโจมตี/สกิล (tools/slice_fx.py): sprites/fx/<ชื่อ>/sheet.json + เฟรม
+    for (const name of FX_NAMES) {
+      const key = `fxsheet_${name}`;
+      this.load.once(`filecomplete-json-${key}`, (_k: string, _t: string, data: { frames: string[] }) => {
+        data.frames.forEach((f, i) => this.load.image(`fx_${name}_${i}`, `sprites/fx/${name}/${f}`));
+      });
+      this.load.json(key, `sprites/fx/${name}/sheet.json`);
+    }
     // NPC: client/public/sprites/<sprite>/sheet.json (ท่ายืน) ยังไม่มีภาพ = โหลดไม่เจอ ใช้ภาพชั่วคราว (drawNpcs)
     for (const n of Object.values(NPCS)) {
       const dir = `sprites/${n.sprite}`, key = `npcsheet_${n.id}`;
@@ -201,6 +214,10 @@ export class GameScene extends Phaser.Scene {
   create() {
     this.makeTextures();
     this.makeSheetAnims();
+    for (const name of FX_NAMES) {
+      const d = this.cache.json.get(`fxsheet_${name}`) as { frames: string[]; frameMs: number } | undefined;
+      if (d) this.anims.create({ key: `fx_${name}`, frames: d.frames.map((_, i) => ({ key: `fx_${name}_${i}` })), frameRate: 1000 / d.frameMs, repeat: 0 });
+    }
     this.drawMap();
     this.drawNpcs();
 
@@ -301,10 +318,25 @@ export class GameScene extends Phaser.Scene {
 
   /** ปุ่มโจมตี: ตีเป้าหมายที่เลือกอยู่ ถ้าไม่มี เลือกมอนที่ใกล้ที่สุดในระยะ (รัศมีเดียวกับ auto) */
   attackButton() {
+    const id = this.pickTarget();
+    if (!id) return;
+    this.net.send({ t: "attack", target: id });
+    this.setTarget(id);
+  }
+
+  /** ใช้สกิล: เป้าหมายที่เลือกอยู่ หรือมอนใกล้สุดในระยะ (server เดินเข้าระยะแล้วใช้ ตรวจ SP/คูลดาวน์เอง) */
+  useSkill(skill: string) {
+    const id = this.pickTarget();
+    if (!id) return;
+    this.net.send({ t: "skill", id: skill, target: id });
+    this.setTarget(id);
+  }
+
+  private pickTarget(): string | null {
     let id = this.targetId && this.views.has(this.targetId) ? this.targetId : null;
     if (!id) {
       const me = this.me ? this.views.get(this.me) : undefined;
-      if (!me) return;
+      if (!me) return null;
       const cx = Math.floor(me.c.x / TILE), cy = Math.floor(me.c.y / TILE);
       let best = Infinity;
       for (const v of this.views.values()) {
@@ -313,9 +345,7 @@ export class GameScene extends Phaser.Scene {
         if (d <= AUTO_RADIUS && d < best) { best = d; id = v.id; }
       }
     }
-    if (!id) return;
-    this.net.send({ t: "attack", target: id });
-    this.setTarget(id);
+    return id;
   }
 
   // ---------- ข้อความจาก server ----------
@@ -469,6 +499,9 @@ export class GameScene extends Phaser.Scene {
         this.onExpGain?.(m);
         break;
       }
+      case "skill_hit":
+        this.skillFx(m);
+        break;
       case "level_up": {
         const v = this.views.get(m.id);
         if (v) this.levelUpFx(v);
@@ -684,17 +717,15 @@ export class GameScene extends Phaser.Scene {
     return v?.kind === "player" && !(id === this.me && this.myWeapon);
   }
 
-  /** ต่อย (โค้ดล้วน ยังไม่มีภาพท่าตี): ง้าง = ถอยหลัง+เอนไปข้างหลัง → ต่อย = พุ่งไปข้างหน้า มีหมัดพุ่งออกไปหาเป้า + เส้นความเร็ว
-   *  แขนอยู่ในภาพตัวละครภาพเดียว ขยับแยกไม่ได้ จึงใช้หมัดที่วาดด้วยโค้ดแทน */
+  /** ตีมือเปล่า: ต่อยสลับเตะ (ภาพ sprites/fx/punch, kick) ง้างถอยหลังแล้วพุ่ง ภาพหมัด/เท้าพุ่งไปหาเป้า */
   private punchFx(src: View, dst: View, crit: boolean) {
+    const kick = (this.strikeSide.get(src.id) ?? false);
+    this.strikeSide.set(src.id, !kick);
     const dx = dst.c.x - src.c.x, dy = dst.c.y - src.c.y;
     const len = Math.hypot(dx, dy) || 1;
     const ux = dx / len, uy = dy / len;
-    const depth = Math.max(src.c.y, dst.c.y) + 2;
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     const lean = ux >= 0 ? 1 : -1;
-
-    // ง้าง แล้วต่อย (ขยับแค่ภาพตัว ตำแหน่งจริงบน server ไม่เปลี่ยน)
     if (!calm) {
       const bx = src.body.x, by = src.body.y;
       const push = crit ? 8 : 6;
@@ -708,39 +739,53 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => { src.body.setPosition(bx, by).setAngle(0); },
       });
     }
+    // หมัดสูงระดับอก เตะต่ำกว่า เริ่มพุ่งตอนง้างเสร็จ
+    this.time.delayedCall(PUNCH_WINDUP_MS - 20, () => this.playFx(kick ? "kick" : "punch", src, dst, {
+      from: 10, to: 24, height: kick ? -8 : -17, scale: crit ? 1.35 : 1 }));
+  }
 
-    // หมัด: วงกลมสีผิวขอบเข้ม พุ่งจากหน้าอกไปหาเป้าตอนต่อย แล้วจางหาย
-    const sx = src.c.x + ux * 6, sy = src.c.y - src.lift - 17 + uy * 4;
-    const ex = src.c.x + ux * 24, ey = src.c.y - src.lift - 15 + uy * 14;
-    const r = crit ? 8 : 6;
-    const fist = this.add.graphics({ x: sx, y: sy }).setDepth(depth).setAlpha(0);
-    // หมัด: เงาเรือง + ขอบเข้ม + สีผิว + ข้อนิ้ว + ไฮไลต์
-    fist.fillStyle(crit ? 0xffd84a : 0xffffff, 0.35).fillCircle(0, 0, r + 4)
-      .fillStyle(0x5a2e1e).fillCircle(0, 0, r + 1.5)
-      .fillStyle(crit ? 0xffd9a0 : 0xf0b089).fillCircle(0, 0, r)
-      .lineStyle(1, 0x8a4a30, 0.9).lineBetween(-r * 0.5, -r * 0.2, -r * 0.5, r * 0.5).lineBetween(0, -r * 0.3, 0, r * 0.5).lineBetween(r * 0.5, -r * 0.2, r * 0.5, r * 0.5)
-      .fillStyle(0xffffff, 0.7).fillCircle(-r * 0.35, -r * 0.45, r * 0.25);
-    this.tweens.chain({
-      targets: fist,
-      tweens: [
-        { alpha: 1, duration: 1, delay: PUNCH_WINDUP_MS - 10 },
-        { x: ex, y: ey, duration: 55, ease: "Quad.easeIn" },
-        { alpha: 0, scale: 1.6, duration: 130 },
-      ],
-      onComplete: () => fist.destroy(),
-    });
+  /** เล่นเอฟเฟกต์จาก sprites/fx/<name> พุ่งจากตัว src ไปทาง dst (ภาพต้นฉบับหันขวา หมุนตามทิศ ทางซ้ายกลับหัวให้ตั้งตรง) */
+  private playFx(name: string, src: View, dst: View, o: { from: number; to: number; height: number; scale: number }) {
+    if (!this.anims.exists(`fx_${name}`)) return;
+    const dx = dst.c.x - src.c.x, dy = dst.c.y - src.c.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const a = Math.atan2(dy, dx);
+    const y0 = src.c.y - src.lift + o.height;
+    const fx = this.add.sprite(src.c.x + ux * o.from, y0 + uy * o.from * 0.7, `fx_${name}_0`)
+      .setOrigin(0.92, 0.5).setRotation(a)  /* จุดยึด = ปลายหมัด/เท้า */.setFlipY(Math.abs(a) > Math.PI / 2).setScale(o.scale)
+      .setDepth(Math.max(src.c.y, dst.c.y) + 3);
+    fx.play(`fx_${name}`);
+    const dur = this.anims.get(`fx_${name}`).duration;
+    this.tweens.add({ targets: fx, x: src.c.x + ux * o.to, y: y0 + uy * o.to * 0.7, duration: dur * 0.6, ease: "Quad.easeOut" });
+    fx.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () =>
+      this.tweens.add({ targets: fx, alpha: 0, duration: 80, onComplete: () => fx.destroy() }));
+  }
 
-    // เส้นความเร็วด้านหลังหมัด
-    this.time.delayedCall(PUNCH_WINDUP_MS + 20, () => {
-      const nx = -uy, ny = ux; // ตั้งฉากกับทิศต่อย
-      for (const off of crit ? [-8, -4, 0, 4, 8] : [-6, -2, 2, 6]) {
-        const g = this.add.graphics().setDepth(depth).setBlendMode(Phaser.BlendModes.ADD);
-        const ax = ex - ux * 9 + nx * off, ay = ey - uy * 7 + ny * off;
-        const l = 14 + Math.random() * 6;
-        g.lineStyle(2.5, crit ? 0xffd84a : 0xffffff, 0.95).lineBetween(ax, ay, ax - ux * l, ay - uy * l * 0.8);
-        this.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() });
-      }
-    });
+  /** สกิลโดน: ชื่อสกิลเหนือหัว + เอฟเฟกต์สกิล แล้วตัวเลข/ประกายของแต่ละครั้งทยอยขึ้น */
+  private skillFx(m: Extract<ServerMsg, { t: "skill_hit" }>) {
+    const src = this.views.get(m.src), dst = this.views.get(m.dst);
+    const sk = SKILLS[m.skill];
+    if (!sk) return;
+    if (src && dst) {
+      this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
+      this.floatText(src.c.x, src.c.y - src.lift + src.topY - 16, `${sk.name}!`, "#ffd84a", 900);
+      if (m.skill === "flurry") this.playFx(sk.fx, src, dst, { from: 12, to: 26, height: -16, scale: 1 });
+      else this.playFx(sk.fx, src, dst, { from: 10, to: 28, height: -16, scale: 1.1 });
+      if (m.src === this.me) this.onSkillCast?.(m.skill);
+    }
+    if (!dst) return;
+    const gap = m.skill === "flurry" ? 90 : 0;
+    const start = m.skill === "flurry" ? 60 : 240; // หมัดทองชนเป้าตอนท้ายภาพ
+    m.hits.forEach((h, i) => this.time.delayedCall(start + i * gap, () => {
+      if (!dst.body.active) return;
+      if (h.miss) { this.floatText(dst.c.x, dst.c.y - dst.lift + dst.topY - 9, "พลาด", "#bfc7d5", 700); return; }
+      this.floatDamage(dst, h.dmg, h.crit || m.skill === "golden_fist");
+      this.hitFx(dst, src, h.crit || m.skill === "golden_fist");
+      dst.body.setTintFill(0xffffff);
+      this.time.delayedCall(70, () => dst.body.clearTint());
+    }));
+    this.time.delayedCall(start + (m.hits.length - 1) * gap, () => { dst.hp = m.hp; this.drawHp(dst); });
   }
 
   /** ท่าตีของผู้เล่น (โค้ดล้วน ยังไม่มีภาพท่าตี): พุ่งเข้าหาเป้านิดหนึ่งแล้วดีดกลับ + รอยฟันโค้งกวาดไปทางเป้า

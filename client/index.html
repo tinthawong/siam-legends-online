@@ -277,6 +277,18 @@
     .bar-text { font-size: 12px; color: var(--ink-dim); margin-top: 3px; }
     .bar.hp i { background: #e0525a; }
 
+    #skill-bar { position: fixed; right: calc(min(22vmin, 170px) + 22px + env(safe-area-inset-right)); bottom: calc(var(--xh) + 12px + env(safe-area-inset-bottom));
+      display: flex; gap: 8px; z-index: 3; }
+    .skill-btn { position: relative; width: 56px; height: 56px; padding: 0; border-radius: 50%; border: 2px solid var(--gold);
+      background: radial-gradient(circle at 40% 35%, #4a2208, #1c0c04); box-shadow: 0 0 0 2px #3a1a05, 0 3px 8px rgba(0, 0, 0, 0.5);
+      overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; }
+    .skill-btn img { width: 88%; height: 88%; object-fit: contain; pointer-events: none; }
+    .skill-btn .key { position: absolute; left: 4px; top: 1px; font-size: 11px; font-weight: 700; color: #fff; text-shadow: 0 0 2px #000; }
+    .skill-btn .sp { position: absolute; right: 0; left: 0; bottom: 1px; font-size: 9px; color: #9fd0ff; text-shadow: 0 0 2px #000; }
+    .skill-btn .cd { position: absolute; inset: 0; background: conic-gradient(rgba(0, 0, 0, 0.7) var(--p, 0%), transparent 0); pointer-events: none; }
+    .skill-btn .cdt { position: absolute; inset: 0; display: grid; place-items: center; font-size: 16px; font-weight: 700; color: #fff; text-shadow: 0 0 3px #000; pointer-events: none; }
+    .skill-btn.nosp img { filter: grayscale(0.8) brightness(0.6); }
+    .skill-btn:active { transform: scale(0.92); }
     /* AUTO อยู่เหนือปุ่มโจมตี */
     #auto-btn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(min(22vmin, 170px) + var(--xh) + 22px + env(safe-area-inset-bottom));
       width: 60px; height: 60px; border-radius: 50%; border: 3px solid var(--window-edge);
@@ -731,6 +743,8 @@
       <img class="joy-knob" src="/ui/joystick-knob.webp" alt="" draggable="false" />
     </div>
     <button type="button" id="attack-btn" hidden aria-label="โจมตี"><img src="/ui/attack-button.webp" alt="" draggable="false" /></button>
+    <!-- สกิล (shared/skills.ts) ปุ่ม 1 / 2 รอบปุ่มโจมตี: ไอคอน = เฟรมเอฟเฟกต์, วงคูลดาวน์, SP ไม่พอ = จาง -->
+    <div id="skill-bar"></div>
     <!-- ปุ่มเมนู 6 ปุ่ม (docs/hud-status.md): กดปุ่มเปิด/ปิดหน้าต่างของปุ่มนั้น เปิดได้ทีละหน้า -->
     <nav id="menu" aria-label="เมนู">
       <button type="button" data-panel="bag" aria-expanded="false" aria-label="กระเป๋า (Alt+E)" title="กระเป๋า (Alt+E)"><img src="/ui/hud/btn-inventory.webp" alt="" draggable="false" /></button>
