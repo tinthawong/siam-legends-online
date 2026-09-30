@@ -1,0 +1,27 @@
+{
+ "frameWidth": 282,
+ "frameHeight": 101,
+ "frames": [
+  "0.png",
+  "1.png",
+  "2.png",
+  "3.png",
+  "4.png",
+  "5.png"
+ ],
+ "frameMs": 50,
+ "durations": [
+  50,
+  50,
+  50,
+  110,
+  70,
+  70
+ ],
+ "anchor": {
+  "x": 0.6882453151618398,
+  "y": 0.49523809523809526
+ },
+ "scale": 0.5,
+ "hitFrame": 3
+}

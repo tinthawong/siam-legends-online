@@ -72,7 +72,9 @@ const STEPS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, 
 const JOY_AHEAD = 4;     // จอยสติ๊ก: สั่งเดินไปช่องข้างหน้ากี่ช่อง
 const JOY_RESEND_MS = 150;
 const PUNCH_WINDUP_MS = 80;
-const FX_NAMES = ["punch", "kick", "flurry", "golden-fist"];
+const FX_NAMES = ["punch", "kick", "flurry", "golden-fist", "punch-sheet"];
+// หมัดตีปกติ (art/fx/punch-sheet.png): หมัดโดนที่เฟรม 4 = 50+50+50 ms หลังเริ่ม
+const PUNCH_HIT_MS = 150;
 // มินิแมพ: ภาพพื้นแมพย่อเก็บไว้ที่สัดส่วนนี้ แสดงพื้นที่กว้าง MINI_VIEW px (โลก) รอบตัวเรา วาดใหม่ทุก 100 ms
 const MINI_SCALE = 0.25;
 const MINI_VIEW = 560; // ต่อย: ง้างก่อนกี่ ms แล้วค่อยแสดงผลที่เป้า (ตัวเลข/ประกาย)
@@ -215,8 +217,12 @@ export class GameScene extends Phaser.Scene {
     this.makeTextures();
     this.makeSheetAnims();
     for (const name of FX_NAMES) {
-      const d = this.cache.json.get(`fxsheet_${name}`) as { frames: string[]; frameMs: number } | undefined;
-      if (d) this.anims.create({ key: `fx_${name}`, frames: d.frames.map((_, i) => ({ key: `fx_${name}_${i}` })), frameRate: 1000 / d.frameMs, repeat: 0 });
+      const d = this.cache.json.get(`fxsheet_${name}`) as { frames: string[]; frameMs: number; durations?: number[] } | undefined;
+      if (!d) continue;
+      // เวลาต่อเฟรมไม่เท่ากัน (durations): Phaser บวก duration เพิ่มจาก msPerFrame จึงตั้ง frameRate 1000 (1 ms) แล้วใส่ที่เหลือ
+      if (d.durations) this.anims.create({ key: `fx_${name}`, frameRate: 1000, repeat: 0,
+        frames: d.frames.map((_, i) => ({ key: `fx_${name}_${i}`, duration: d.durations![i] - 1 })) });
+      else this.anims.create({ key: `fx_${name}`, frames: d.frames.map((_, i) => ({ key: `fx_${name}_${i}` })), frameRate: 1000 / d.frameMs, repeat: 0 });
     }
     this.drawMap();
     this.drawNpcs();
@@ -435,7 +441,8 @@ export class GameScene extends Phaser.Scene {
             dst.body.setTintFill(0xffffff);
             this.time.delayedCall(70, () => dst.body.clearTint());
           };
-          if (this.isPunch(m.src)) this.time.delayedCall(PUNCH_WINDUP_MS, impact);
+          // มือเปล่า: ต่อย = โดนตอนภาพหมัดเข้าเฟรม 4, เตะ = หลังง้าง
+          if (this.isPunch(m.src)) this.time.delayedCall(this.strikeSide.get(m.src) ? PUNCH_WINDUP_MS : PUNCH_HIT_MS, impact);
           else impact();
           // มอนจาก sheet ที่มีท่าโดนตี: เล่นพร้อมกะพริบขาว แต่ไม่ขัดท่า attack ที่กำลังเล่นอยู่
           if (dst.sheet && dst.pose !== "attack" && this.anims.exists(`${dst.sheet}_hit`)) {
@@ -747,9 +754,29 @@ export class GameScene extends Phaser.Scene {
         onComplete: () => { src.body.setPosition(bx, by).setAngle(0); },
       });
     }
-    // หมัดสูงระดับอก เตะต่ำกว่า เริ่มพุ่งตอนง้างเสร็จ
-    this.time.delayedCall(PUNCH_WINDUP_MS - 20, () => this.playFx(kick ? "kick" : "punch", src, dst, {
-      from: 10, to: 24, height: kick ? -8 : -17, scale: crit ? 1.35 : 1 }));
+    // ต่อย: ภาพหมัดชุดใหม่ วางจุดโดนที่ขอบตัวมอน เริ่มพร้อมง้าง (โดนที่เฟรม 4) · เตะ: พุ่งจากตัวหลังง้าง
+    if (!kick) this.punchSheetFx(src, dst, crit);
+    else this.time.delayedCall(PUNCH_WINDUP_MS - 20, () => this.playFx("kick", src, dst, {
+      from: 10, to: 24, height: -8, scale: crit ? 1.35 : 1 }));
+  }
+
+  /** หมัดตีปกติ (art/fx/punch-sheet.png): จุดยึด = จุดที่หมัดโดน วางที่ขอบตัวมอนฝั่งที่ผู้เล่นยืน หมุนตามมุมผู้เล่น→มอน */
+  private punchSheetFx(src: View, dst: View, crit: boolean) {
+    if (!this.anims.exists("fx_punch-sheet")) return;
+    const meta = this.cache.json.get("fxsheet_punch-sheet") as { anchor: { x: number; y: number }; scale: number };
+    const dx = dst.c.x - src.c.x, dy = dst.c.y - src.c.y;
+    const len = Math.hypot(dx, dy) || 1;
+    const ux = dx / len, uy = dy / len;
+    const a = Math.atan2(dy, dx);
+    const R = 11; // ครึ่งความกว้างตัวมอน (ขอบตัวฝั่งที่ผู้เล่นยืน)
+    const x = dst.c.x - ux * R, y = dst.c.y - dst.lift + dst.topY * 0.45 - uy * R * 0.6;
+    const left = Math.abs(a) > Math.PI / 2;
+    const fx = this.add.sprite(x, y, "fx_punch-sheet_0")
+      .setOrigin(meta.anchor.x, left ? 1 - meta.anchor.y : meta.anchor.y)  // กลับหัว (ทางซ้าย) = จุดยึดแนวตั้งกลับด้าน
+      .setRotation(a).setFlipY(left).setScale(meta.scale * (crit ? 1.2 : 1))
+      .setDepth(Math.max(src.c.y, dst.c.y) + 3);
+    fx.play("fx_punch-sheet");
+    fx.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => fx.destroy());
   }
 
   /** เล่นเอฟเฟกต์จาก sprites/fx/<name> พุ่งจากตัว src ไปทาง dst (ภาพต้นฉบับหันขวา หมุนตามทิศ ทางซ้ายกลับหัวให้ตั้งตรง)
