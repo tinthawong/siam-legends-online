@@ -4,7 +4,8 @@
     python tools/build_map.py maps/ban-pak-ao.tmj
 
 - Tiled ช่องละ 64 px → ตารางเดิน 32 px (1 ช่อง Tiled = 2×2 ช่องเดิน)
-- เลเยอร์: ground (พื้น), block (ช่องเดินไม่ได้เพิ่ม), props, spawns, npcs, start, exits
+- เลเยอร์: ground… (พื้น หลายเลเยอร์ได้ เช่น ground-1-deep, ground-2-shallow, ground-3-beach, ground-4-land
+  เลเยอร์บนทับล่าง ช่องว่างใช้ของเลเยอร์ล่าง ชนิดพื้นดู property terrain ของ tile บนสุด), block, props, spawns, npcs, start, exits
 - props: จุดยึด = กึ่งกลางขอบล่าง (tileset props.tsx ตั้ง objectalignment="bottom") พลิกซ้าย-ขวาได้
   property ของแต่ละชิ้นใน props.tsx: solid (ขวางทาง), deck (พื้นไม้เดินได้บนน้ำ), arch (สะพานโค้ง)
 - เจอปัญหา: แจ้งเป็นภาษาไทยแล้วหยุด (ไม่เขียนไฟล์)
@@ -24,20 +25,26 @@ class MapError(Exception):
     pass
 
 
+def read_props(el):
+    out = {}
+    for p in el.findall("properties/property") if el is not None else []:
+        v, typ = p.get("value"), p.get("type", "string")
+        out[p.get("name")] = (v == "true") if typ == "bool" else int(v) if typ == "int" else v
+    return out
+
+
 def load_tileset(tmj_dir: Path, ref):
-    """คืน [(firstgid, {local_id: {properties}})] อ่านจาก .tsx ภายนอก"""
+    """คืน (firstgid, ชื่อ, {local_id: properties}, properties ระดับ tileset) อ่านจาก .tsx ภายนอก
+    property ระดับ tileset (เช่น terrain = water ของชุดชายฝั่ง) ใช้กับทุก tile ที่ไม่ได้ตั้งเอง"""
     path = (tmj_dir / ref["source"]).resolve()
     root = ET.parse(path).getroot()
     tiles = {}
     for t in root.findall("tile"):
-        props = {}
-        for p in t.findall("properties/property"):
-            v, typ = p.get("value"), p.get("type", "string")
-            props[p.get("name")] = (v == "true") if typ == "bool" else int(v) if typ == "int" else v
+        props = read_props(t)
         img = t.find("image")
         props["_image"] = img.get("source") if img is not None else ""
         tiles[int(t.get("id"))] = props
-    return ref["firstgid"], root.get("name"), tiles
+    return ref["firstgid"], root.get("name"), tiles, read_props(root)
 
 
 def build(tmj_path: Path) -> dict:
@@ -51,24 +58,40 @@ def build(tmj_path: Path) -> dict:
 
     def tile_of(gid):
         gid &= ~(FLIP_H | FLIP_V | FLIP_D)
-        for first, name, tiles in reversed(tilesets):
+        for first, name, tiles, defaults in reversed(tilesets):
             if gid >= first:
-                return name, tiles.get(gid - first, {})
+                return name, {**defaults, **tiles.get(gid - first, {})}
         return None, {}
 
-    layers = {l["name"]: l for l in tmj["layers"]}
-    for req in REQUIRED:
+    # เลเยอร์ในกลุ่ม (Group) นับด้วย ลำดับตาม Tiled: ตัวแรกอยู่ล่างสุด
+    def flat(ls):
+        for l in ls:
+            if l.get("type") == "group":
+                yield from flat(l.get("layers", []))
+            else:
+                yield l
+    all_layers = list(flat(tmj["layers"]))
+    layers = {l["name"]: l for l in all_layers}
+    grounds = [l for l in all_layers if l["name"].startswith("ground") and l.get("type") == "tilelayer"]
+    if not grounds:
+        raise MapError("ไม่มีเลเยอร์พื้น (Tile layer ที่ชื่อขึ้นต้นด้วย ground เช่น ground, ground-1-deep)")
+    for req in REQUIRED[1:]:
         if req not in layers:
-            raise MapError(f"ไม่มีเลเยอร์ '{req}' (ต้องมี: {', '.join(REQUIRED)})")
+            raise MapError(f"ไม่มีเลเยอร์ '{req}' (ต้องมี: เลเยอร์พื้น ground…, {', '.join(REQUIRED[1:])})")
 
-    # ---- พื้น: 64 → ตาราง 32 (2×2) ----
+    # ---- พื้น: หลายเลเยอร์ ground… เลเยอร์บนทับล่าง ช่องว่างในเลเยอร์บนใช้ของเลเยอร์ล่าง
+    #      ชนิดพื้น (เดินได้หรือไม่) = property terrain ของ tile บนสุด แล้วแปลง 64 → ตาราง 32 (2×2) ----
     terrain = [[""] * (W * 2) for _ in range(H * 2)]
-    for i, gid in enumerate(layers["ground"]["data"]):
+    for i in range(W * H):
         x, y = i % W, i // W
-        ts, props = tile_of(gid) if gid else (None, {})
+        top = next(((l["name"], l["data"][i]) for l in reversed(grounds) if l["data"][i]), None)
+        if not top:
+            raise MapError(f"ช่องพื้นว่างที่ช่อง ({x}, {y}) ของ Tiled — ทุกช่องต้องมีพื้นอย่างน้อยหนึ่งเลเยอร์ ground…")
+        ts, props = tile_of(top[1])
         name = props.get("terrain")
-        if not gid or name not in LETTER:
-            raise MapError(f"ช่องพื้นว่างหรือไม่ใช่ลายพื้นที่ช่อง ({x}, {y}) ของ Tiled — ทุกช่องในเลเยอร์ ground ต้องระบาย")
+        if name not in LETTER:
+            raise MapError(f"ช่อง ({x}, {y}) ในเลเยอร์ {top[0]}: tile จาก tileset '{ts}' ไม่มี property terrain "
+                           f"(ต้องเป็น {', '.join(LETTER)}) — ตั้งที่ tile หรือที่ tileset ทั้งชุด")
         for dy in (0, 1):
             for dx in (0, 1):
                 terrain[y * 2 + dy][x * 2 + dx] = LETTER[name]

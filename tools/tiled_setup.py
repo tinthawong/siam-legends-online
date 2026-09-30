@@ -69,6 +69,29 @@ def write_block():
         ' <tile id="0">\n  <image width="64" height="64" source="block.png"/>\n </tile>\n</tileset>\n', encoding="utf-8")
 
 
+def write_shore():
+    """shore.tsx: tile ชายฝั่งจาก shore-tiles-64.png (หาใน maps/tilesets, art/tiles, Downloads) ทุก tile terrain = water
+    (เดินไม่ได้ ผู้เล่นหยุดที่ทราย) ตั้งทั้งระดับ tileset และทีละ tile — ไม่มีไฟล์ = ข้าม"""
+    cands = [TS / "shore-tiles-64.png", ROOT / "art/tiles/shore-tiles-64.png", Path.home() / "Downloads/shore-tiles-64.png"]
+    src = next((c for c in cands if c.exists()), None)
+    if not src:
+        print("ไม่พบ shore-tiles-64.png (ข้าม shore.tsx) วางไฟล์ไว้ที่ art/tiles/ แล้วรันใหม่")
+        return
+    if src != TS / "shore-tiles-64.png":
+        shutil.copy(src, TS / "shore-tiles-64.png")
+    im = Image.open(src)
+    cols, rows = im.width // TILE, im.height // TILE
+    water = xml_props({"terrain": "water"})
+    NL = "\n"
+    tiles = "".join(f' <tile id="{i}">{NL}{water} </tile>{NL}' for i in range(cols * rows))
+    (TS / "shore.tsx").write_text(
+        f'<?xml version="1.0" encoding="UTF-8"?>{NL}<tileset version="1.10" tiledversion="1.12.2" name="shore" tilewidth="64" tileheight="64" '
+        f'tilecount="{cols * rows}" columns="{cols}">{NL}{water} <image source="shore-tiles-64.png" width="{im.width}" height="{im.height}"/>{NL}'
+        f'{tiles}</tileset>{NL}',
+        encoding="utf-8")
+    print(f"สร้าง shore.tsx ({cols * rows} tile, terrain = water) เพิ่มเข้าแมพใน Tiled: Map → Add External Tileset")
+
+
 def placeholder(name):
     d = TS / "placeholder"
     d.mkdir(parents=True, exist_ok=True)
@@ -189,7 +212,7 @@ def main():
     # ชิ้นที่ผังระบุว่าเป็นพื้นไม้เดินได้ (decks) → property deck
     DECKS.update(d["name"] for L in layouts.values() for d in L.get("decks", []))
     NOT_SOLID.update(DECKS)
-    write_terrain(); write_block()
+    write_terrain(); write_block(); write_shore()
     names, missing, sizes = write_props(extra)
     (MAPS / "siam.tiled-project").write_text(json.dumps({"automappingRulesFile": "", "commands": [], "extensionsPath": "extensions",
                                                         "folders": ["."], "propertyTypes": []}, indent=4), encoding="utf-8")
