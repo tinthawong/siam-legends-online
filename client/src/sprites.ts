@@ -41,4 +41,6 @@ export const walkDirs = (gender: string) => WALK_DIRS[gender] ?? [];
 export const WALK_FRAMES = 6;
 export const WALK_FPS = 10; // ไฟล์ต้นฉบับ 200ms ต่อเฟรม เร่งให้ก้าวทันความเร็วเดินในเกม (150ms ต่อช่อง)
 export const WALK_OFFSET = 3;
+// ท่าเดินที่ได้จาก PixelLab ตัวเล็กกว่าท่ายืน (สูง 39–40 px เทียบกับ 44) ขยายให้ใกล้กัน ถ้าได้ไฟล์ขนาดเท่าท่ายืนแล้วตั้งเป็น 1
+export const WALK_SCALE = 1.1;
 export const walkFrameUrl = (gender: string, dir: string, i: number) => `sprites/base-${gender}/walk-${dir}/${i}.png`;

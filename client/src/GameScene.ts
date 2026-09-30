@@ -12,7 +12,7 @@ import { MOBS } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, emptyLog, npcMark, type QuestLog } from "../../shared/quests";
-import { IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, WALK_FRAMES, WALK_FPS, WALK_OFFSET, animSource, idleDirs, idleFrameUrl, walkDirs, walkFrameUrl } from "./sprites";
+import { IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, WALK_FRAMES, WALK_FPS, WALK_OFFSET, WALK_SCALE, animSource, idleDirs, idleFrameUrl, walkDirs, walkFrameUrl } from "./sprites";
 
 interface View {
   id: string;
@@ -783,6 +783,7 @@ export class GameScene extends Phaser.Scene {
     if (idle) {
       this.setMotion(v, null);
       v.body.setFlipX(src!.flip).setOrigin(0.5, (45 + (walking ? WALK_OFFSET : IDLE_OFFSET)) / 64).play(idle, true);
+      v.body.setScale(walking ? WALK_SCALE : 1); // ยึดเท้า ขยายแล้วเท้ายังติดพื้น
     } else {
       v.body.stop();
       v.body.setFlipX(false).setTexture(`${v.sprite}_${v.dir}`).setOrigin(0.5, 45 / 48);
