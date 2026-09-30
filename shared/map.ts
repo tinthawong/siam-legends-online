@@ -68,7 +68,12 @@ export interface MapProp {
   px: number;
   py: number;
   kind: string;
+  flip: boolean;     // พลิกซ้าย-ขวา (ตั้งใน Tiled)
+  solid?: boolean;   // จาก Tiled (props.tsx) ไม่มี = ใช้กฎ isSolidProp
+  deck?: boolean;    // พื้นไม้เดินได้บนน้ำ (ท่าเรือ/แพ) จาก Tiled
 }
+/** ผังจาก Tiled (tools/build_map.py) มีช่องเดินไม่ได้เพิ่ม และค่าต่อชิ้น — ผังเก่าไม่มี */
+type LayoutProp = { name: string; x: number; y: number; flipX?: boolean; solid?: boolean; deck?: boolean };
 
 // ชุดของประดับ: ไฟล์เกมที่ client/public/sprites/props/<ชุด>/ (มี props.json ของแต่ละชุด)
 export const PROP_SETS: Record<string, string[]> = {
@@ -107,9 +112,9 @@ function generate() {
   const T = new Uint8Array(MAP_W * MAP_H);
   LAYOUT.terrain.forEach((row, y) => { for (let x = 0; x < MAP_W; x++) T[y * MAP_W + x] = LETTER[row[x]] ?? GRASS; });
 
-  const props: MapProp[] = LAYOUT.props.map((p) => {
+  const props: MapProp[] = (LAYOUT.props as LayoutProp[]).map((p) => {
     const kind = PROP_ALIAS[p.name] ?? p.name;
-    return { kind, px: p.x, py: p.y, x: Math.floor(p.x / TILE_PX), y: Math.floor((p.y - 1) / TILE_PX) };
+    return { kind, px: p.x, py: p.y, x: Math.floor(p.x / TILE_PX), y: Math.floor((p.y - 1) / TILE_PX), flip: !!p.flipX, solid: p.solid, deck: p.deck };
   });
 
   const blocked = new Uint8Array(MAP_W * MAP_H);
@@ -130,6 +135,18 @@ function generate() {
       arches.push({ cx: p.px, left, right: left + s.width, row, width: s.width });
       continue;
     }
+    if (p.deck && p.kind !== "pier" && p.kind !== "pier-plank") {
+      // พื้นไม้อื่นจาก Tiled (deck = true): ช่องที่กึ่งกลางอยู่ในภาพ (หักขอบ 8 px) เดินได้ ยังไม่มีภาพ = ไม่รู้ขนาด ข้าม
+      const s = PROP_SIZE[p.kind];
+      if (!s) continue;
+      const x0 = p.px - s.width / 2 + 8, x1 = p.px + s.width / 2 - 8, y0 = p.py - s.height + 8;
+      for (let y = Math.floor(y0 / TILE_PX); y <= Math.floor((p.py - 1) / TILE_PX); y++)
+        for (let x = Math.floor(x0 / TILE_PX); x <= Math.floor((x1 - 1) / TILE_PX); x++) {
+          const cx = x * TILE_PX + TILE_PX / 2, cy = y * TILE_PX + TILE_PX / 2;
+          if (cx >= x0 && cx < x1 && cy >= y0 && cy < p.py) mark(bridge, x, y);
+        }
+      continue;
+    }
     if (p.kind === "pier") {
       // ท่าเรือ: ทุกช่องใต้พื้น (ภาพกว้าง 72 ตัดราวข้างละ 12 px) นับช่องที่กึ่งกลางอยู่บนพื้น
       const s = PROP_SIZE.pier;
@@ -141,7 +158,7 @@ function generate() {
         }
       continue;
     }
-    if (!isSolidProp(p.kind)) continue;
+    if (!(p.solid ?? isSolidProp(p.kind)) || !PROP_SIZE[p.kind]) continue;
     if (p.kind === "village-gate") { // ขวางเฉพาะเสาสองข้าง เดินผ่านช่องกลางได้
       mark(blocked, Math.floor((p.px - 34) / TILE_PX), p.y);
       mark(blocked, Math.floor((p.px + 33) / TILE_PX), p.y);
@@ -153,6 +170,9 @@ function generate() {
     for (let y = p.y - rows + 1; y <= p.y; y++)
       for (let x = Math.floor((p.px - half) / TILE_PX); x <= Math.floor((p.px + half - 1) / TILE_PX); x++) mark(blocked, x, y);
   }
+
+  // ช่องเดินไม่ได้ที่ระบายเองในเลเยอร์ block ของ Tiled
+  for (const [x, y] of ((LAYOUT as { blocked?: number[][] }).blocked ?? [])) mark(blocked, x, y);
 
   // ช่องที่เดินได้แต่ไปไม่ถึงจากจุดเกิด → กันไว้ ไม่ให้มอนเกิดในที่ปิดตาย
   const open = (i: number) => ((T[i] !== WATER && T[i] !== FOREST) || bridge[i]) && !blocked[i];

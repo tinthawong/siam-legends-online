@@ -1263,7 +1263,7 @@ export class GameScene extends Phaser.Scene {
       const depth = block ? y - 8 : -1;
       if (!FLAT_PROPS.has(p.kind))
         this.add.ellipse(x, y, m.shadowWidth, Math.max(3, Math.round(m.shadowWidth * 0.3)), 0x000000, 70 / 255).setDepth(block ? depth - 0.5 : -2);
-      this.add.image(x, y, `prop_${p.kind}`).setOrigin(m.anchor.x / m.width, (m.anchor.y + 1) / m.height).setDepth(depth);
+      this.add.image(x, y, `prop_${p.kind}`).setOrigin(m.anchor.x / m.width, (m.anchor.y + 1) / m.height).setDepth(depth).setFlipX(p.flip);
     }
   }
 }

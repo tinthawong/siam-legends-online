@@ -4,6 +4,7 @@
   "type": "module",
   "scripts": {
     "dev": "node tools/dev.mjs",
+    "map": "python tools/build_map.py",
     "dev:server": "wrangler dev",
     "dev:client": "vite --config client/vite.config.ts",
     "build": "vite build --config client/vite.config.ts",

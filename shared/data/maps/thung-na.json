@@ -1,0 +1,318 @@
+{
+ "id": "thung-na",
+ "name": "ทุ่งนาริมคลอง",
+ "width": 60,
+ "height": 44,
+ "tile": 32,
+ "legend": {
+  "G": "grass",
+  "S": "sand",
+  "W": "water",
+  "D": "dirt",
+  "P": "paddy",
+  "F": "forest"
+ },
+ "terrain": [
+  "FFFFFFFFFFFFFFFFFFFFFFFFFFFFDDDDFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+  "FFFFFFFFFFFFFFFFFFFFFFFFFFFFDDDDFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
+  "FFGGGGFFGGGGFFFFGGGGFFGGGGGGDDGGGGFFGGGGFFFFGGGGFFGGGGFFFFFF",
+  "FFGGGGFFGGGGFFFFGGGGFFGGGGGGDDGGGGFFGGGGFFFFGGGGFFGGGGFFFFFF",
+  "FFFFGGPPPPGGPPPPGGPPPPGGGGGGDDGGGGGGGGPPPPGGPPPPGGPPPPGGFFFF",
+  "FFFFGGPPPPGGPPPPGGPPPPGGGGGGDDGGGGGGGGPPPPGGPPPPGGPPPPGGFFFF",
+  "FFFFGGPPPPPPPPPPPPPPPPPPGGGGDDGGGGFFFFPPPPPPPPPPPPPPPPPPFFFF",
+  "FFFFGGPPPPPPPPPPPPPPPPPPGGGGDDGGGGFFFFPPPPPPPPPPPPPPPPPPFFFF",
+  "FFFFGGPPPPGGPPPPGGPPPPGGGGGGDDDDDDFFFFPPPPGGPPPPGGPPPPGGFFFF",
+  "FFFFGGPPPPGGPPPPGGPPPPGGGGGGDDDDDDFFFFPPPPGGPPPPGGPPPPGGFFFF",
+  "FFGGGGPPPPPPPPPPPPPPPPPPGGGGDDDDDDDDDDPPPPPPPPPPPPPPPPPPGGFF",
+  "FFGGGGPPPPPPPPPPPPPPPPPPGGGGDDDDDDDDDDPPPPPPPPPPPPPPPPPPGGFF",
+  "FFGGGGPPPPPPPPPPPPPPPPPPGGDDDDGGGGGGGGPPDDDDPPPPPPPPPPPPGGFF",
+  "FFGGGGPPPPPPPPPPPPPPPPPPGGDDDDGGGGGGGGPPDDDDPPPPPPPPPPPPGGFF",
+  "FFFFGGGGGGGGDDDDDDDDDDDDDDGGDDGGGGGGGGGGGGGGDDDDGGGGGGGGFFFF",
+  "FFFFGGGGGGGGDDDDDDDDDDDDDDGGDDGGGGGGGGGGGGGGDDDDGGGGGGGGFFFF",
+  "WWWWWWSSSSSSSSWWWWWWWWWWWWWWDDDDGGGGGGSSWWWWWWWWWWWWSSSSFFFF",
+  "WWWWWWSSSSSSSSWWWWWWWWWWWWWWDDDDGGGGGGSSWWWWWWWWWWWWSSSSFFFF",
+  "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+  "WWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWWW",
+  "FFSSWWWWWWWWWWSSSSSSGGGGSSSSWWWWWWWWWWWWWWWWSSSSSSSSWWWWWWWW",
+  "FFSSWWWWWWWWWWSSSSSSGGGGSSSSWWWWWWWWWWWWWWWWSSSSSSSSWWWWWWWW",
+  "FFFFDDDDDDDDDDDDGGGGGGGGGGGGDDDDSSSSSSDDDDDDDDDDGGGGGGSSFFFF",
+  "FFFFDDDDDDDDDDDDGGGGGGGGGGGGDDDDSSSSSSDDDDDDDDDDGGGGGGSSFFFF",
+  "FFFFGGPPPPGGPPPPDDDDDDDDDDGGDDDDDDDDDDDDPPPPGGPPPPGGPPPPFFFF",
+  "FFFFGGPPPPGGPPPPDDDDDDDDDDGGDDDDDDDDDDDDPPPPGGPPPPGGPPPPFFFF",
+  "FFFFGGPPPPPPPPPPPPGGGGDDDDDDDDGGGGGGGGGGPPPPPPPPPPPPPPPPFFFF",
+  "FFFFGGPPPPPPPPPPPPGGGGDDDDDDDDGGGGGGGGGGPPPPPPPPPPPPPPPPFFFF",
+  "FFGGGGPPPPGGPPPPGGGGGGFFFFGGDDGGGGGGGGGGPPPPGGPPPPGGPPPPGGFF",
+  "FFGGGGPPPPGGPPPPGGGGGGFFFFGGDDGGGGGGGGGGPPPPGGPPPPGGPPPPGGFF",
+  "GGGGGGPPPPPPPPPPPPGGGGFFFFFFDDGGGGGGGGGGPPPPPPPPPPPPPPPPGGFF",
+  "GGGGGGPPPPPPPPPPPPGGGGFFFFFFDDGGGGGGGGGGPPPPPPPPPPPPPPPPGGFF",
+  "GGGGGGPPPPPPPPPPPPGGGGFFFFFFDDGGGGGGGGGGPPPPPPPPPPPPPPPPFFFF",
+  "GGGGGGPPPPPPPPPPPPGGGGFFFFFFDDGGGGGGGGGGPPPPPPPPPPPPPPPPFFFF",
+  "FFGGGGGGGGGGGGGGGGGGGGGGGGGGDDDDGGGGGGGGGGGGGGGGGGGGGGGGFFFF",
+  "FFGGGGGGGGGGGGGGGGGGGGGGGGGGDDDDGGGGGGGGGGGGGGGGGGGGGGGGFFFF",
+  "FFGGGGFFFFFFGGGGGGGGGGGGGGGGDDDDGGGGGGGGGGGGGGGGGGGGGGGGFFFF",
+  "FFGGGGFFFFFFGGGGGGGGGGGGGGGGDDDDGGGGGGGGGGGGGGGGGGGGGGGGFFFF",
+  "FFGGGGGGFFFFGGGGGGGGGGGGGGGGDDDDGGGGGGGGGGGGGGGGGGGGGGGGGGFF",
+  "FFGGGGGGFFFFGGGGGGGGGGGGGGGGDDDDGGGGGGGGGGGGGGGGGGGGGGGGGGFF",
+  "FFFFFFFFFFFFFFFFFFFFFFFFFFGGDDDDGGFFFFFFFFFFFFFFFFFFFFFFFFFF",
+  "FFFFFFFFFFFFFFFFFFFFFFFFFFGGDDDDGGFFFFFFFFFFFFFFFFFFFFFFFFFF",
+  "FFFFFFFFFFFFFFFFFFFFFFFFFFGGDDDDGGFFFFFFFFFFFFFFFFFFFFFFFFFF",
+  "FFFFFFFFFFFFFFFFFFFFFFFFFFGGDDDDGGFFFFFFFFFFFFFFFFFFFFFFFFFF"
+ ],
+ "props": [
+  {
+   "name": "pier-plank",
+   "x": 963,
+   "y": 579,
+   "solid": false,
+   "deck": true
+  },
+  {
+   "name": "pier-plank",
+   "x": 963,
+   "y": 611,
+   "solid": false,
+   "deck": true
+  },
+  {
+   "name": "pier-plank",
+   "x": 963,
+   "y": 643,
+   "solid": false,
+   "deck": true
+  },
+  {
+   "name": "pier-plank",
+   "x": 963,
+   "y": 675,
+   "solid": false,
+   "deck": true
+  },
+  {
+   "name": "pier-plank",
+   "x": 963,
+   "y": 707,
+   "solid": false,
+   "deck": true
+  },
+  {
+   "name": "pier-plank",
+   "x": 963,
+   "y": 739,
+   "solid": false,
+   "deck": true
+  },
+  {
+   "name": "field-hut",
+   "x": 784,
+   "y": 409,
+   "solid": true
+  },
+  {
+   "name": "rice-granary",
+   "x": 1100,
+   "y": 448,
+   "solid": true
+  },
+  {
+   "name": "bamboo-hut",
+   "x": 688,
+   "y": 806,
+   "solid": true
+  },
+  {
+   "name": "water-wheel",
+   "x": 816,
+   "y": 563,
+   "solid": true
+  },
+  {
+   "name": "ox-cart",
+   "x": 1062,
+   "y": 300,
+   "solid": true
+  },
+  {
+   "name": "rice-straw",
+   "x": 736,
+   "y": 300,
+   "solid": false
+  },
+  {
+   "name": "rice-straw",
+   "x": 1139,
+   "y": 563,
+   "solid": false
+  },
+  {
+   "name": "scarecrow",
+   "x": 480,
+   "y": 284,
+   "solid": true
+  },
+  {
+   "name": "scarecrow",
+   "x": 1504,
+   "y": 281,
+   "solid": true
+  },
+  {
+   "name": "scarecrow",
+   "x": 1424,
+   "y": 928,
+   "solid": true
+  },
+  {
+   "name": "sugar-palm",
+   "x": 368,
+   "y": 294,
+   "solid": true
+  },
+  {
+   "name": "sugar-palm",
+   "x": 563,
+   "y": 294,
+   "solid": true
+  },
+  {
+   "name": "sugar-palm",
+   "x": 1395,
+   "y": 297,
+   "solid": true
+  },
+  {
+   "name": "sugar-palm",
+   "x": 1587,
+   "y": 297,
+   "solid": true
+  },
+  {
+   "name": "sugar-palm",
+   "x": 368,
+   "y": 934,
+   "solid": true
+  },
+  {
+   "name": "sugar-palm",
+   "x": 1459,
+   "y": 934,
+   "solid": true
+  },
+  {
+   "name": "sugar-palm",
+   "x": 1651,
+   "y": 934,
+   "solid": true
+  },
+  {
+   "name": "banana-tree",
+   "x": 1075,
+   "y": 921,
+   "solid": true
+  },
+  {
+   "name": "mango-tree",
+   "x": 832,
+   "y": 1168,
+   "solid": true
+  },
+  {
+   "name": "frangipani",
+   "x": 1036,
+   "y": 1158,
+   "solid": true
+  },
+  {
+   "name": "dense-shrub",
+   "x": 883,
+   "y": 1299,
+   "solid": true
+  },
+  {
+   "name": "dense-shrub",
+   "x": 1043,
+   "y": 1286,
+   "solid": true
+  },
+  {
+   "name": "lotus",
+   "x": 672,
+   "y": 636,
+   "solid": false
+  },
+  {
+   "name": "lotus",
+   "x": 1168,
+   "y": 691,
+   "solid": false
+  },
+  {
+   "name": "lotus",
+   "x": 409,
+   "y": 678,
+   "solid": false
+  },
+  {
+   "name": "lotus",
+   "x": 1440,
+   "y": 652,
+   "solid": false
+  },
+  {
+   "name": "driftwood",
+   "x": 1299,
+   "y": 556,
+   "solid": true
+  },
+  {
+   "name": "mossy-boulder",
+   "x": 556,
+   "y": 684,
+   "solid": true
+  },
+  {
+   "name": "tall-grass",
+   "x": 1216,
+   "y": 729,
+   "solid": false
+  },
+  {
+   "name": "tall-grass",
+   "x": 256,
+   "y": 691,
+   "solid": false
+  }
+ ],
+ "blocked": [],
+ "start": {
+  "x": 160,
+  "y": 1024
+ },
+ "exits": [
+  {
+   "to": "todo-pa-long",
+   "label": "ป่าชายเลน (ยังไม่เปิด)",
+   "x": 832,
+   "y": 1376,
+   "w": 256,
+   "h": 32
+  },
+  {
+   "to": "todo-nakhon",
+   "label": "นครสุวรรณ (ยังไม่เปิด)",
+   "x": 832,
+   "y": 0,
+   "w": 256,
+   "h": 32
+  },
+  {
+   "to": "ban-pak-ao",
+   "label": "บ้านปากอ่าว",
+   "x": 0,
+   "y": 928,
+   "w": 32,
+   "h": 192
+  }
+ ],
+ "npcs": [],
+ "spawns": []
+}
