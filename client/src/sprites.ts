@@ -19,7 +19,7 @@ export function animSource(available: readonly string[], dir: string): { dir: st
 // ได้ทิศใหม่มา: วางไฟล์ที่ sprites/base-<เพศ>/idle-<ทิศ>/0..8.png แล้วเพิ่มทิศในลิสต์ของเพศนั้น
 // ทิศซ้าย/ขวาต้องมีอย่างน้อยฝั่งเดียว อีกฝั่งกลับภาพให้เอง (ต้นฉบับอยู่ art/pixellab/base-<เพศ>-idle/)
 export const IDLE_DIRS: Record<string, readonly string[]> = {
-  male: ["south", "south-west", "north"],
+  male: ["south", "south-west", "north", "north-east"],
   female: ["south"],
 };
 export const idleDirs = (gender: string) => IDLE_DIRS[gender] ?? [];
