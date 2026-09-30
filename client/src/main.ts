@@ -389,6 +389,11 @@ function bindHud(net: Net, openQuests: () => void) {
   };
 
   let last: PlayerStats | null = null;
+  // เลเวลอัพ: ป็อปอัพ ! ชวนอัพค่าพลัง กดแล้วเปิดหน้าค่าพลัง หายเองเมื่อไม่มีแต้มพอเพิ่มค่าไหนได้แล้ว
+  let prevLevel = 0;
+  const lvup = $<HTMLButtonElement>("lvup");
+  lvup.onclick = () => toggle("stat-panel", true);
+  const canSpend = (s: PlayerStats) => STATS.some((st) => s.stats[st.key] < STAT_MAX && s.points >= statCost(s.stats[st.key]));
   const statRow: Record<string, { v: HTMLElement; bonus: HTMLElement; cost: HTMLElement; btn: HTMLButtonElement }> = {};
   for (const st of STATS) {
     const row = document.createElement("div");
@@ -456,6 +461,9 @@ function bindHud(net: Net, openQuests: () => void) {
         r.btn.disabled = x >= STAT_MAX || s.points < cost;
       }
       $("stat-badge").hidden = s.points <= 0; // จุดแดงเตือนเมื่อมีแต้มว่าง
+      if (prevLevel && s.level > prevLevel && canSpend(s)) lvup.hidden = false;
+      if (!canSpend(s)) lvup.hidden = true;
+      prevLevel = s.level;
       renderEquip(s);
     },
     joined: sendBot, // ส่งค่าบอทให้ server ตอนเข้าแมพ (server ไม่ได้เก็บค่านี้)

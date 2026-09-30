@@ -411,6 +411,22 @@
     .eq-text b { font-size: 13px; font-weight: 600; color: var(--gold-lite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .eq-slot.empty .eq-text b { color: var(--ink-dim); font-weight: 400; }
 
+    /* ป็อปอัพเลเวลอัพ: กลางบนจอ เด้งเข้า แล้ว ! เต้นเบา ๆ */
+    #lvup { position: fixed; left: 50%; top: calc(14px + env(safe-area-inset-top)); z-index: 5; transform: translateX(-50%);
+      display: flex; align-items: center; gap: 10px; padding: 6px 16px 6px 6px; border-radius: 30px; border: 2px solid var(--gold-lite);
+      background: linear-gradient(180deg, var(--lacquer-2), var(--lacquer)); color: var(--ink); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.5), 0 0 16px rgba(233, 185, 73, 0.45);
+      cursor: pointer; animation: lvup-in 380ms cubic-bezier(0.3, 1.6, 0.5, 1); }
+    #lvup[hidden] { display: none; }
+    #lvup i { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 50%; font-style: normal; font-size: 24px; font-weight: 800;
+      color: #3a1a05; background: radial-gradient(circle at 35% 30%, #fff2b0, var(--gold) 60%, #c98f2a); animation: lvup-bounce 1s ease-in-out infinite; }
+    #lvup span { display: grid; text-align: left; line-height: 1.25; }
+    #lvup b { color: var(--gold-lite); font-size: 15px; }
+    #lvup small { font-size: 12px; color: var(--ink-dim); }
+    @keyframes lvup-in { from { transform: translateX(-50%) scale(0.4); opacity: 0; } }
+    @keyframes lvup-bounce { 50% { transform: translateY(-3px) scale(1.08); } }
+    @media (prefers-reduced-motion: reduce) { #lvup, #lvup i { animation: none; } }
+    @media (max-width: 560px) { #lvup { top: calc(152px + env(safe-area-inset-top)); } } /* จอแคบ: อยู่ใต้กล่องสถานะ */
+
     /* คุยกับ NPC: กล่องข้อความกลางล่างจอ */
     #dialog { position: fixed; left: 50%; bottom: calc(min(22vmin, 170px) + 40px + env(safe-area-inset-bottom)); transform: translateX(-50%);
       width: min(520px, calc(100vw - 20px)); padding: 12px 16px 14px; z-index: 6; }
@@ -604,6 +620,8 @@
       <button id="logout">ออกจากระบบ</button><button id="link-google" hidden>ผูกบัญชี Google</button>
     </div>
     <button id="auto-btn" aria-pressed="false">AUTO</button>
+    <!-- เลเวลอัพ: ชวนอัพค่าพลัง หายเมื่อใช้แต้มหมด (main.ts) -->
+    <button type="button" id="lvup" hidden><i>!</i><span><b>เลเวลอัพ!</b><small>แตะเพื่ออัพค่าพลัง</small></span></button>
     <!-- จอยสติ๊ก + ปุ่มโจมตี (docs/ui-controls.md): แสดงทั้งมือถือและคอม -->
     <div id="joystick" hidden aria-hidden="true">
       <img class="joy-base" src="/ui/joystick-base.webp" alt="" draggable="false" />
