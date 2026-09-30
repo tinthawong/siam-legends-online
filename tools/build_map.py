@@ -203,6 +203,9 @@ def main():
         out = ROOT / "shared/data/maps" / f"{data['id']}.json"
         out.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
         print(f"  เขียน {out.relative_to(ROOT)} ({data['width']}×{data['height']} ช่องเดิน, ของประดับ {len(data['props'])} ชิ้น)")
+        # วาดพื้นเป็นภาพเดียว (ทะเลไล่เฉด คลื่น ปะการัง หาดทราย) ให้เกมโหลดแทนพื้นที่วาดด้วยโค้ด
+        from bake_maps import bake
+        bake(data["id"])
     if failed:
         sys.exit(1)
 

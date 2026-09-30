@@ -69,6 +69,7 @@ npm run typecheck       # tsc ทั้ง client และ server
   - `python tools/tiled_setup.py` สร้าง tileset ใหม่ (terrain/block/props — ของที่ยังไม่มีภาพเป็นกล่องชมพู) รันใหม่เมื่อเพิ่มภาพ props; ไม่เขียนทับ .tmj ที่มีอยู่
   - `npm run map` แปลง `maps/*.tmj` → `shared/data/maps/<id>.json` ตรวจแล้วแจ้งภาษาไทย แมพที่ผิด (เช่นจุดเกิดบนน้ำ) ไม่เขียนทับไฟล์ที่เกมใช้
   - พื้นหลายเลเยอร์ได้: Tile layer ที่ชื่อขึ้นต้นด้วย `ground` (เช่น ground-1-deep … ground-4-land, อยู่ในกลุ่มก็ได้) ชั้นบนทับชั้นล่าง ช่องว่างใช้ชั้นล่าง ชนิดพื้น = property `terrain` ของ tile บนสุด (ตั้งทีละ tile หรือทั้ง tileset) · `shore-tiles-64.png` (วางที่ art/tiles/) → `shore.tsx` ทุก tile terrain = water
+  - พื้นในเกม = ภาพที่ bake แล้ว `client/public/maps/<id>/ground.webp` (`tools/bake_sea.py` ทะเลไล่เฉด คลื่น ปะการัง หาดทราย ลายจาก `art/tiles/`) `npm run map` bake ให้เอง / `npm run bake` bake ใหม่ทุกแมพ · ไม่มีภาพ = วาดด้วยโค้ด (mapRender.ts)
   - props.tsx property: `solid` ขวางทาง, `deck` พื้นไม้เดินได้บนน้ำ (หักขอบ 8 px), `arch` สะพานโค้ง · เกมโหลดแค่ ban-pak-ao (ยังไม่มีระบบข้ามแมพ)
 - `client/src/mapRender.ts` วาดพื้นทั้งแผ่นเป็นภาพเดียวตอนเข้าเกม: ลายพื้น 64×64 ปูซ้ำตามพิกัดโลก, ขอบโค้งด้วย noise (`WARP`), ทรายเปียกริมน้ำ, ฟองคลื่น, เส้นขอบหญ้า 1px
 - `client/public/sprites/base-male/`, `base-female/` ภาพ base 8 ทิศ (ผมดำ)

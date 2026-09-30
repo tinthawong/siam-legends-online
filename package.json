@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "node tools/dev.mjs",
     "map": "python tools/build_map.py",
+    "bake": "python tools/bake_maps.py",
     "dev:server": "wrangler dev",
     "dev:client": "vite --config client/vite.config.ts",
     "build": "vite build --config client/vite.config.ts",

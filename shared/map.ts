@@ -14,6 +14,8 @@ import P7 from "../client/public/sprites/props/bridges/props.json";
 const PROP_SIZE: Record<string, { width: number; height: number }> = { ...P1, ...P2, ...P3, ...P4, ...P5, ...P6, ...P7 };
 
 export const TILE_PX = LAYOUT.tile;
+/** id แมพตาม layout (ใช้หาภาพพื้นที่ bake แล้ว client/public/maps/<id>/ground.webp) */
+export const MAP_LAYOUT_ID = LAYOUT.id;
 export const MAP_W = LAYOUT.width;
 export const MAP_H = LAYOUT.height;
 export const SPAWN = { x: Math.floor(LAYOUT.start.x / TILE_PX), y: Math.floor(LAYOUT.start.y / TILE_PX) };

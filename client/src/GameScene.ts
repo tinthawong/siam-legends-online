@@ -3,7 +3,7 @@ import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
 import type { Cell } from "../../shared/pathfind";
 import { TILE, AUTO_RADIUS, cheb } from "../../shared/constants";
-import { MAP_W, MAP_H, PROPS, FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, EXITS, ARCH_BRIDGES, isWalkable, isSolidProp, PROP_SET_OF, bridgeLift } from "../../shared/map";
+import { MAP_LAYOUT_ID, MAP_W, MAP_H, PROPS, FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, EXITS, ARCH_BRIDGES, isWalkable, isSolidProp, PROP_SET_OF, bridgeLift } from "../../shared/map";
 import { forestTrees, FOREST_KINDS } from "./forest";
 import { renderGround, TILE_URLS } from "./mapRender";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
@@ -141,6 +141,8 @@ export class GameScene extends Phaser.Scene {
         for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
     // พื้นหญ้า 64×64 ปูซ้ำทั้งแมพ (ขนาดเดิม ไม่ย่อ/ขยาย)
     TILE_URLS.forEach((url, i) => this.load.image(`tile_${TERRAIN_NAMES[i]}`, url));
+    // พื้นที่ bake แล้ว (npm run bake / npm run map) ถ้ามี ใช้แทนพื้นที่วาดด้วยโค้ด ไม่มี = วาดเอง (renderGround)
+    this.load.image("baked_ground", `maps/${MAP_LAYOUT_ID}/ground.webp`);
     // ของประดับในแมพ: props.json (ขนาด, จุดยึด, ความกว้างเงา) + รูปแต่ละชิ้น
     for (const set of Object.keys(PROP_SETS)) this.load.json(`props_${set}`, `sprites/props/${set}/props.json`);
     // สะพานโค้งใช้ภาพสองชั้น (-back/-front) ของที่ยังไม่มีภาพ (ไม่อยู่ในชุดไหน) ข้าม
@@ -1208,7 +1210,12 @@ export class GameScene extends Phaser.Scene {
     // พื้นทั้งแผ่น (ลายพื้น + ขอบโค้ง + ทรายเปียก + ฟองคลื่น + เส้นขอบหญ้า) วาดครั้งเดียว
     const tiles = TERRAIN_NAMES.map((n) => this.textures.get(`tile_${n}`).getSourceImage() as HTMLImageElement);
     const meta0 = Object.assign({}, ...Object.keys(PROP_SETS).map((set) => this.cache.json.get(`props_${set}`) ?? {})) as Record<string, { width: number; height: number; anchor: { x: number; y: number }; shadowWidth: number }>;
-    const ground = renderGround(tiles);
+    let ground: HTMLCanvasElement;
+    if (this.textures.exists("baked_ground")) {
+      ground = document.createElement("canvas");
+      ground.width = MAP_W * TILE; ground.height = MAP_H * TILE;
+      ground.getContext("2d")!.drawImage(this.textures.get("baked_ground").getSourceImage() as HTMLImageElement, 0, 0, ground.width, ground.height);
+    } else ground = renderGround(tiles);
 
     // ป่า: ต้นไม้ด้านในวาดรวมกับพื้น (ประหยัดเครื่อง) ต้นริมป่าเป็น sprite เรียงความลึกตาม y
     const gctx = ground.getContext("2d")!;
