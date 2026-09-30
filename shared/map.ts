@@ -9,8 +9,9 @@ import P3 from "../client/public/sprites/props/set3/props.json";
 import P4 from "../client/public/sprites/props/set4/props.json";
 import P5 from "../client/public/sprites/props/set5/props.json";
 import P6 from "../client/public/sprites/props/set6/props.json";
+import P7 from "../client/public/sprites/props/bridges/props.json";
 /** ขนาดภาพของประดับทุกชิ้น (จาก props.json ของแต่ละชุด) ใช้คิดฐานที่ขวางทาง */
-const PROP_SIZE: Record<string, { width: number; height: number }> = { ...P1, ...P2, ...P3, ...P4, ...P5, ...P6 };
+const PROP_SIZE: Record<string, { width: number; height: number }> = { ...P1, ...P2, ...P3, ...P4, ...P5, ...P6, ...P7 };
 
 export const TILE_PX = LAYOUT.tile;
 export const MAP_W = LAYOUT.width;
@@ -74,14 +75,18 @@ export const PROP_SETS: Record<string, string[]> = {
   set1: ["flowers-yellow", "flowers-pink", "tall-grass", "fern", "bush", "rock", "rocks-3", "mossy-boulder",
     "seashell", "starfish", "driftwood", "coconut", "beach-grass", "rice-straw", "clay-jar", "lotus"],
   set2: ["banyan", "coconut-palm", "sugar-palm", "coconut-palm-leaning", "bamboo", "hibiscus-bush"], // ต้นไม้ใหญ่
-  set3: ["stilt-house", "stilt-hut", "sala", "market-stall", "fish-rack", "village-gate", "pier", "longtail-boat", "dragon-jars"], // หมู่บ้าน
+  set3: ["stilt-house", "stilt-hut", "sala", "market-stall", "fish-rack", "village-gate", "pier-plank", "longtail-boat", "dragon-jars"], // หมู่บ้าน (pier-plank = ท่าเรือแบบเก่า แผ่นไม้ต่อกัน)
   set4: ["fence-wood", "fence-bamboo", "fence-corner", "fence-gate", "clothesline", "firewood", "well", "potted-plant",
     "bench", "quest-board", "lantern-post", "baskets", "barrel", "crate", "stepping-stone", "signpost"], // บ้านเรือน/ลานกลาง
   set5: ["net-rack", "net-pile", "fish-trap", "rowboat-upturned", "oars", "rope-coil", "buoys", "anchor",
     "scarecrow", "ox-cart", "field-hut", "water-wheel", "shore-rocks", "tide-pool", "hammock", "morning-glory"], // ท่าเรือ/นา/หาด
   set6: ["mango-tree", "jackfruit-tree", "tamarind-tree", "rain-tree", "golden-shower", "flame-tree", "frangipani", "indian-almond",
     "banana-tree", "papaya-tree", "areca-palm", "round-tree", "tall-forest-tree", "young-tree", "dense-shrub", "shrub-cluster"], // ต้นไม้/ป่า
+  // สะพานโค้ง/ท่าเรือ (docs/bridges.md) สะพานในผังชื่อ bridge-main / bridge-foot ภาพแยกเป็นชั้นหลัง (-back) กับชั้นหน้า (-front)
+  bridges: ["bridge-main-back", "bridge-main-front", "bridge-foot-back", "bridge-foot-front", "pier"],
 };
+/** สะพานโค้งในผัง: วาดชั้นหลัง (ใต้ตัวละคร) + ชั้นหน้า (เรียงความลึก) */
+export const ARCH_BRIDGES = new Set(["bridge-main", "bridge-foot"]);
 export const PROP_SET_OF: Record<string, string> = Object.fromEntries(
   Object.entries(PROP_SETS).flatMap(([set, kinds]) => kinds.map((k) => [k, set])),
 );
@@ -90,10 +95,13 @@ const PROP_ALIAS: Record<string, string> = { "lantern-pole": "lantern-post", "ra
 
 // ขวางทาง (solid) ตาม docs/map-system.md: ทุกชิ้นขวาง ยกเว้นของเตี้ย/เล็กกว่าครึ่งช่อง
 const NOT_SOLID = new Set(["flowers-yellow", "flowers-pink", "tall-grass", "fern", "seashell", "starfish", "stepping-stone",
-  "rice-straw", "morning-glory", "lotus", "pier"]);
+  "rice-straw", "morning-glory", "lotus", "pier", "pier-plank"]);
 export const isSolidProp = (kind: string) => !NOT_SOLID.has(kind) && (PROP_SIZE[kind]?.width ?? 0) >= TILE_PX / 2;
 // ชิ้นที่แบนราบกับพื้น วาดใต้ตัวละครเสมอ (สะพาน, หินทางเดิน)
-export const FLAT_PROPS = new Set(["pier", "stepping-stone"]);
+export const FLAT_PROPS = new Set(["pier", "pier-plank", "stepping-stone"]);
+
+/** สะพานโค้ง: แถวที่เดินได้ + ข้อมูลคิดความโค้ง (docs/bridges.md) */
+export interface ArchBridge { cx: number; left: number; right: number; row: number; width: number }
 
 function generate() {
   const T = new Uint8Array(MAP_W * MAP_H);
@@ -106,10 +114,31 @@ function generate() {
 
   const blocked = new Uint8Array(MAP_W * MAP_H);
   const bridge = new Uint8Array(MAP_W * MAP_H);
+  const arches: ArchBridge[] = [];
   const mark = (arr: Uint8Array, x: number, y: number) => { if (x >= 0 && y >= 0 && x < MAP_W && y < MAP_H) arr[y * MAP_W + x] = 1; };
   for (const p of props) {
-    if (p.kind === "pier") { // สะพานชิ้นละ 40px ต่อกันแนวตั้ง: ทุกช่องที่ชิ้นทับเดินได้
+    if (p.kind === "pier-plank") { // ท่าเรือแบบเก่า ชิ้นละ 40px ต่อกันแนวตั้ง: ทุกช่องที่ชิ้นทับเดินได้
       for (let y = Math.floor((p.py - 40) / TILE_PX); y <= p.y; y++) mark(bridge, p.x, y);
+      continue;
+    }
+    if (ARCH_BRIDGES.has(p.kind)) {
+      // สะพานโค้ง: แถวช่องใต้เส้นเท้า (ขอบบนของภาพ + 37 px) เดินได้ตลอดความกว้าง แม้เป็นช่องน้ำ
+      const s = PROP_SIZE[`${p.kind}-back`];
+      if (!s) continue;
+      const left = p.px - s.width / 2, row = Math.floor((p.py - s.height + 37) / TILE_PX);
+      for (let x = Math.floor(left / TILE_PX); x <= Math.floor((left + s.width - 1) / TILE_PX); x++) mark(bridge, x, row);
+      arches.push({ cx: p.px, left, right: left + s.width, row, width: s.width });
+      continue;
+    }
+    if (p.kind === "pier") {
+      // ท่าเรือ: ทุกช่องใต้พื้น (ภาพกว้าง 72 ตัดราวข้างละ 12 px) นับช่องที่กึ่งกลางอยู่บนพื้น
+      const s = PROP_SIZE.pier;
+      const x0 = p.px - s.width / 2 + 12, x1 = p.px + s.width / 2 - 12, y0 = p.py - s.height;
+      for (let y = Math.floor(y0 / TILE_PX); y <= Math.floor((p.py - 1) / TILE_PX); y++)
+        for (let x = Math.floor(x0 / TILE_PX); x <= Math.floor((x1 - 1) / TILE_PX); x++) {
+          const cx = x * TILE_PX + TILE_PX / 2, cy = y * TILE_PX + TILE_PX / 2;
+          if (cx >= x0 && cx < x1 && cy >= y0 && cy < p.py) mark(bridge, x, y);
+        }
       continue;
     }
     if (!isSolidProp(p.kind)) continue;
@@ -142,7 +171,7 @@ function generate() {
   }
   for (let i = 0; i < T.length; i++) if (open(i) && !seen[i]) blocked[i] = 1;
 
-  return { T, props, blocked, bridge };
+  return { T, props, blocked, bridge, arches };
 }
 
 const GEN = generate();
@@ -150,6 +179,19 @@ export const TERRAIN = GEN.T;
 export const PROPS: readonly MapProp[] = GEN.props;
 const BLOCKED = GEN.blocked;
 const BRIDGE = GEN.bridge;
+export const ARCHES: readonly ArchBridge[] = GEN.arches;
+
+/** ความสูงที่ยกภาพตัวละครบนสะพานโค้ง (px) — แค่วาด ตำแหน่งจริงไม่เปลี่ยน
+ *  t = min(1, |x - กึ่งกลาง| / (กว้าง × 0.37)), ยก = 16 × (1 - t²) */
+export function bridgeLift(px: number, py: number): number {
+  const row = Math.floor(py / TILE_PX);
+  for (const b of GEN.arches) {
+    if (row !== b.row || px < b.left || px >= b.right) continue;
+    const t = Math.min(1, Math.abs(px - b.cx) / (b.width * 0.37));
+    return 16 * (1 - t * t);
+  }
+  return 0;
+}
 
 export function isWalkable(x: number, y: number): boolean {
   if (x < 0 || y < 0 || x >= MAP_W || y >= MAP_H) return false;

@@ -3,7 +3,7 @@ import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
 import type { Cell } from "../../shared/pathfind";
 import { TILE, AUTO_RADIUS, cheb } from "../../shared/constants";
-import { MAP_W, MAP_H, PROPS, FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, EXITS, isWalkable, isSolidProp, PROP_SET_OF } from "../../shared/map";
+import { MAP_W, MAP_H, PROPS, FLAT_PROPS, TERRAIN_NAMES, PROP_SETS, EXITS, ARCH_BRIDGES, isWalkable, isSolidProp, PROP_SET_OF, bridgeLift } from "../../shared/map";
 import { forestTrees, FOREST_KINDS } from "./forest";
 import { renderGround, TILE_URLS } from "./mapRender";
 import { DEFAULT_LOOK, GENDERS, lookKey, type Look } from "../../shared/appearance";
@@ -20,6 +20,8 @@ interface View {
   c: Phaser.GameObjects.Container;
   body: Phaser.GameObjects.Sprite;
   hpBar: Phaser.GameObjects.Graphics | null;
+  inner: Phaser.GameObjects.Container; // ตัว + เงา (ยกขึ้นตอนอยู่บนสะพานโค้ง)
+  lift: number;                         // ยกขึ้นกี่ px (สะพานโค้ง) — ข้อความ/เอฟเฟกต์เหนือตัวต้องยกตาม
   oc: Phaser.GameObjects.Container; // ชื่อ + แถบ HP ลอยอยู่ชั้นบนสุด ไม่โดนต้นไม้/หลังคาบัง (ตามตำแหน่ง c ทุกเฟรม)
   hp: number;
   maxHp: number;
@@ -127,7 +129,9 @@ export class GameScene extends Phaser.Scene {
     TILE_URLS.forEach((url, i) => this.load.image(`tile_${TERRAIN_NAMES[i]}`, url));
     // ของประดับในแมพ: props.json (ขนาด, จุดยึด, ความกว้างเงา) + รูปแต่ละชิ้น
     for (const set of Object.keys(PROP_SETS)) this.load.json(`props_${set}`, `sprites/props/${set}/props.json`);
-    for (const kind of new Set([...PROPS.map((p) => p.kind), ...FOREST_KINDS])) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
+    // สะพานโค้งใช้ภาพสองชั้น (-back/-front) ของที่ยังไม่มีภาพ (ไม่อยู่ในชุดไหน) ข้าม
+    const kinds = new Set([...PROPS.flatMap((p) => ARCH_BRIDGES.has(p.kind) ? [`${p.kind}-back`, `${p.kind}-front`] : [p.kind]), ...FOREST_KINDS]);
+    for (const kind of kinds) if (PROP_SET_OF[kind]) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
     // NPC: client/public/sprites/<sprite>/sheet.json (ท่ายืน) ยังไม่มีภาพ = โหลดไม่เจอ ใช้ภาพชั่วคราว (drawNpcs)
@@ -320,8 +324,8 @@ export class GameScene extends Phaser.Scene {
       case "quest_reward": {
         const v = this.me ? this.views.get(this.me) : undefined;
         if (v) {
-          this.floatText(v.c.x, v.c.y + v.topY - 26, "เควสสำเร็จ!", "#ffd84a", 1500);
-          if (m.exp) this.floatText(v.c.x, v.c.y + v.topY - 12, `+${m.exp} EXP`, "#ffd84a", 1300);
+          this.floatText(v.c.x, v.c.y - v.lift + v.topY - 26, "เควสสำเร็จ!", "#ffd84a", 1500);
+          if (m.exp) this.floatText(v.c.x, v.c.y - v.lift + v.topY - 12, `+${m.exp} EXP`, "#ffd84a", 1300);
         }
         this.onQuestReward?.(m);
         break;
@@ -375,7 +379,7 @@ export class GameScene extends Phaser.Scene {
           // ต่อย: ง้างหมัดก่อน ตัวเลข/ประกายขึ้นตอนหมัดถึงเป้า
           const impact = () => {
             if (!dst.body.active) return;
-            if (m.miss) this.floatText(dst.c.x, dst.c.y + dst.topY - 9, "พลาด", "#bfc7d5", 700);
+            if (m.miss) this.floatText(dst.c.x, dst.c.y - dst.lift + dst.topY - 9, "พลาด", "#bfc7d5", 700);
             else { this.floatDamage(dst, m.dmg, m.crit); this.hitFx(dst, this.views.get(m.src), m.crit); }
             if (m.miss) return;
             dst.body.setTintFill(0xffffff);
@@ -432,7 +436,7 @@ export class GameScene extends Phaser.Scene {
       }
       case "notice": {
         const v = this.me ? this.views.get(this.me) : undefined;
-        if (v) this.floatText(v.c.x, v.c.y + v.topY - 12, m.text, "#ffe39a", 1600);
+        if (v) this.floatText(v.c.x, v.c.y - v.lift + v.topY - 12, m.text, "#ffe39a", 1600);
         break;
       }
       case "exp":
@@ -441,7 +445,7 @@ export class GameScene extends Phaser.Scene {
         break;
       case "heal": {
         const v = this.views.get(m.id);
-        if (v) this.floatText(v.c.x, v.c.y + v.topY - 9, `+${m.amount}`, "#7ee08a", 900);
+        if (v) this.floatText(v.c.x, v.c.y - v.lift + v.topY - 9, `+${m.amount}`, "#7ee08a", 900);
         break;
       }
       case "die": {
@@ -505,9 +509,11 @@ export class GameScene extends Phaser.Scene {
       stroke: "#10192a", strokeThickness: 3,
     }).setOrigin(0.5, 0).setResolution(2);
     // เงาวงรีที่พื้นใต้เท้า (อยู่กับที่ ไม่ขยับตามตัวตอนเด้ง/เดิน/ท่ายืน): มอนจาก sheet และผู้เล่น
-    if (sheet) c.add(this.add.ellipse(0, 7, 26, 8, 0x000000, 0.3));
-    else if (sprite) c.add(this.add.ellipse(0, 7, 22, 7, 0x000000, 0.3));
-    c.add(body);
+    const inner = this.add.container(0, 0);
+    if (sheet) inner.add(this.add.ellipse(0, 7, 26, 8, 0x000000, 0.3));
+    else if (sprite) inner.add(this.add.ellipse(0, 7, 22, 7, 0x000000, 0.3));
+    inner.add(body);
+    c.add(inner);
     const oc = this.add.container(c.x, c.y, [label]).setDepth(90000);
 
     let hpBar: Phaser.GameObjects.Graphics | null = null;
@@ -528,7 +534,7 @@ export class GameScene extends Phaser.Scene {
       : null;
 
     const v: View = {
-      id: e.id, kind: e.kind, c, oc, body, hpBar, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
+      id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
       sprite, look: e.look ?? null, dead: !!e.dead, motion: null, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
@@ -623,7 +629,7 @@ export class GameScene extends Phaser.Scene {
   /** ตัวเลขดาเมจ: เด้งขยายแล้วหดกลับ ลอยโค้งขึ้นไปด้านข้างแล้วจาง คริใหญ่กว่า สีทอง มี ! */
   private floatDamage(v: View, dmg: number, crit: boolean) {
     const mine = v.kind === "player";
-    const t = this.add.text(v.c.x, v.c.y + v.topY - 9, crit ? `${dmg}!` : String(dmg), {
+    const t = this.add.text(v.c.x, v.c.y - v.lift + v.topY - 9, crit ? `${dmg}!` : String(dmg), {
       fontFamily: "Mitr, sans-serif", fontStyle: "bold", fontSize: crit ? "24px" : "17px",
       color: mine ? "#ff6b6b" : crit ? "#ffd84a" : "#ffffff",
       stroke: crit ? "#6b2400" : "#10192a", strokeThickness: crit ? 5 : 4,
@@ -673,8 +679,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     // หมัด: วงกลมสีผิวขอบเข้ม พุ่งจากหน้าอกไปหาเป้าตอนต่อย แล้วจางหาย
-    const sx = src.c.x + ux * 6, sy = src.c.y - 17 + uy * 4;
-    const ex = src.c.x + ux * 24, ey = src.c.y - 15 + uy * 14;
+    const sx = src.c.x + ux * 6, sy = src.c.y - src.lift - 17 + uy * 4;
+    const ex = src.c.x + ux * 24, ey = src.c.y - src.lift - 15 + uy * 14;
     const r = crit ? 8 : 6;
     const fist = this.add.graphics({ x: sx, y: sy }).setDepth(depth).setAlpha(0);
     // หมัด: เงาเรือง + ขอบเข้ม + สีผิว + ข้อนิ้ว + ไฮไลต์
@@ -713,7 +719,7 @@ export class GameScene extends Phaser.Scene {
     const len = Math.hypot(dx, dy) || 1;
     const ux = dx / len, uy = dy / len;
     const a = Math.atan2(dy, dx);
-    const cx = src.c.x + ux * 14, cy = src.c.y - 14 + uy * 10;
+    const cx = src.c.x + ux * 14, cy = src.c.y - src.lift - 14 + uy * 10;
     const depth = Math.max(src.c.y, dst.c.y) + 2;
     const sweep = 1.3; // ครึ่งมุมกวาด (เรเดียน)
     const dirSign = Math.random() < 0.5 ? 1 : -1; // ฟันสลับซ้าย-ขวา
@@ -747,7 +753,7 @@ export class GameScene extends Phaser.Scene {
    *  hit-stop + ตัวสั่น, จอสั่นทุกครั้งที่เราตีหรือโดนตี · เราโดนตี = สีแดง, คริ = สีทองและใหญ่กว่า */
   private hitFx(dst: View, src: View | undefined, crit: boolean) {
     const calm = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const x = dst.c.x, y = dst.c.y + dst.topY / 2, depth = dst.c.y + 1;
+    const x = dst.c.x, y = dst.c.y - dst.lift + dst.topY / 2, depth = dst.c.y + 1;
     const onMe = !!this.me && dst.id === this.me;
     const main = onMe ? 0xff5a5a : crit ? 0xffd84a : 0xffffff;
     const glow = onMe ? 0xff9a8a : crit ? 0xfff2b0 : 0xbfe3ff;
@@ -988,10 +994,12 @@ export class GameScene extends Phaser.Scene {
       }
       this.updatePose(v);
       v.c.setDepth(v.c.y);
-      v.oc.setPosition(v.c.x, v.c.y);
+      const lift = bridgeLift(v.c.x, v.c.y);
+      if (lift !== v.lift) { v.lift = lift; v.inner.y = -lift; }
+      v.oc.setPosition(v.c.x, v.c.y - v.lift);
     }
     const t = this.targetId ? this.views.get(this.targetId) : undefined;
-    if (t) this.targetRing.setPosition(t.c.x, t.c.y + 2).setDepth(t.c.y - 1).setVisible(true);
+    if (t) this.targetRing.setPosition(t.c.x, t.c.y + 2 - t.lift).setDepth(t.c.y - 1).setVisible(true);
   }
 
   // ---------- ภาพ placeholder ----------
@@ -1060,6 +1068,14 @@ export class GameScene extends Phaser.Scene {
     // ชิ้นที่ขวางทางเรียงลำดับตามแกน y กับตัวละคร/มอน ชิ้นเล็กเดินผ่านได้อยู่ระดับพื้น (ใต้ตัวละครเสมอ)
     const meta = Object.assign({}, ...Object.keys(PROP_SETS).map((set) => this.cache.json.get(`props_${set}`) ?? {})) as Record<string, { width: number; height: number; anchor: { x: number; y: number }; shadowWidth: number }>;
     for (const p of PROPS) {
+      if (ARCH_BRIDGES.has(p.kind)) {
+        // สะพานโค้ง: ชั้นหลัง (พื้น+ราวไกล) ใต้ตัวละครทุกตัว, ชั้นหน้า (ราวใกล้+เสา) เรียงความลึกตามขอบล่างของภาพ
+        for (const [part, depth] of [["back", -1], ["front", p.py - 8]] as const) {
+          const mm = meta[`${p.kind}-${part}`];
+          if (mm) this.add.image(p.px, p.py, `prop_${p.kind}-${part}`).setOrigin(mm.anchor.x / mm.width, (mm.anchor.y + 1) / mm.height).setDepth(depth);
+        }
+        continue;
+      }
       const m = meta[p.kind];
       if (!m) continue;
       const x = p.px, y = p.py; // จุดยึดกึ่งกลางฐานตาม layout (พิกเซล)

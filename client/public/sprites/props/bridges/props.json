@@ -1,0 +1,52 @@
+{
+ "bridge-main-back": {
+  "file": "bridge-main-back.png",
+  "width": 235,
+  "height": 103,
+  "anchor": {
+   "x": 117,
+   "y": 102
+  },
+  "shadowWidth": 0
+ },
+ "bridge-main-front": {
+  "file": "bridge-main-front.png",
+  "width": 235,
+  "height": 103,
+  "anchor": {
+   "x": 117,
+   "y": 102
+  },
+  "shadowWidth": 0
+ },
+ "bridge-foot-back": {
+  "file": "bridge-foot-back.png",
+  "width": 235,
+  "height": 103,
+  "anchor": {
+   "x": 117,
+   "y": 102
+  },
+  "shadowWidth": 0
+ },
+ "bridge-foot-front": {
+  "file": "bridge-foot-front.png",
+  "width": 235,
+  "height": 103,
+  "anchor": {
+   "x": 117,
+   "y": 102
+  },
+  "shadowWidth": 0
+ },
+ "pier": {
+  "file": "pier.png",
+  "width": 72,
+  "height": 146,
+  "anchor": {
+   "x": 36,
+   "y": 145
+  },
+  "shadowWidth": 0
+ }
+}

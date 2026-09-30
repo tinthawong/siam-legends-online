@@ -59,8 +59,8 @@
   },
   "shadowWidth": 58
  },
- "pier": {
-  "file": "pier.png",
+ "pier-plank": {
+  "file": "pier-plank.png",
   "width": 40,
   "height": 40,
   "anchor": {
