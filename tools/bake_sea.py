@@ -43,6 +43,24 @@ sea=shallow*w1[...,None]+mid*w2[...,None]+deep*w3[...,None]
 # ปรับสีตามความลึกให้ไล่นุ่มขึ้น (ตื้นสว่างอมเขียว, ลึกเข้ม)
 tint=np.stack([np.interp(dd,[0,60,200,420],[90,30,10,5]),np.interp(dd,[0,60,200,420],[230,180,110,70]),np.interp(dd,[0,60,200,420],[220,220,190,150])],-1)
 sea=sea*(1-A.tint)+tint*A.tint
+# แถบชายฝั่ง (art/tiles/shore-strip.png ถ้ามี): ทะเลดึงสีจากแถวของภาพตามระยะจากฝั่ง
+#   แถว = SHORE_ROW + ระยะจากฝั่ง (เบลอให้นุ่ม คลื่นจึงขนานฝั่ง) · คอลัมน์ = พิกัด x (ใช้จุดบนฝั่งที่ใกล้สุดทำให้เป็นแฉกรัศมีตรงฝั่งโค้ง)
+#   ใช้เฉพาะน้ำผืนใหญ่ (ทะเล) แม่น้ำ/บ่อที่แคบใช้ลายน้ำตื้นตามเดิม
+import os
+strip_path=os.path.join(A.tiles,'shore-strip.png'); SHORE_ROW=75
+use_strip=np.zeros((H,W),bool)
+if os.path.exists(strip_path):
+    ST=np.array(Image.open(strip_path).convert('RGB')).astype(float); SH,SW=ST.shape[:2]
+    # ทะเล = น้ำที่อยู่ไม่ไกลจากแกนน้ำกว้าง (ห่างฝั่งเกิน 90 px) แม่น้ำ/บ่อ (แคบกว่า ~180 px) จึงไม่โดนแถบ
+    core=d>90
+    use_strip=water&(ndimage.distance_transform_edt(~core)<110) if core.any() else np.zeros((H,W),bool)
+    ds=ndimage.gaussian_filter(d,5)
+    rows=np.clip((SHORE_ROW+ds).astype(int),0,SH-1)
+    cols=np.broadcast_to(np.arange(W)%SW,(H,W))
+    sample=ST[rows,cols]
+    # ปลายแถบ (น้ำลึกเกินภาพ) ค่อย ๆ กลับไปใช้ทะเลลายน้ำลึก
+    fade=np.clip((SHORE_ROW+ds-(SH-60))/60,0,1)[...,None]
+    sea=np.where(use_strip[...,None],sample*(1-fade)+sea*fade,sea)
 # แนวปะการัง/โขดหินใต้น้ำ: หย่อมมืดในเขตน้ำตื้น-กลาง
 reef=np.zeros((H,W))
 for _ in range(90):
@@ -74,7 +92,7 @@ for k,(dist,wid,a) in enumerate([(22,4,0.55),(46,3,0.35),(78,3,0.2)]):
     wave=np.exp(-((d-(dist+noise(40,14)-7))/wid)**2)
     broken=noise(10,1.0)>0.45
     bands+=wave*a*broken
-white=np.clip(foam+bands,0,1)*water
+white=np.clip(foam+bands,0,1)*water*(~use_strip)  # ทะเลใช้ฟองจากแถบชายฝั่งแทน
 sea=sea*(1-white[...,None])+255*white[...,None]
 # แผ่นดิน: ทรายเปียกใกล้น้ำ, ทราย, หญ้า, ทางดิน (ตามผัง)
 lg=np.array([[c for c in r] for r in G])
