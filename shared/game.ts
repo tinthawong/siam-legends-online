@@ -98,8 +98,8 @@ export function derive(level: number, base: Stats, gear: Gear = NO_GEAR): Derive
     mdefBonus: s.int,
     aspdMs: Math.max(300, Math.round(1200 * (1 - (s.agi * 4 + s.dex) / 1000))),
     castMul: Math.max(0, 1 - s.dex / 150),
-    hpRegen: 1 + f(s.vit / 5) + f(maxHp / 200),   // ทุก 6 วินาทีตอนยืนนิ่ง
-    spRegen: 1 + f(s.int / 6) + f(maxSp / 100),   // ทุก 8 วินาทีตอนยืนนิ่ง
+    hpRegen: 1 + f(s.vit / 5) + f(maxHp / 200),   // โบนัสฟื้น HP (บวกกับ 5% ของ HP สูงสุด ทุก REGEN_MS)
+    spRegen: 1 + f(s.int / 6) + f(maxSp / 100),   // โบนัสฟื้น SP
     weight: 2000 + s.str * 30,
   };
 }

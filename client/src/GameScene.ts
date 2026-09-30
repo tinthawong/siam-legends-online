@@ -499,6 +499,14 @@ export class GameScene extends Phaser.Scene {
         this.onExpGain?.(m);
         break;
       }
+      case "regen": {
+        const v = this.me ? this.views.get(this.me) : undefined;
+        if (!v) break;
+        const y = v.c.y - v.lift + v.topY - 6;
+        if (m.hp) this.floatText(v.c.x - (m.sp ? 10 : 0), y, `+${m.hp}`, "#7ee08a", 900);
+        if (m.sp) this.floatText(v.c.x + (m.hp ? 10 : 0), y, `+${m.sp}`, "#6cc8ff", 900);
+        break;
+      }
       case "skill_hit":
         this.skillFx(m);
         break;

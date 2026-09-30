@@ -3,7 +3,7 @@ import type { Env } from "./index";
 import {
   TICK_MS, GROUND_ITEM_MS, PLAYER_MOVE_MS, PLAYER_RANGE, AUTO_RADIUS, MOB_RESPAWN_MS, MISS_LEVEL_GAP,
   MOB_ASPD_MS, MOB_RANGE, MOB_CHASE_RANGE,
-  POTION_COOLDOWN_MS, MAX_BUY,
+  POTION_COOLDOWN_MS, MAX_BUY, REGEN_MS, REGEN_PCT, REGEN_MOVING,
   stepMs, cheb,
 } from "../../shared/constants";
 import { MAP_W, MAP_H, SPAWN, ZONES, isWalkable, inZone, exitAt } from "../../shared/map";
@@ -644,6 +644,7 @@ export class MapRoom extends DurableObject<Env> {
     p.path = [];
     p.x = SPAWN.x; p.y = SPAWN.y;
     p.hp = p.maxHp;
+    p.sp = p.maxSp; // ฟื้นที่จุดเกิด: เลือดและ SP เต็ม
     this.broadcast({ t: "respawn", id: p.id, x: p.x, y: p.y });
     this.send(p, { t: "stats", self: this.stats(p) });
   }
@@ -670,18 +671,16 @@ export class MapRoom extends DurableObject<Env> {
 
   /** ฟื้น HP ทุก 6 วิ และ SP ทุก 8 วิ ตอนยืนนิ่ง (docs/stat-system.md) */
   private regen(p: Player, now: number) {
-    if (p.dead) return;
-    if (p.path.length) { p.nextHpRegenAt = now + 6000; p.nextSpRegenAt = now + 8000; return; } // เดินอยู่ = เริ่มนับใหม่
-    let changed = false;
-    if (now >= p.nextHpRegenAt) {
-      p.nextHpRegenAt = now + 6000;
-      if (p.hp < p.maxHp) { p.hp = Math.min(p.maxHp, p.hp + p.der.hpRegen); changed = true; }
-    }
-    if (now >= p.nextSpRegenAt) {
-      p.nextSpRegenAt = now + 8000;
-      if (p.sp < p.maxSp) { p.sp = Math.min(p.maxSp, p.sp + p.der.spRegen); changed = true; }
-    }
-    if (changed) this.send(p, { t: "stats", self: this.stats(p) });
+    if (p.dead || now < p.nextHpRegenAt) return;
+    p.nextHpRegenAt = now + REGEN_MS;
+    // ยืนนิ่งได้เต็ม เดิน/กำลังตี (มีเป้าหมาย) ได้ครึ่งหนึ่ง
+    const mul = p.path.length || p.target ? REGEN_MOVING : 1;
+    const hp = p.hp < p.maxHp ? Math.min(p.maxHp - p.hp, Math.ceil((p.maxHp * REGEN_PCT + p.der.hpRegen) * mul)) : 0;
+    const sp = p.sp < p.maxSp ? Math.min(p.maxSp - p.sp, Math.ceil((p.maxSp * REGEN_PCT + p.der.spRegen) * mul)) : 0;
+    if (!hp && !sp) return;
+    p.hp += hp; p.sp += sp;
+    this.send(p, { t: "regen", hp, sp });
+    this.send(p, { t: "stats", self: this.stats(p) });
   }
 
   /** คิดค่าที่คำนวณใหม่ (หลังเพิ่มค่าหลัก เลเวลขึ้น หรือเปลี่ยนอุปกรณ์) HP/SP สูงสุดที่เพิ่มขึ้นเติมให้ทันที ลดลงไม่ต่ำกว่า 1 */
