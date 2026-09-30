@@ -145,6 +145,16 @@ function startGame(ch: Character, session: Session) {
   };
   scene.onQuests = quests.setLog;
   scene.onDialog = quests.dialog;
+  // เควสครบแล้ว: ป้ายด้านบนจอ แตะ = เดินไปหา NPC ที่ต้องส่ง (มีลูกศรในเกมชี้ทางด้วย)
+  const guide = $<HTMLButtonElement>("quest-guide");
+  guide.onclick = () => scene.goToGuide();
+  scene.onQuestGuide = (g) => {
+    guide.hidden = !g;
+    if (g) {
+      $("quest-guide-title").textContent = `${g.quest} สำเร็จ!`;
+      $("quest-guide-sub").textContent = `แตะเพื่อไปรับของที่${g.npcName}`;
+    }
+  };
   scene.onStats = hud.stats;
   scene.onJoined = hud.joined;
   // สลบ: แสดงสาเหตุ กดกลับเมืองแล้ว server ฟื้นให้ที่จุดเกิด

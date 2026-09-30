@@ -11,7 +11,7 @@ import { recolorSprite } from "./recolor";
 import { MOBS } from "../../shared/game";
 import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
-import { NPCS, emptyLog, npcMark, type QuestLog } from "../../shared/quests";
+import { NPCS, QUESTS, emptyLog, isComplete, npcMark, type QuestLog } from "../../shared/quests";
 import { IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, WALK_FRAMES, WALK_FPS, WALK_OFFSET, WALK_SCALE, animSource, idleDirs, idleFrameUrl, walkDirs, walkFrameUrl } from "./sprites";
 
 interface View {
@@ -103,6 +103,10 @@ export class GameScene extends Phaser.Scene {
   onQuests: ((log: QuestLog) => void) | null = null;
   onDialog: ((m: Extract<ServerMsg, { t: "dialog" }>) => void) | null = null;
   onQuestReward: ((m: Extract<ServerMsg, { t: "quest_reward" }>) => void) | null = null;
+  /** เควสที่ทำครบแล้ว รอส่ง (null = ไม่มี) → main.ts แสดงป้าย "เควสสำเร็จ! แตะเพื่อไปรับของ" */
+  onQuestGuide: ((g: { quest: string; npc: string; npcName: string } | null) => void) | null = null;
+  private guideNpc: string | null = null;
+  private guideArrow!: Phaser.GameObjects.Graphics;
 
   // NPC: เครื่องหมาย ! / ? เหนือหัว คิดจากเลเวล กระเป๋า และสถานะเควสของเรา
   private npcMarks = new Map<string, Phaser.GameObjects.Text>();
@@ -196,6 +200,11 @@ export class GameScene extends Phaser.Scene {
 
     this.targetRing = this.add.image(0, 0, "ring").setVisible(false);
     this.tapMarker = this.add.image(0, 0, "marker").setVisible(false).setDepth(1);
+    // ลูกศรนำทางไปส่งเควส: สามเหลี่ยมทองขอบเข้ม หมุนรอบตัวเราชี้ไปทาง NPC
+    this.guideArrow = this.add.graphics().setDepth(90002).setVisible(false);
+    this.guideArrow.fillStyle(0x3a1a05).fillTriangle(13, 0, -7, -10, -7, 10)
+      .fillStyle(0xffd84a).fillTriangle(10, 0, -5, -7, -5, 7)
+      .fillStyle(0xfff2b0).fillTriangle(8, -1, -3, -5, -3, -1);
 
     this.input.on("pointerdown", this.onTap, this);
     this.autoBtn.onclick = () => this.net.send({ t: "auto", on: !this.autoOn });
@@ -931,6 +940,31 @@ export class GameScene extends Phaser.Scene {
       const mark = npcMark(id, this.level, this.questLog, (i) => this.invCount.get(i) ?? 0);
       t.setText(mark ?? "").setColor(mark === "?" ? "#7ee08a" : "#ffd84a");
     }
+    // เควสที่ครบแล้ว (รวมเควสคุยที่แค่ต้องไปหาเป้าหมาย) → นำทางไปหา NPC ที่ต้องส่ง
+    const ready = Object.keys(this.questLog.active).map((k) => QUESTS[k])
+      .find((q) => q && NPCS[q.turnIn] && isComplete(q, this.questLog, (i) => this.invCount.get(i) ?? 0));
+    this.guideNpc = ready ? ready.turnIn : null;
+    this.onQuestGuide?.(ready ? { quest: ready.name, npc: ready.turnIn, npcName: NPCS[ready.turnIn].name } : null);
+  }
+
+  /** ป้ายนำทางถูกแตะ: เดินไปหา NPC ที่ต้องส่งเควส (ถึงแล้ว server เปิดหน้ารับรางวัลให้) */
+  goToGuide() {
+    if (!this.guideNpc) return;
+    this.net.send({ t: "talk", npc: this.guideNpc });
+    this.setTarget(null);
+  }
+
+  /** ลูกศรรอบตัวเรา ชี้ไปทาง NPC ที่ต้องส่งเควส (ใกล้แล้วซ่อน) ขยับเข้าออกเบา ๆ ให้สะดุดตา */
+  private updateGuideArrow(time: number) {
+    const me = this.me ? this.views.get(this.me) : undefined;
+    const n = this.guideNpc ? NPCS[this.guideNpc] : undefined;
+    if (!me || !n) { this.guideArrow.setVisible(false); return; }
+    const dx = center(n.x) - me.c.x, dy = center(n.y) - me.c.y;
+    const d = Math.hypot(dx, dy);
+    if (d < TILE * 3) { this.guideArrow.setVisible(false); return; }
+    const r = 30 + Math.sin(time / 180) * 3;
+    this.guideArrow.setVisible(true).setRotation(Math.atan2(dy, dx))
+      .setPosition(me.c.x + (dx / d) * r, me.c.y - me.lift - 14 + (dy / d) * r * 0.8);
   }
 
   /** NPC ยืนนิ่งตามตำแหน่งใน layout แมพ: ชื่อสีทอง + เครื่องหมายเควสเหนือหัว กดแล้วเดินไปคุย */
@@ -976,6 +1010,7 @@ export class GameScene extends Phaser.Scene {
 
   update(time: number, dt: number) {
     if (this.joyDir !== null) this.joyStep(time);
+    this.updateGuideArrow(time);
     const meV = this.me ? this.views.get(this.me) : undefined;
     if (meV) for (const { t, e } of this.exitLabels) {
       const cx = ((e.x0 + e.x1 + 1) / 2) * TILE, cy = ((e.y0 + e.y1 + 1) / 2) * TILE;
