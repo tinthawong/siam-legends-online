@@ -25,6 +25,7 @@ Supabase project ref: `ctmbapudylwizbrhfcoy` (ค่า URL และ anon key �
 
 ```powershell
 npm install
+npm run dev             # คำสั่งเดียว: migration + wrangler dev + vite → เปิด http://localhost:5173 แก้โค้ดแล้วหน้าเกมโหลดใหม่เอง ไม่ต้อง build
 npm run db:migrate      # ใช้ migration กับ D1 บนเครื่อง (ต้องรันทุกครั้งที่มีไฟล์ใหม่ใน migrations/)
 npm run build           # build client ไปที่ client/dist (wrangler เสิร์ฟจากตรงนี้)
 npx wrangler dev        # เปิด http://localhost:8787 (เปิดด้วย localhost ไม่ใช่ 127.0.0.1 เพราะ redirect ของ Supabase)
