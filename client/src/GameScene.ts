@@ -537,6 +537,8 @@ export class GameScene extends Phaser.Scene {
         if (Phaser.Math.Distance.Between(v.c.x, v.c.y, fx, fy) > TILE * 1.5) v.c.setPosition(fx, fy);
         v.moveMs = m.moveMs;
         v.path = m.path.length ? m.path.slice() : [m.from]; // path ว่าง = หยุดที่ช่อง from
+        // สั่งเดินใหม่จริง = เลิกต่อย · path ว่าง (server หยุดตัวเพื่อตี) ไม่เลิก ท่าต่อยเล่นไปพร้อมเลื่อนเข้าช่องให้จบ
+        if (m.path.length) v.punching = false;
         break;
       }
       case "hit": {
@@ -1523,7 +1525,9 @@ export class GameScene extends Phaser.Scene {
     const walking = v.path.length > 0;
     const alive = v.kind === "player" && !v.dead;
     if (v.punching) {
-      if (alive && !walking) return; // ต่อยจนจบท่า (ANIMATION_COMPLETE ปลด) เดิน/สลบ = เลิกต่อย
+      // ต่อยจนจบท่า (ANIMATION_COMPLETE ปลด) · สลบ = เลิกต่อย · สั่งเดินใหม่ = เลิก (ข้อความ move)
+      // ยังเลื่อนเข้าช่องที่ server หยุดไม่เสร็จ ไม่นับว่าเดิน (ไม่อย่างนั้นท่าต่อยโดนยกเลิกทันที)
+      if (alive) return;
       v.punching = false;
     }
     const walk = alive && walking && this.anims.exists(`${v.sprite}_walk_${v.dir}`) ? `${v.sprite}_walk_${v.dir}` : null;
