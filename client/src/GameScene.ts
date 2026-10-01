@@ -459,7 +459,8 @@ export class GameScene extends Phaser.Scene {
         for (const e of m.entities) this.addView(e);
         { const mv = this.views.get(m.you); if (mv) { this.setOutfit(mv); this.setWeapon(mv); } }
         for (const g of m.ground) this.addGround(g, false);
-        this.cameras.main.startFollow(this.views.get(m.you)!.c, true, 0.2, 0.2);
+        // กล้องล็อกตัวเรา (lerp 1): ถ้าไล่ตามช้า ๆ กล้องกับตัวปัดเศษพิกเซลคนละจังหวะ ตัวละครสั่นไปมา 1 px ตอนเดิน
+        this.cameras.main.startFollow(this.views.get(m.you)!.c, true, 1, 1);
         this.updateStats(m.self);
         this.setInv(m.inv);
         this.questLog = m.quests;
@@ -1492,14 +1493,19 @@ export class GameScene extends Phaser.Scene {
         if (v.body.texture.key !== key) v.body.setTexture(key);
       }
       if (v.path.length) {
-        const n = v.path[0];
-        const tx = center(n.x), ty = center(n.y);
-        const dx = tx - v.c.x, dy = ty - v.c.y;
-        const dist = Math.hypot(dx, dy);
-        const step = (TILE / v.moveMs) * dt; // ทแยงใช้เวลา ×1.414 ตรงกับ server
-        if (dist <= step) { v.c.setPosition(tx, ty); v.path.shift(); }
-        else { v.c.x += (dx / dist) * step; v.c.y += (dy / dist) * step; }
-        this.face(v, dx, dy);
+        // ระยะที่เดินได้ในเฟรมนี้ ถึงช่องแล้วเหลือเท่าไหร่เดินต่อช่องถัดไป (ไม่ทิ้งเศษ ความเร็วสม่ำเสมอทุกช่อง)
+        let rest = (TILE / v.moveMs) * dt; // ทแยงใช้เวลา ×1.414 ตรงกับ server
+        let fx = 0, fy = 0;
+        while (v.path.length && rest > 0) {
+          const n = v.path[0];
+          const tx = center(n.x), ty = center(n.y);
+          const dx = tx - v.c.x, dy = ty - v.c.y;
+          const dist = Math.hypot(dx, dy);
+          fx = dx; fy = dy;
+          if (dist <= rest) { v.c.setPosition(tx, ty); v.path.shift(); rest -= dist; }
+          else { v.c.x += (dx / dist) * rest; v.c.y += (dy / dist) * rest; rest = 0; }
+        }
+        this.face(v, fx, fy);
       }
       this.updatePose(v);
       v.c.setDepth(v.c.y);
