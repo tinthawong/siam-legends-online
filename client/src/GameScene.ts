@@ -25,6 +25,7 @@ interface View {
   hpBar: Phaser.GameObjects.Graphics | null;
   inner: Phaser.GameObjects.Container; // ตัว + เงา (ยกขึ้นตอนอยู่บนสะพานโค้ง)
   outfit: Phaser.GameObjects.Image | null; // เสื้อ: ภาพทับขนาดเท่าตัวละคร ทิศละไฟล์ (ทดสอบ)
+  skin: Phaser.GameObjects.Image | null;   // พิกเซลสีผิวของเฟรมตัวที่เล่นอยู่ วาดทับเสื้อ (มีเฉพาะตอนใส่เสื้อ)
   weapon: Phaser.GameObjects.Image | null; // อาวุธในมือ (ทดสอบ)
   swing: { a: number };                    // มุมเหวี่ยงอาวุธตอนตี (องศา ก่อนกลับด้าน)
   lift: number;                         // ยกขึ้นกี่ px (สะพานโค้ง) — ข้อความ/เอฟเฟกต์เหนือตัวต้องยกตาม
@@ -91,6 +92,22 @@ function inhaleCanvas(still: HTMLImageElement | HTMLCanvasElement): HTMLCanvasEl
   ctx.drawImage(still, 0, 1, still.width, BREATH_ROW, 0, 0, still.width, BREATH_ROW);
   return cv;
 }
+/** ชั้นสีผิว: เก็บเฉพาะพิกเซลสีผิวของเฟรมตัว (R>180, 100<G<190, 70<B<170, R-B>40) ที่เหลือโปร่งใส
+ *  วาดทับเสื้อ → แขนที่แกว่งผ่านหน้าลำตัวอยู่หน้าเสื้อเสมอ หน้าไม่โดนทับ (สร้างครั้งเดียวต่อเฟรมตอนโหลด) */
+function skinCanvas(src: HTMLImageElement | HTMLCanvasElement): HTMLCanvasElement {
+  const cv = document.createElement("canvas");
+  cv.width = src.width; cv.height = src.height;
+  const ctx = cv.getContext("2d", { willReadFrequently: true })!;
+  ctx.drawImage(src, 0, 0);
+  const img = ctx.getImageData(0, 0, cv.width, cv.height), p = img.data;
+  for (let i = 0; i < p.length; i += 4) {
+    const r = p[i], g = p[i + 1], b = p[i + 2];
+    if (!(r > 180 && g > 100 && g < 190 && b > 70 && b < 170 && r - b > 40)) p[i + 3] = 0;
+  }
+  ctx.putImageData(img, 0, 0);
+  return cv;
+}
+const skinKey = (bodyKey: string) => `${bodyKey}_skin`;
 // เสื้อ (แบบหลัก): ภาพทับขนาด 48×48 เท่าตัวละคร ทิศละไฟล์ sprites/equipment/body/<id>/<id>-<ทิศ>.png
 // วาดซ้อนตำแหน่งเดียวกับตัวละคร ไม่ย่อ · หายใจเข้าใช้เฟรมเลื่อนแบบเดียวกับตัว · เดินไม่ขยับ (ขยับแค่ขา)
 // เสื้อชุดใหม่ = วางไฟล์ 8 ทิศ แล้วเพิ่ม id ในรายการนี้ (ไฟล์ไม่ครบ 8 ทิศ = ไม่ขึ้นในปุ่มทดสอบ)
@@ -697,7 +714,7 @@ export class GameScene extends Phaser.Scene {
       : null;
 
     const v: View = {
-      id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, outfit: null, weapon: null, swing: { a: 0 }, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
+      id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, outfit: null, skin: null, weapon: null, swing: { a: 0 }, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
       sprite, look: e.look ?? null, dead: !!e.dead, breathing: false, breath0: Math.random() * BREATH_MS * 2, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
@@ -1172,7 +1189,8 @@ export class GameScene extends Phaser.Scene {
 
   private setOutfit(v: View) {
     v.outfit?.destroy();
-    v.outfit = null;
+    v.skin?.destroy();
+    v.outfit = v.skin = null;
     const id = this.outfitId;
     if (!id || !this.textures.exists(outfitKey(id, "south"))) return;
     // เฟรมหายใจเข้าของเสื้อ สร้างครั้งแรกครั้งเดียว
@@ -1181,9 +1199,11 @@ export class GameScene extends Phaser.Scene {
       if (this.textures.exists(k) && !this.textures.exists(`${k}_in`))
         this.textures.addCanvas(`${k}_in`, inhaleCanvas(this.textures.get(k).getSourceImage() as HTMLImageElement));
     }
-    // ลำดับวาด: ตัวละคร → เสื้อ → อาวุธ (อาวุธด้านหน้าอยู่บนสุดของ inner, ด้านหลังอยู่ใต้ตัว)
+    // ลำดับวาด: ตัวละคร → เสื้อ → สีผิวของตัว → อาวุธ (อาวุธด้านหน้าอยู่บนสุดของ inner, ด้านหลังอยู่ใต้ตัว)
     v.outfit = this.add.image(0, 0, outfitKey(id, v.dir));
     v.inner.addAt(v.outfit, v.inner.getIndex(v.body) + 1);
+    v.skin = this.add.image(0, 0, "__MISSING");
+    v.inner.addAt(v.skin, v.inner.getIndex(v.outfit) + 1);
     this.placeOutfit(v);
   }
 
@@ -1208,6 +1228,11 @@ export class GameScene extends Phaser.Scene {
     if (o.texture.key !== k && this.textures.exists(k)) o.setTexture(k);
     const sh = this.walkShifts.has(key) ? this.bodyShift(v) : { dx: 0, dy: 0 };
     o.setFlipX(flip).setOrigin(0.5, 45 / 48).setPosition(b.x + sh.dx, b.y + sh.dy).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
+    // ชั้นสีผิว: ตรงกับตัวทุกอย่าง (ภาพเฟรมเดียวกัน กลับด้าน/จุดยึดเดียวกัน)
+    const sk = v.skin!, sKey = skinKey(key);
+    sk.setVisible(this.textures.exists(sKey));
+    if (sk.visible && sk.texture.key !== sKey) sk.setTexture(sKey);
+    sk.setFlipX(b.flipX).setOrigin(b.originX, b.originY).setPosition(b.x, b.y).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
   }
 
 
@@ -1278,10 +1303,13 @@ export class GameScene extends Phaser.Scene {
         const still = recolorSprite(src, look);
         stills[d] = still;
         this.textures.addCanvas(`${prefix}_${d}`, still);
-        this.textures.addCanvas(`${prefix}_${d}_in`, inhaleCanvas(still));
+        const inhale = inhaleCanvas(still);
+        this.textures.addCanvas(`${prefix}_${d}_in`, inhale);
+        this.textures.addCanvas(skinKey(`${prefix}_${d}`), skinCanvas(still));
+        this.textures.addCanvas(skinKey(`${prefix}_${d}_in`), skinCanvas(inhale));
       }
-      // ท่าเดิน: มีภาพ PixelLab ของทิศนี้ (หรือทิศฝั่งตรงข้าม → กลับด้าน) ใช้ภาพนั้น
-      // ไม่มี = โค้ดล้วน (walkgen.ts) 4 เฟรมจากภาพยืนนิ่ง ทิศซ้าย 3 ทิศใช้ภาพฝั่งขวาที่กลับด้านแล้วค่อยแบ่งขา
+      // ท่าเดิน: มีภาพ PixelLab ของทิศนี้ (หรือทิศฝั่งตรงข้าม → กลับด้าน) ใช้ภาพนั้น (ผู้ชายมีครบทุกทิศแล้ว)
+      // ไม่มี (เช่น ตัวละครที่ยังไม่มีท่าเดิน) = โค้ดล้วน (walkgen.ts) 4 เฟรมจากภาพยืนนิ่ง ทิศซ้าย 3 ทิศใช้ภาพฝั่งขวาที่กลับด้านแล้วค่อยแบ่งขา
       const pl = walkDirs(look.gender);
       for (const d of DIRS) {
         const src = animSource(pl, d);
@@ -1295,7 +1323,9 @@ export class GameScene extends Phaser.Scene {
               const raw = `base_${look.gender}_walk_${src.dir}_${i}`;
               if (!this.textures.exists(raw)) break;
               const img = this.textures.get(raw).getSourceImage() as HTMLImageElement;
-              this.textures.addCanvas(key, recolorSprite(img, look));
+              const frame = recolorSprite(img, look);
+              this.textures.addCanvas(key, frame);
+              this.textures.addCanvas(skinKey(key), skinCanvas(frame));
               const stand = this.textures.get(`base_${look.gender}_${src.dir}`).getSourceImage() as HTMLImageElement;
               this.walkShifts.set(key, walkShift(img, stand, WALK_PAD));
             }
@@ -1308,6 +1338,7 @@ export class GameScene extends Phaser.Scene {
           frames = makeWalkFrames(base).map((f, i) => {
             const key = `${prefix}_walk_${d}_${i}`;
             this.textures.addCanvas(key, f.canvas);
+            this.textures.addCanvas(skinKey(key), skinCanvas(f.canvas));
             this.walkFeet.set(key, { left: f.left, right: f.right });
             return { key };
           });
@@ -1326,7 +1357,7 @@ export class GameScene extends Phaser.Scene {
     else if (!v.sheet && Math.abs(dx) > 0.5) v.body.setFlipX(dx < 0);
   }
 
-  /** ผู้เล่น: ยืน = ภาพนิ่งของทิศ + หายใจ (update), เดิน = ท่าเดิน 4 เฟรมของทิศนั้น (walkgen.ts), สลบ = ภาพนิ่ง
+  /** ผู้เล่น: ยืน = ภาพนิ่งของทิศ + หายใจ (update), เดิน = ท่าเดินของทิศนั้น (PixelLab หรือ walkgen.ts), สลบ = ภาพนิ่ง
    *  มอนจาก sheet: เดิน = ท่า walk, ยืน = เฟรมแรกของ walk + ขยับขึ้นลง */
   private updatePose(v: View) {
     if (v.sheet) {
@@ -1362,7 +1393,7 @@ export class GameScene extends Phaser.Scene {
       // ภาพ PixelLab 64×64: ภาพยืนอยู่กลางด้วยระยะ WALK_PAD → เท้า (แถว 45 ของภาพยืน) อยู่แถว 45 + WALK_PAD
       const pixellab = this.walkShifts.has(this.anims.get(walk).frames[0].textureKey);
       v.body.setFlipX(this.walkFlip.has(walk)).setOrigin(0.5, pixellab ? (45 + WALK_PAD) / (48 + WALK_PAD * 2) : 45 / 48);
-      v.body.play(walk, true);
+      v.body.play(walk); // เปลี่ยนทิศระหว่างเดิน = เริ่มเฟรมแรกของทิศใหม่
     } else v.body.stop().setFlipX(false).setOrigin(0.5, 45 / 48).setTexture(`${v.sprite}_${v.dir}`);
   }
 

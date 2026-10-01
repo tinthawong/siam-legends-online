@@ -34,7 +34,7 @@ export const idleFrameUrl = (gender: string, dir: string, i: number) => `sprites
 // (ต้นฉบับ GIF อยู่ art/pixellab/base-<เพศ>-walk/) ทิศฝั่งตรงข้ามที่ไม่มีใช้ภาพนี้กลับด้าน (MIRROR)
 // ทิศที่ยังไม่มีเลย ใช้ท่าเดินที่สร้างด้วยโค้ด (walkgen.ts) · ทุกทิศใช้ความเร็วเฟรมเท่ากัน (WALK_FRAME_MS) วนตามจำนวนเฟรมของตัวเอง
 export const WALK_ANIMS: Record<string, Record<string, number>> = {
-  male: { south: 9, "south-east": 11 },
+  male: { south: 9, "south-east": 11, east: 11, "north-east": 11, north: 11 },
   female: {},
 };
 export const walkDirs = (gender: string) => Object.keys(WALK_ANIMS[gender] ?? {});
