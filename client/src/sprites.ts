@@ -44,13 +44,13 @@ export const walkFrameUrl = (gender: string, dir: string, i: number) => `sprites
 // ท่าต่อย (มือเปล่า เล่นครั้งเดียวต่อการตี) จาก PixelLab: เฟรม 64×64 วางแบบเดียวกับท่าเดิน (WALK_PAD)
 // hit = เฟรมที่หมัดโดน (นับจาก 1) → เอฟเฟกต์/ตัวเลข/มอนโดนตีขึ้นตอนนี้ · ทิศฝั่งตรงข้ามที่ไม่มีใช้ภาพนี้กลับด้าน
 // ทิศที่ไม่มีเลย (ตอนนี้ south, north) ใช้ท่าต่อยด้วยโค้ด (GameScene.punchFx) · ต้นฉบับ GIF อยู่ art/pixellab/base-<เพศ>-punch/
-// south = ท่าถีบ (teep) แทนต่อย: folder ภาพ teep-<ทิศ>, เฟรมละ frameMs, ไม่มีหมัดไฟ (fist: false)
+// south = ท่าถีบ (teep) แทนต่อย: folder ภาพ teep-<ทิศ>
 // ทิศที่ไม่มี south/north ยืมท่าทแยง (GameScene.punchAnim)
-export interface PunchAnim { frames: number; hit: number; frameMs?: number; folder?: string; fist?: boolean }
+export interface PunchAnim { frames: number; hit: number; frameMs?: number; folder?: string }
 export const PUNCH_ANIMS: Record<string, Record<string, PunchAnim>> = {
   male: {
     east: { frames: 11, hit: 7 }, "south-east": { frames: 13, hit: 8 }, "north-east": { frames: 13, hit: 8 },
-    south: { frames: 13, hit: 10, frameMs: 70, folder: "teep", fist: false },
+    south: { frames: 13, hit: 10, folder: "teep" },
   },
   female: {},
 };

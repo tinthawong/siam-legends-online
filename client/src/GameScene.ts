@@ -857,7 +857,7 @@ export class GameScene extends Phaser.Scene {
 
   /** ท่าต่อย PixelLab ของทิศที่หันอยู่ (ไม่มี = null ใช้ท่าต่อยด้วยโค้ด) + เวลาจากเริ่มท่าถึงเฟรมที่หมัดโดน
    *  south มีท่าถีบ (teep) ของตัวเอง · หัน south/north ที่ไม่มีท่าของทิศนั้น: ยืมทิศทแยง มอนอยู่ขวาหรือตรงกลาง (หรือไม่มีเป้า) = -east, อยู่ซ้าย = -west */
-  private punchAnim(v: View, dst?: View): { key: string; dir: string; hitMs: number; fist: boolean } | null {
+  private punchAnim(v: View, dst?: View): { key: string; dir: string; hitMs: number } | null {
     if (!v.sprite || !v.look || v.dead) return null;
     let dir = v.dir;
     if ((dir === "south" || dir === "north") && !punchDirs(v.look.gender).includes(dir)) dir = `${dir}-${!dst || dst.c.x >= v.c.x ? "east" : "west"}`;
@@ -865,11 +865,11 @@ export class GameScene extends Phaser.Scene {
     const src = animSource(punchDirs(v.look.gender), dir);
     if (!src || !this.anims.exists(key)) return null;
     const p = PUNCH_ANIMS[v.look.gender][src.dir];
-    return { key, dir, hitMs: (p.hit - 1) * punchFrameMs(p), fist: p.fist !== false };
+    return { key, dir, hitMs: (p.hit - 1) * punchFrameMs(p) };
   }
 
-  /** เล่นท่าต่อยครั้งเดียว (ตีซ้ำระหว่างท่า = เริ่มใหม่) จบแล้วกลับท่ายืน · โดน = หมัดไฟที่มอนตอนถึงเฟรม hit */
-  private playPunch(v: View, p: { key: string; dir: string; hitMs: number; fist: boolean }, dst: View | undefined, crit: boolean, hit: boolean) {
+  /** เล่นท่าต่อยครั้งเดียว (ตีซ้ำระหว่างท่า = เริ่มใหม่) จบแล้วกลับท่ายืน · โดน = แรงกระแทก (strikeFx) ที่มอนตอนถึงเฟรม hit */
+  private playPunch(v: View, p: { key: string; dir: string; hitMs: number }, dst: View | undefined, crit: boolean, hit: boolean) {
     v.punching = true;
     v.punchDir = p.dir;
     v.breathing = false;
@@ -882,26 +882,43 @@ export class GameScene extends Phaser.Scene {
       v.pose = "";
       this.updatePose(v);
     });
-    if (hit && dst && p.fist) this.time.delayedCall(p.hitMs, () => { if (dst.body.active) this.fireFistFx(v, dst, crit); });
+    if (hit && dst) this.time.delayedCall(p.hitMs, () => { if (dst.body.active) this.strikeFx(v, dst, crit); });
   }
 
-  /** หมัดไฟ (ภาพ fx flurry) ปลายหมัดชนกลางตัวมอน หันตามทิศต่อย พุ่งเข้าอีกนิดแล้วจางหาย */
-  private fireFistFx(src: View, dst: View, crit: boolean) {
-    if (!this.anims.exists("fx_flurry")) return;
-    const meta = this.cache.json.get("fxsheet_flurry") as { scale?: number } | undefined;
-    const sc = (meta?.scale ?? 1) * (crit ? 1.3 : 1);
+  /** แรงกระแทกตอนต่อย/ถีบโดน (โค้ดล้วน หันตามทิศที่ตี): เส้นความเร็วพุ่งเข้าหาจุดโดน + แสงวาบรีตามแนวตี
+   *  + วงกระแทกครึ่งวงด้านหลังเป้า + เศษแสงกระเด็นไปทางเดียวกับแรงตี · คริ = สีทองและใหญ่กว่า */
+  private strikeFx(src: View, dst: View, crit: boolean) {
+    const ADD = Phaser.BlendModes.ADD;
     const a = Math.atan2(dst.c.y - src.c.y, dst.c.x - src.c.x);
-    const x = dst.c.x, y = dst.c.y - dst.lift + dst.topY / 2;
-    const parts = [false, true].map((add) => this.add.sprite(x - Math.cos(a) * 6, y - Math.sin(a) * 4, "fx_flurry_0")
-      .setOrigin(0.92, 0.5).setRotation(a).setFlipY(Math.abs(a) > Math.PI / 2)
-      .setScale(add ? sc * 1.12 : sc).setDepth(dst.c.y + 3 + (add ? 0.1 : 0))
-      .setBlendMode(add ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL).setAlpha(add ? 0.5 : 1));
-    for (const p of parts) {
-      p.play("fx_flurry");
-      this.tweens.add({ targets: p, x, y, duration: 90, ease: "Quad.easeOut" });
+    const ux = Math.cos(a), uy = Math.sin(a) * 0.7; // มุมมองเอียง: แกนตั้งแบนลง
+    const nx = -Math.sin(a), ny = Math.cos(a) * 0.7;
+    const x = dst.c.x - ux * 4, y = dst.c.y - dst.lift + dst.topY / 2 - uy * 4, depth = dst.c.y + 2;
+    const main = crit ? 0xffd84a : 0xffffff, glow = crit ? 0xfff2b0 : 0xbfe3ff;
+    const k = crit ? 1.35 : 1;
+
+    // เส้นความเร็ว: มาจากฝั่งคนตี พุ่งเข้าจุดโดนแล้วหดหาย
+    for (const off of crit ? [-9, -5, -1, 3, 7] : [-7, -3, 1, 5]) {
+      const len = (16 + Math.random() * 8) * k;
+      const g = this.add.graphics({ x: x + nx * off, y: y + ny * off }).setBlendMode(ADD).setDepth(depth);
+      g.lineStyle(off === -1 || off === 1 ? 3 : 2, off % 2 ? glow : main, 1).lineBetween(-ux * (len + 10), -uy * (len + 10), -ux * 4, -uy * 4);
+      this.tweens.add({ targets: g, x: g.x + ux * 8, y: g.y + uy * 8, alpha: 0, duration: 140, ease: "Quad.easeOut", onComplete: () => g.destroy() });
     }
-    parts[0].once(Phaser.Animations.Events.ANIMATION_COMPLETE, () =>
-      this.tweens.add({ targets: parts, alpha: 0, duration: 90, onComplete: () => parts.forEach((q) => q.destroy()) }));
+    // แสงวาบรีตามแนวตี
+    const flash = this.add.ellipse(x, y, 22 * k, 10 * k, main).setRotation(a).setBlendMode(ADD).setDepth(depth + 1).setScale(0.3);
+    this.tweens.add({ targets: flash, scaleX: 1.6, scaleY: 1.1, alpha: 0, duration: 150, ease: "Quad.easeOut", onComplete: () => flash.destroy() });
+    // วงกระแทกครึ่งวง ด้านหลังเป้า (ฝั่งที่แรงพุ่งออกไป)
+    const arc = this.add.graphics({ x: x + ux * 4, y: y + uy * 4 }).setBlendMode(ADD).setDepth(depth + 1);
+    arc.lineStyle(3, glow, 1).beginPath().arc(0, 0, 9 * k, a - 1.1, a + 1.1).strokePath();
+    arc.setScale(1, 0.75);
+    this.tweens.add({ targets: arc, scaleX: 2.2, scaleY: 1.6, x: arc.x + ux * 10, y: arc.y + uy * 10, alpha: 0, duration: 220,
+      ease: "Cubic.easeOut", onComplete: () => arc.destroy() });
+    // เศษแสงกระเด็นไปทางเดียวกับแรงตี
+    for (let i = 0; i < (crit ? 9 : 6); i++) {
+      const b = a + (Math.random() - 0.5) * 1.6, d = (18 + Math.random() * 14) * k;
+      const p = this.add.rectangle(x, y, 4, 2, i % 2 ? main : glow).setRotation(b).setBlendMode(ADD).setDepth(depth + 1);
+      this.tweens.add({ targets: p, x: x + Math.cos(b) * d, y: y + Math.sin(b) * d * 0.7, scaleX: 0.2, alpha: 0,
+        duration: 200 + Math.random() * 100, ease: "Quad.easeOut", onComplete: () => p.destroy() });
+    }
   }
 
   /** ต่อย (โค้ดล้วน ใช้กับทิศที่ยังไม่มีภาพท่าต่อย): ง้าง = ถอยหลัง+เอนไปข้างหลัง → ต่อย = พุ่งไปข้างหน้า มีหมัดพุ่งออกไปหาเป้า + เส้นความเร็ว
