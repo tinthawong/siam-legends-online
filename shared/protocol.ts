@@ -85,6 +85,7 @@ export type ServerMsg =
   | { t: "heal"; id: string; amount: number } // ผู้เล่นกินยา (ทุกคนเห็นตัวเลขเขียว)
   | { t: "drop"; g: GroundItem }          // ของหล่นบนพื้น
   | { t: "picked"; id: string; by: string } // ของบนพื้นถูกเก็บแล้ว (by = id ผู้เล่นที่เก็บ)
+  | { t: "pickup_start"; id: string; gid: string } // ผู้เล่น id ถึงของ gid แล้ว เริ่มท่าก้มเก็บ (ของหายตอน picked)
   | { t: "inv"; items: InvItem[] }          // กระเป๋าของเราเปลี่ยน
   | { t: "expire"; id: string }             // ของบนพื้นหมดเวลา หายไป
   | { t: "stats"; self: PlayerStats }

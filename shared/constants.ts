@@ -37,3 +37,8 @@ export function stepMs(dx: number, dy: number, moveMs: number): number {
 export function cheb(ax: number, ay: number, bx: number, by: number): number {
   return Math.max(Math.abs(ax - bx), Math.abs(ay - by));
 }
+
+// ท่าก้มเก็บของ: เฟรมละ 60 ms, ของเข้ากระเป๋าตอนเฟรมที่ 5 (นับจาก 1) → server รอ (5-1) × 60 ms หลังเริ่มท่า
+export const PICKUP_FRAME_MS = 60;
+export const PICKUP_HIT_FRAME = 5;
+export const PICKUP_HIT_MS = (PICKUP_HIT_FRAME - 1) * PICKUP_FRAME_MS;

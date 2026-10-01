@@ -60,3 +60,15 @@ export const punchFrameMs = (p: PunchAnim) => p.frameMs ?? PUNCH_MS / p.frames;
 export const punchDirs = (gender: string) => Object.keys(PUNCH_ANIMS[gender] ?? {});
 export const punchFrameUrl = (gender: string, dir: string, i: number) =>
   `sprites/base-${gender}/${PUNCH_ANIMS[gender][dir].folder ?? "punch"}-${dir}/${i}.png`;
+
+// ท่าก้มเก็บของ (เล่นครั้งเดียว) จาก PixelLab: เฟรม 64×64 วางแบบเดียวกับท่าเดิน · ทิศซ้ายกลับด้าน (x มือ = 63 - x)
+// hand = ตำแหน่งมือในภาพ 64×64 ตอนเฟรมที่ของเข้ามือ (ไอคอนของโผล่ตรงนี้แล้วลอยขึ้นหาหัว) · ต้นฉบับ GIF art/pixellab/base-<เพศ>-pickup/
+export const PICKUP_ANIMS: Record<string, Record<string, { frames: number; hand: [number, number] }>> = {
+  male: {
+    south: { frames: 9, hand: [32, 49] }, "south-east": { frames: 11, hand: [28, 49] }, east: { frames: 11, hand: [40, 49] },
+    "north-east": { frames: 11, hand: [27, 49] }, north: { frames: 11, hand: [25, 49] },
+  },
+  female: {},
+};
+export const pickupDirs = (gender: string) => Object.keys(PICKUP_ANIMS[gender] ?? {});
+export const pickupFrameUrl = (gender: string, dir: string, i: number) => `sprites/base-${gender}/pickup-${dir}/${i}.png`;

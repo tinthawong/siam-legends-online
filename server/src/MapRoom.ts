@@ -4,7 +4,7 @@ import {
   TICK_MS, GROUND_ITEM_MS, PLAYER_MOVE_MS, PLAYER_RANGE, AUTO_RADIUS, MOB_RESPAWN_MS, MISS_LEVEL_GAP,
   MOB_ASPD_MS, MOB_RANGE, MOB_CHASE_RANGE,
   POTION_COOLDOWN_MS, MAX_BUY, REGEN_MS, REGEN_PCT, REGEN_MOVING,
-  stepMs, cheb,
+  stepMs, cheb, PICKUP_HIT_MS,
 } from "../../shared/constants";
 import { MAPS, getMap, type GameMap } from "../../shared/map";
 import { pathTo, pathNear, type Cell } from "../../shared/pathfind";
@@ -48,6 +48,7 @@ interface Player extends Ent {
   sp: number;
   maxSp: number;
   pickup: string | null;   // ของบนพื้นที่กำลังเดินไปเก็บ
+  pickAt: number;          // ถึงของแล้ว กำลังก้มเก็บ: ของเข้ากระเป๋าตอนนี้ (0 = ยังไม่เริ่ม)
   dead: boolean;           // เลือดหมด สลบอยู่กับที่ จนกว่าจะกดกลับเมือง
   money: number;           // เบี้ย
   st: Stats;               // ค่าพลังหลัก 6 ค่า
@@ -141,7 +142,7 @@ export class MapRoom extends DurableObject<Env> {
       ws: server, level: ch.level, exp: ch.exp,
       target: null, auto: false, nextAttackAt: 0, chaseKey: null,
       nextHpRegenAt: 0, nextSpRegenAt: 0,
-      pickup: null, dead: false, money: ch.money ?? 0, st: { ...ch.stats }, points: ch.points, der: der0, potionAt: 0, nextPotionAt: 0, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
+      pickup: null, pickAt: 0, dead: false, money: ch.money ?? 0, st: { ...ch.stats }, points: ch.points, der: der0, potionAt: 0, nextPotionAt: 0, inv: new Map((ch.inv ?? []).map((i) => [i.item, i.count])),
       quests: ch.quests ?? { active: {}, done: [] }, talk: null, equip: { ...(ch.equip ?? {}) }, gear, skill: null, skillReady: {}, mapId: this.map.id,
     };
     this.players.set(id, p);
@@ -194,6 +195,7 @@ export class MapRoom extends DurableObject<Env> {
         if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
         if (p.target) { p.target = null; this.send(p, { t: "target", id: null }); }
         p.pickup = g.id;
+        p.pickAt = 0;
         p.chaseKey = null;
         p.talk = null;
         p.skill = null;
@@ -535,13 +537,21 @@ export class MapRoom extends DurableObject<Env> {
 
   // ---------- ของบนพื้น / กระเป๋า ----------
 
-  /** เดินไปที่ของ ถึงช่องนั้นหรือช่องติดกันแล้วเก็บเข้ากระเป๋า */
+  /** เดินไปที่ของ ถึงช่องนั้นหรือช่องติดกันแล้วก้มเก็บ (client เล่นท่า) ของเข้ากระเป๋าตอนเฟรมที่ 5 ของท่า
+   *  ระหว่างก้ม: สั่งเดิน/ตี/คุย = p.pickup ถูกล้าง → ยกเลิก ของยังอยู่บนพื้น */
   private updatePickup(p: Player, now: number) {
     const g = this.ground.get(p.pickup!);
     if (!g) { p.pickup = null; return; } // มีคนเก็บไปก่อน
     if (cheb(p.x, p.y, g.x, g.y) <= 1) {
-      if (p.path.length) this.setPath(p, [], now);
+      if (!p.pickAt) {
+        if (p.path.length) this.setPath(p, [], now);
+        p.pickAt = now + PICKUP_HIT_MS;
+        this.broadcast({ t: "pickup_start", id: p.id, gid: g.id });
+        return;
+      }
+      if (now < p.pickAt) return;
       p.pickup = null;
+      p.pickAt = 0;
       this.ground.delete(g.id);
       this.groundExpire.delete(g.id);
       p.inv.set(g.item, (p.inv.get(g.item) ?? 0) + 1);
