@@ -14,7 +14,7 @@ import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, QUESTS, emptyLog, isComplete, npcMark, type QuestLog } from "../../shared/quests";
 import { SKILLS } from "../../shared/skills";
-import { IDLE_FRAMES, IDLE_FPS, IDLE_OFFSET, WALK_FRAMES, WALK_FPS, WALK_OFFSET, WALK_SCALE, animSource, idleDirs, idleFrameUrl, walkDirs, walkFrameUrl } from "./sprites";
+import { WALK_FRAMES, WALK_FPS, WALK_OFFSET, WALK_SCALE, animSource, walkDirs, walkFrameUrl } from "./sprites";
 
 interface View {
   id: string;
@@ -35,7 +35,9 @@ interface View {
   sprite: string | null; // มี = ภาพ 8 ทิศ (ผู้เล่น หรือมอนที่มีภาพ)
   look: Look | null;     // ผู้เล่น: เพศใช้เลือกทิศที่มีท่ายืน
   dead: boolean;         // ผู้เล่นสลบ (นิ่ง ไม่ขยับ)
-  motion: { mode: "breath" | "step"; tween: Phaser.Tweens.Tween } | null; // ผู้เล่นที่ไม่มีภาพท่านั้น: ขยับด้วยโค้ด
+  motion: { mode: "step"; tween: Phaser.Tweens.Tween } | null; // เดินในทิศที่ไม่มีภาพท่าเดิน: เด้งด้วยโค้ด
+  breathing: boolean; // ผู้เล่นยืนนิ่ง: สลับภาพนิ่ง/ภาพหายใจเข้า (update)
+  breath0: number;    // จุดเริ่มจังหวะหายใจ (สุ่ม ทุกคนไม่พร้อมกัน)
   sheet: string | null;  // มี = มอนจาก sheet (ทิศเดียว มีท่า walk/attack/death)
   bob: Phaser.Tweens.Tween | null; // ท่ายืนของมอนจาก sheet (ขยับขึ้นลงด้วยโค้ด)
   topY: number;          // ขอบบนของตัว (ใช้วางแถบ HP / ตัวเลขดาเมจ)
@@ -76,6 +78,9 @@ const STEPS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, 
 const JOY_AHEAD = 4;     // จอยสติ๊ก: สั่งเดินไปช่องข้างหน้ากี่ช่อง
 const JOY_RESEND_MS = 150;
 const PUNCH_WINDUP_MS = 80;
+// ท่ายืนผู้เล่น (โค้ดล้วน): สลับภาพนิ่ง ↔ หายใจเข้า ทุก 660 ms
+// หายใจเข้า = แถว y 0–32 เลื่อนขึ้น 1 px (แถว y ใช้ค่าจากแถว y+1) แถว 33 คงเดิม แถว 34 ลงไป (ขา) ไม่ขยับ
+const BREATH_MS = 660, BREATH_ROW = 33;
 // เสื้อทับตัว (ทดสอบ) ภาพ sprites/equipment/tunic/<ทิศ>.png ตาม tunic.json: เสื้ออยู่แถว TOP–BOTTOM ของภาพตัวละคร 48×48
 const TUNIC_DIRS = ["south", "south-east", "east", "north-east", "north", "north-west", "west", "south-west"];
 const TUNIC_BOTTOM = 35, TUNIC_HD = 2;
@@ -199,9 +204,6 @@ export class GameScene extends Phaser.Scene {
     for (const g of Object.keys(GENDERS))
       for (const d of walkDirs(g))
         for (let i = 0; i < WALK_FRAMES; i++) this.load.image(`base_${g}_walk_${d}_${i}`, walkFrameUrl(g, d, i));
-    for (const g of Object.keys(GENDERS))
-      for (const d of idleDirs(g))
-        for (let i = 0; i < IDLE_FRAMES; i++) this.load.image(`base_${g}_idle_${d}_${i}`, idleFrameUrl(g, d, i));
     // พื้นหญ้า 64×64 ปูซ้ำทั้งแมพ (ขนาดเดิม ไม่ย่อ/ขยาย)
     TILE_URLS.forEach((url, i) => this.load.image(`tile_${TERRAIN_NAMES[i]}`, url));
     // พื้นที่ bake แล้ว (npm run bake / npm run map) ถ้ามี ใช้แทนพื้นที่วาดด้วยโค้ด ไม่มี = วาดเอง (renderGround)
@@ -678,7 +680,7 @@ export class GameScene extends Phaser.Scene {
 
     const v: View = {
       id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, tunic: null, weapon: null, swing: { a: 0 }, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
-      sprite, look: e.look ?? null, dead: !!e.dead, motion: null, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
+      sprite, look: e.look ?? null, dead: !!e.dead, motion: null, breathing: false, breath0: Math.random() * BREATH_MS * 2, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
     if (e.dead) this.setDead(v, true);
@@ -1270,21 +1272,18 @@ export class GameScene extends Phaser.Scene {
     if (!this.textures.exists(`${prefix}_south`)) {
       for (const d of DIRS) {
         const src = this.textures.get(`base_${look.gender}_${d}`).getSourceImage() as HTMLImageElement;
-        this.textures.addCanvas(`${prefix}_${d}`, recolorSprite(src, look));
+        const still = recolorSprite(src, look);
+        this.textures.addCanvas(`${prefix}_${d}`, still);
+        // เฟรมหายใจเข้า สร้างครั้งเดียว: แถว 0..32 ← แถว 1..33 ของภาพนิ่ง ที่เหลือคงเดิม
+        const inhale = document.createElement("canvas");
+        inhale.width = still.width; inhale.height = still.height;
+        const ctx = inhale.getContext("2d")!;
+        ctx.drawImage(still, 0, 0);
+        ctx.clearRect(0, 0, still.width, BREATH_ROW);
+        ctx.drawImage(still, 0, 1, still.width, BREATH_ROW, 0, 0, still.width, BREATH_ROW);
+        this.textures.addCanvas(`${prefix}_${d}_in`, inhale);
       }
-      // ท่ายืน: เปลี่ยนสีทุกเฟรม แล้วสร้าง animation (ทิศที่ไม่มีใช้ของฝั่งตรงข้ามกลับภาพ ดู updatePose)
-      for (const d of idleDirs(look.gender)) {
-        const frames: Phaser.Types.Animations.AnimationFrame[] = [];
-        for (let i = 0; i < IDLE_FRAMES; i++) {
-          const key = `base_${look.gender}_idle_${d}_${i}`;
-          if (!this.textures.exists(key)) break;
-          const src = this.textures.get(key).getSourceImage() as HTMLImageElement;
-          this.textures.addCanvas(`${prefix}_idle_${d}_${i}`, recolorSprite(src, look));
-          frames.push({ key: `${prefix}_idle_${d}_${i}` });
-        }
-        if (frames.length === IDLE_FRAMES) this.anims.create({ key: `${prefix}_idle_${d}`, frames, frameRate: IDLE_FPS, repeat: -1 });
-      }
-      // ท่าเดิน: เหมือนท่ายืน
+      // ท่าเดิน: เปลี่ยนสีทุกเฟรม แล้วสร้าง animation (ทิศที่ไม่มีใช้ของฝั่งตรงข้ามกลับภาพ ดู updatePose)
       for (const d of walkDirs(look.gender)) {
         const frames: Phaser.Types.Animations.AnimationFrame[] = [];
         for (let i = 0; i < WALK_FRAMES; i++) {
@@ -1308,7 +1307,7 @@ export class GameScene extends Phaser.Scene {
     else if (!v.sheet && Math.abs(dx) > 0.5) v.body.setFlipX(dx < 0);
   }
 
-  /** ผู้เล่น: ยืนนิ่งและมีท่ายืนของทิศนั้น (หรือทิศกระจก) = เล่น animation นอกนั้นใช้ภาพนิ่งของทิศ
+  /** ผู้เล่น: ยืน = ภาพนิ่งของทิศ + หายใจ (update), เดิน = ท่าเดินของทิศนั้น (หรือทิศกระจก) ไม่มี = ภาพนิ่งเด้งด้วยโค้ด
    *  มอนจาก sheet: เดิน = ท่า walk, ยืน = เฟรมแรกของ walk + ขยับขึ้นลง */
   private updatePose(v: View) {
     if (v.sheet) {
@@ -1332,38 +1331,37 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (!v.sprite) return;
-    // ผู้เล่น: ยืน = ท่ายืน, เดิน = ท่าเดิน (ทิศที่ไม่มีใช้ของฝั่งตรงข้ามกลับภาพ)
+    // ผู้เล่น: ยืน = ภาพนิ่ง + หายใจ, เดิน = ท่าเดิน (ทิศที่ไม่มีใช้ของฝั่งตรงข้ามกลับภาพ)
     const walking = v.path.length > 0;
-    const kind = walking ? "walk" : "idle";
-    const src = v.kind === "player" && !v.dead && v.look ? animSource((walking ? walkDirs : idleDirs)(v.look.gender), v.dir) : null;
-    const idle = src && this.anims.exists(`${v.sprite}_${kind}_${src.dir}`) ? `${v.sprite}_${kind}_${src.dir}` : null;
-    // ไม่มีภาพท่าของทิศนี้: ภาพนิ่ง + ขยับด้วยโค้ด (ยืน = หายใจ, เดิน = เด้งตามก้าว, สลบ = นิ่ง)
-    const motion = v.kind !== "player" || v.dead ? null : v.path.length ? "step" : "breath";
-    const pose = idle ? `${idle}${src!.flip ? ":flip" : ""}` : `${v.sprite}_${v.dir}:${motion}`;
+    const alive = v.kind === "player" && !v.dead;
+    const src = alive && walking && v.look ? animSource(walkDirs(v.look.gender), v.dir) : null;
+    const walk = src && this.anims.exists(`${v.sprite}_walk_${src.dir}`) ? `${v.sprite}_walk_${src.dir}` : null;
+    // ไม่มีภาพท่าเดินของทิศนี้: ภาพนิ่ง + เด้งตามก้าวด้วยโค้ด · สลบ = ภาพนิ่ง ไม่หายใจ
+    const mode = !alive ? "still" : walking ? "step" : "breath";
+    const pose = walk ? `${walk}${src!.flip ? ":flip" : ""}` : `${v.sprite}_${v.dir}:${mode}`;
     if (pose === v.pose) return;
     v.pose = pose;
-    if (idle) {
+    v.breathing = !walk && mode === "breath" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (walk) {
       this.setMotion(v, null);
-      v.body.setFlipX(src!.flip).setOrigin(0.5, (45 + (walking ? WALK_OFFSET : IDLE_OFFSET)) / 64).play(idle, true);
-      v.body.setScale(walking ? WALK_SCALE : 1); // ยึดเท้า ขยายแล้วเท้ายังติดพื้น
+      v.body.setFlipX(src!.flip).setOrigin(0.5, (45 + WALK_OFFSET) / 64).play(walk, true);
+      v.body.setScale(WALK_SCALE); // ยึดเท้า ขยายแล้วเท้ายังติดพื้น
     } else {
       v.body.stop();
       v.body.setFlipX(false).setTexture(`${v.sprite}_${v.dir}`).setOrigin(0.5, 45 / 48);
-      this.setMotion(v, motion);
+      this.setMotion(v, mode === "step" ? "step" : null);
     }
   }
 
-  /** ท่าขยับด้วยโค้ดของผู้เล่นที่ยังไม่มีภาพท่านั้นจาก PixelLab (ยืดจากเท้า เพราะจุดยึดอยู่ที่เท้า) */
-  private setMotion(v: View, mode: "breath" | "step" | null) {
+  /** เดินในทิศที่ยังไม่มีภาพท่าเดินจาก PixelLab: ภาพนิ่งเด้งตามก้าว */
+  private setMotion(v: View, mode: "step" | null) {
     if ((v.motion?.mode ?? null) === mode) return;
     v.motion?.tween.remove();
     v.motion = null;
     v.body.setScale(1);
     v.body.y = 8; // ตำแหน่งเท้าผู้เล่น (addView)
     if (!mode || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const tween = mode === "breath"
-      ? this.tweens.add({ targets: v.body, scaleY: 1.035, scaleX: 0.985, yoyo: true, repeat: -1, duration: 900 + Math.random() * 200, ease: "Sine.easeInOut" })
-      : this.tweens.add({ targets: v.body, y: 6, yoyo: true, repeat: -1, duration: v.moveMs / 2, ease: "Sine.easeOut" });
+    const tween = this.tweens.add({ targets: v.body, y: 6, yoyo: true, repeat: -1, duration: v.moveMs / 2, ease: "Sine.easeOut" });
     v.motion = { mode, tween };
   }
 
@@ -1456,6 +1454,11 @@ export class GameScene extends Phaser.Scene {
       t.setVisible(Math.abs(meV.c.x - cx) < TILE * 7 && Math.abs(meV.c.y - cy) < TILE * 7);
     }
     for (const v of this.views.values()) {
+      // หายใจ: สลับภาพนิ่ง/หายใจเข้าตามจังหวะของแต่ละคน (เสื้อ/อาวุธตามด้วย headDelta ใน placeTunic/placeWeapon)
+      if (v.breathing) {
+        const key = `${v.sprite}_${v.dir}${Math.floor((time + v.breath0) / BREATH_MS) % 2 ? "_in" : ""}`;
+        if (v.body.texture.key !== key) v.body.setTexture(key);
+      }
       if (v.path.length) {
         const n = v.path[0];
         const tx = center(n.x), ty = center(n.y);
