@@ -1,0 +1,80 @@
+[
+ {
+  "id": "dab",
+  "name": "ดาบ",
+  "file": "dab.png",
+  "width": 298,
+  "height": 371,
+  "gameScale": 0.0391,
+  "grip": [
+   61,
+   306
+  ],
+  "hand": true
+ },
+ {
+  "id": "hand_wrap",
+  "name": "ผ้าพันมือ",
+  "file": "hand_wrap.png",
+  "width": 245,
+  "height": 252,
+  "gameScale": 0.0426,
+  "grip": [
+   122,
+   127
+  ],
+  "hand": false
+ },
+ {
+  "id": "ngao",
+  "name": "ง้าว",
+  "file": "ngao.png",
+  "width": 386,
+  "height": 448,
+  "gameScale": 0.0563,
+  "grip": [
+   99,
+   331
+  ],
+  "hand": true
+ },
+ {
+  "id": "plong",
+  "name": "ไม้พลอง",
+  "file": "plong.png",
+  "width": 305,
+  "height": 327,
+  "gameScale": 0.0673,
+  "grip": [
+   93,
+   220
+  ],
+  "hand": true
+ },
+ {
+  "id": "mid_mor",
+  "name": "มีดหมอ",
+  "file": "mid_mor.png",
+  "width": 297,
+  "height": 321,
+  "gameScale": 0.0309,
+  "grip": [
+   58,
+   249
+  ],
+  "hand": true
+ },
+ {
+  "id": "sam_ngam",
+  "name": "สามง่าม",
+  "file": "sam_ngam.png",
+  "width": 356,
+  "height": 407,
+  "gameScale": 0.0599,
+  "grip": [
+   83,
+   317
+  ],
+  "hand": true
+ }
+]

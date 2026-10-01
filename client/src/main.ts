@@ -144,6 +144,12 @@ function startGame(ch: Character, session: Session) {
     net.onClose = onNetClose;
     scene.warpTo(map, net);
   };
+  $("weapon-test").onclick = () => {
+    const name = scene.cycleWeapon();
+    $("weapon-test").textContent = `อาวุธ: ${name ?? "มือเปล่า"}`;
+    $("weapon-test").setAttribute("aria-pressed", String(!!name));
+  };
+  $("tunic-test").onclick = () => { $("tunic-test").setAttribute("aria-pressed", String(scene.toggleTunic())); };
   scene.onMapReady = (id, name) => {
     $("minimap-name").textContent = name;
     setWorldMapPin(id);

@@ -1,0 +1,50 @@
+{
+ "south": {
+  "file": "south.png",
+  "top": 18,
+  "bottom": 35,
+  "hd": 2
+ },
+ "south-east": {
+  "file": "south-east.png",
+  "top": 18,
+  "bottom": 35,
+  "hd": 2
+ },
+ "east": {
+  "file": "east.png",
+  "top": 18,
+  "bottom": 35,
+  "hd": 2
+ },
+ "north-east": {
+  "file": "north-east.png",
+  "top": 20,
+  "bottom": 35,
+  "hd": 2
+ },
+ "north": {
+  "file": "north.png",
+  "top": 20,
+  "bottom": 35,
+  "hd": 2
+ },
+ "north-west": {
+  "file": "north-west.png",
+  "top": 20,
+  "bottom": 35,
+  "hd": 2
+ },
+ "west": {
+  "file": "west.png",
+  "top": 18,
+  "bottom": 35,
+  "hd": 2
+ },
+ "south-west": {
+  "file": "south-west.png",
+  "top": 18,
+  "bottom": 35,
+  "hd": 2
+ }
+}

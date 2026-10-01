@@ -279,6 +279,11 @@
 
     #skill-bar { position: fixed; right: calc(min(22vmin, 170px) + 22px + env(safe-area-inset-right)); bottom: calc(var(--xh) + 12px + env(safe-area-inset-bottom));
       display: flex; gap: 8px; z-index: 3; }
+    #tunic-test { position: fixed; right: calc(12px + env(safe-area-inset-right)); top: calc(var(--mini, 150px) + 26px + env(safe-area-inset-top)); z-index: 3;
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gold); background: rgba(20, 10, 4, 0.8); color: var(--gold-lite); font-size: 12px; }
+    #weapon-test { position: fixed; right: calc(12px + env(safe-area-inset-right)); top: calc(var(--mini, 150px) + 56px + env(safe-area-inset-top)); z-index: 3;
+      padding: 4px 10px; border-radius: 12px; border: 1px solid var(--gold); background: rgba(20, 10, 4, 0.8); color: var(--gold-lite); font-size: 12px; }
+    #tunic-test[aria-pressed="true"], #weapon-test[aria-pressed="true"] { background: var(--gold); color: #3a1a05; }
     .skill-btn { position: relative; width: 56px; height: 56px; padding: 0; border-radius: 50%; border: 2px solid var(--gold);
       background: radial-gradient(circle at 40% 35%, #4a2208, #1c0c04); box-shadow: 0 0 0 2px #3a1a05, 0 3px 8px rgba(0, 0, 0, 0.5);
       overflow: hidden; touch-action: none; -webkit-tap-highlight-color: transparent; }
@@ -293,13 +298,6 @@
     #auto-btn { position: fixed; right: calc(16px + env(safe-area-inset-right)); bottom: calc(min(22vmin, 170px) + var(--xh) + 22px + env(safe-area-inset-bottom));
       width: 60px; height: 60px; border-radius: 50%; border: 3px solid var(--window-edge);
       background: var(--window); color: var(--ink); font-size: 14px; font-weight: 600; }
-    #menu { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(12px + env(safe-area-inset-bottom));
-      display: flex; gap: 6px; padding: 6px; border-radius: 12px; background: var(--window); border: 2px solid var(--window-edge); }
-    #menu button { width: 58px; height: 56px; padding: 4px 0 2px; border: 0; border-radius: 8px; background: rgba(10, 18, 32, 0.55);
-      color: var(--ink); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
-    #menu button svg { width: 24px; height: 24px; }
-    #menu button span { font-size: 11px; line-height: 1; }
-    #menu button[aria-expanded="true"] { background: rgba(242, 193, 78, 0.18); color: var(--exp); box-shadow: inset 0 0 0 1px var(--exp); }
     .panel-pop { position: fixed; left: calc(10px + env(safe-area-inset-left)); bottom: calc(var(--xh, 22px) + var(--hs-w, 320px) * 187 / 653 + 20px + env(safe-area-inset-bottom));
       width: min(320px, calc(100vw - 20px)); padding: 10px 12px 12px; max-height: calc(100vh - var(--hs-w, 320px) * 187 / 653 - 60px); overflow-y: auto; z-index: 4; }
     @media (max-width: 900px) and (pointer: coarse), (max-width: 560px) {
@@ -310,13 +308,6 @@
     .stat-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 16px; margin: 0; font-size: 14px; }
     .stat-list dt { color: var(--ink-dim); }
     .stat-list dd { margin: 0; text-align: right; font-weight: 600; }
-    #menu button { position: relative; }
-    /* ปุ่มภาพ (ตัดจากกรอบกระเป๋า art/ui/inventory-panel.png) */
-    #menu button.img-btn { padding: 0; background: none; }
-    #menu button.img-btn img { width: 54px; height: 54px; pointer-events: none; transition: transform 90ms; }
-    #menu button.img-btn:active img { transform: scale(0.92); }
-    #menu button.img-btn[aria-expanded="true"] { background: none; box-shadow: none; }
-    #menu button.img-btn[aria-expanded="true"] img { filter: brightness(1.15) drop-shadow(0 0 5px rgba(242, 193, 78, 0.9)); }
     .badge { position: absolute; top: -6px; right: -6px; min-width: 20px; height: 20px; padding: 0 5px; border-radius: 10px;
       background: #e0525a; color: #fff; font-size: 11px; font-style: normal; font-weight: 700; line-height: 20px; box-shadow: 0 0 0 2px var(--window); }
     .dot { position: absolute; top: 4px; right: 6px; width: 10px; height: 10px; border-radius: 50%; background: #e0525a; box-shadow: 0 0 0 2px var(--window); animation: dotpulse 1.4s ease-in-out infinite; }
@@ -404,12 +395,6 @@
       padding: 2px 8px; border-radius: 10px; background: #ff4d4d; color: #fff; font-size: 12px; font-weight: 700; box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5); }
     @keyframes wmpulse { 70% { box-shadow: 0 0 0 14px rgba(255, 77, 77, 0); } 100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); } }
     @media (prefers-reduced-motion: reduce) { #wm-pin i { animation: none; } }
-    /* แถบเมนู 6 ปุ่ม: จอแคบย่อปุ่ม */
-    @media (max-width: 440px) {
-      #menu { gap: 4px; padding: 5px; }
-      #menu button { width: 50px; }
-      #menu button.img-btn img { width: 46px; height: 46px; }
-    }
 
     /* อุปกรณ์ */
     .eq-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
@@ -458,8 +443,9 @@
 
 
     /* ===== แถบสถานะ + แถบ EXP + ปุ่มเมนู (docs/hud-status.md) ภาพความละเอียดสูง ไม่ใช้ pixelated ===== */
-    :root { --xh: 22px; --hs-w: 320px; --mb: 44px; }
-    @media (max-width: 560px), (max-height: 500px) { :root { --xh: 18px; --hs-w: 260px; --mb: 38px; } }
+    :root { --xh: 22px; --hs-w: 320px; --mb: 60px; }
+    @media (max-width: 560px), (max-height: 500px) { :root { --xh: 18px; --hs-w: 260px; --mb: 48px; } }
+    @media (max-width: 350px) { :root { --mb: 42px; } }
     #hud-status { position: fixed; left: calc(12px + env(safe-area-inset-left)); bottom: calc(var(--xh) + 8px + env(safe-area-inset-bottom));
       width: var(--hs-w); aspect-ratio: 653 / 187; z-index: 3; user-select: none; -webkit-user-select: none; container-type: inline-size; }
     .hs-frame { display: block; width: 100%; height: 100%; pointer-events: none; }
@@ -503,12 +489,13 @@
     #levelup-banner.show { animation: lvup-banner 2s ease-out forwards; }
     @keyframes lvup-banner { 0% { transform: scale(0.3); opacity: 0; } 12% { transform: scale(1.15); opacity: 1; } 20% { transform: scale(1); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateY(-20px); } }
     #menu { position: fixed; left: calc(12px + var(--hs-w) + 8px + env(safe-area-inset-left)); bottom: calc(var(--xh) + 8px + env(safe-area-inset-bottom));
-      display: flex; gap: 4px; padding: 0; border: 0; background: none; border-radius: 0; z-index: 3; }
+      display: flex; gap: 5px; padding: 0; border: 0; background: none; border-radius: 0; z-index: 3; }
     #menu button { position: relative; width: var(--mb); height: var(--mb); padding: 0; border: 0; background: none; transition: transform 80ms, filter 80ms; -webkit-tap-highlight-color: transparent; }
     #menu button img { width: 100%; height: 100%; pointer-events: none; }
-    #menu button:active { transform: scale(0.92); filter: brightness(1.2); }
+    #menu button:hover { transform: scale(1.08); filter: brightness(1.12); }
+    #menu button:active { transform: scale(0.94); filter: brightness(1.22); }
     #menu button[aria-expanded="true"] { filter: brightness(1.2) drop-shadow(0 0 6px rgba(242, 193, 78, 0.9)); }
-    #menu .dot { top: 2px; right: 2px; }
+    #menu .dot { top: 3px; right: 3px; }
     /* มือถือ: กรอบสถานะมุมซ้ายบน ปุ่มแถวเดียวมุมขวาบน (จอแคบ: ใต้กรอบสถานะ) */
     @media (max-width: 900px) and (pointer: coarse), (max-width: 560px) {
       #hud-status { top: calc(10px + env(safe-area-inset-top)); bottom: auto; }
@@ -749,6 +736,9 @@
     <button type="button" id="attack-btn" hidden aria-label="โจมตี"><img src="/ui/attack-button.webp" alt="" draggable="false" /></button>
     <!-- สกิล (shared/skills.ts) ปุ่ม 1 / 2 รอบปุ่มโจมตี: ไอคอน = เฟรมเอฟเฟกต์, วงคูลดาวน์, SP ไม่พอ = จาง -->
     <div id="skill-bar"></div>
+    <!-- ทดสอบเสื้อทับตัว (ชั่วคราว ยังไม่มีระบบอุปกรณ์) -->
+    <button type="button" id="tunic-test" aria-pressed="false">ทดสอบเสื้อ</button>
+    <button type="button" id="weapon-test" aria-pressed="false">อาวุธ: มือเปล่า</button>
     <!-- ปุ่มเมนู 6 ปุ่ม (docs/hud-status.md): กดปุ่มเปิด/ปิดหน้าต่างของปุ่มนั้น เปิดได้ทีละหน้า -->
     <nav id="menu" aria-label="เมนู">
       <button type="button" data-panel="bag" aria-expanded="false" aria-label="กระเป๋า (Alt+E)" title="กระเป๋า (Alt+E)"><img src="/ui/hud/btn-inventory.webp" alt="" draggable="false" /></button>

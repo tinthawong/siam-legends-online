@@ -1,3 +1,4 @@
+import WEAPON_DATA from "../../shared/data/weapons.json";
 import Phaser from "phaser";
 import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
@@ -22,6 +23,9 @@ interface View {
   body: Phaser.GameObjects.Sprite;
   hpBar: Phaser.GameObjects.Graphics | null;
   inner: Phaser.GameObjects.Container; // ตัว + เงา (ยกขึ้นตอนอยู่บนสะพานโค้ง)
+  tunic: Phaser.GameObjects.Image | null; // เสื้อทับตัว (ทดสอบ)
+  weapon: Phaser.GameObjects.Image | null; // อาวุธในมือ (ทดสอบ)
+  swing: { a: number };                    // มุมเหวี่ยงอาวุธตอนตี (องศา ก่อนกลับด้าน)
   lift: number;                         // ยกขึ้นกี่ px (สะพานโค้ง) — ข้อความ/เอฟเฟกต์เหนือตัวต้องยกตาม
   oc: Phaser.GameObjects.Container; // ชื่อ + แถบ HP ลอยอยู่ชั้นบนสุด ไม่โดนต้นไม้/หลังคาบัง (ตามตำแหน่ง c ทุกเฟรม)
   hp: number;
@@ -72,6 +76,28 @@ const STEPS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, 
 const JOY_AHEAD = 4;     // จอยสติ๊ก: สั่งเดินไปช่องข้างหน้ากี่ช่อง
 const JOY_RESEND_MS = 150;
 const PUNCH_WINDUP_MS = 80;
+// เสื้อทับตัว (ทดสอบ) ภาพ sprites/equipment/tunic/<ทิศ>.png ตาม tunic.json: เสื้ออยู่แถว TOP–BOTTOM ของภาพตัวละคร 48×48
+const TUNIC_DIRS = ["south", "south-east", "east", "north-east", "north", "north-west", "west", "south-west"];
+const TUNIC_BOTTOM = 35, TUNIC_HD = 2;
+const tunicTop = (dir: string) => (dir.startsWith("north") ? 20 : 18);
+// อาวุธในมือ (ทดสอบ) ภาพ sprites/equipment/weapons/<id>.png (tools/make_weapons.py ย่อไว้ HD เท่าของ gameScale)
+// ภาพเอียง 45° ปลายชี้ขึ้นขวา จุดหมุน = grip (พิกเซลของภาพเต็ม) · hand = false ใช้เป็นไอคอนอย่างเดียว
+const WEAPON_HD = 2;
+const HELD_WEAPONS = WEAPON_DATA.filter((w) => w.hand);
+// จุดมือในภาพตัวละคร 48×48 ต่อทิศ: back = วาดก่อนตัวละคร, flip = กลับด้านภาพอาวุธ
+const HAND: Record<string, { x: number; y: number; back: boolean; flip: boolean }> = {
+  south: { x: 15, y: 33, back: false, flip: true },
+  "south-east": { x: 18, y: 34, back: false, flip: true },
+  east: { x: 24, y: 33, back: false, flip: false },
+  "north-east": { x: 31, y: 34, back: false, flip: false },
+  north: { x: 32, y: 33, back: true, flip: false },
+  "north-west": { x: 30, y: 32, back: true, flip: false },
+  west: { x: 23, y: 33, back: true, flip: true },
+  "south-west": { x: 15, y: 33, back: true, flip: true },
+};
+// ตีปกติ: หมุนรอบ grip -10° → -60° → +85° → 0° รวม 0.3 วินาที (โดนเป้าตอนฟันลงสุด)
+const SWING_STEPS = [{ a: -10, ms: 30 }, { a: -60, ms: 90 }, { a: 85, ms: 90 }, { a: 0, ms: 90 }];
+const SWING_HIT_MS = 210;
 const FX_NAMES = ["flurry", "golden-fist"]; // เอฟเฟกต์สกิล (ตีปกติวาดด้วยโค้ด: punchFx)
 // มินิแมพ: ภาพพื้นแมพย่อเก็บไว้ที่สัดส่วนนี้ แสดงพื้นที่กว้าง MINI_VIEW px (โลก) รอบตัวเรา วาดใหม่ทุก 100 ms
 const MINI_SCALE = 0.25;
@@ -126,6 +152,9 @@ export class GameScene extends Phaser.Scene {
   private level = 1;
   private invCount = new Map<string, number>();
   private myWeapon = false; // เราถืออาวุธอยู่ไหม (มือเปล่า = ต่อย)
+  private weaponIdx = -1;   // ปุ่มทดสอบอาวุธ: ลำดับใน HELD_WEAPONS (-1 = มือเปล่า)
+  private tunicOn = false;  // ปุ่มทดสอบใส่เสื้อ (เห็นเฉพาะตัวเอง ยังไม่มีระบบอุปกรณ์)
+  private alphaCache = new Map<string, { w: number; h: number; a: Uint8ClampedArray }>();
   /** เราใช้สกิลโดน → main.ts เริ่มนับคูลดาวน์ที่ปุ่ม */
   onSkillCast: ((id: string) => void) | null = null;
 
@@ -183,6 +212,8 @@ export class GameScene extends Phaser.Scene {
     for (const kind of kinds) if (PROP_SET_OF[kind]) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
+    for (const w of HELD_WEAPONS) this.load.image(`weapon_${w.id}`, `sprites/equipment/weapons/${w.file}`);
+    for (const d of TUNIC_DIRS) this.load.image(`tunic_${d}`, `sprites/equipment/tunic/${d}.png`);
     // เอฟเฟกต์การโจมตี/สกิล (tools/slice_fx.py): sprites/fx/<ชื่อ>/sheet.json + เฟรม
     for (const name of FX_NAMES) {
       const key = `fxsheet_${name}`;
@@ -388,6 +419,7 @@ export class GameScene extends Phaser.Scene {
       case "welcome":
         this.me = m.you;
         for (const e of m.entities) this.addView(e);
+        { const mv = this.views.get(m.you); if (mv) { if (this.tunicOn) this.setTunic(mv, true); this.setWeapon(mv); } }
         for (const g of m.ground) this.addGround(g, false);
         this.cameras.main.startFollow(this.views.get(m.you)!.c, true, 0.2, 0.2);
         this.updateStats(m.self);
@@ -469,6 +501,7 @@ export class GameScene extends Phaser.Scene {
             this.time.delayedCall(70, () => dst.body.clearTint());
           };
           if (this.isPunch(m.src)) this.time.delayedCall(PUNCH_WINDUP_MS, impact);
+          else if (this.views.get(m.src)?.weapon) this.time.delayedCall(SWING_HIT_MS, impact);
           else impact();
           // มอนจาก sheet ที่มีท่าโดนตี: เล่นพร้อมกะพริบขาว แต่ไม่ขัดท่า attack ที่กำลังเล่นอยู่
           if (dst.sheet && dst.pose !== "attack" && this.anims.exists(`${dst.sheet}_hit`)) {
@@ -485,7 +518,8 @@ export class GameScene extends Phaser.Scene {
         if (src && dst) this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
         // ผู้เล่นตี: พุ่งตัว + รอยฟัน (ตีพลาดก็เห็นท่าเหวี่ยง)
         if (src?.kind === "player" && dst) {
-          if (this.isPunch(src.id)) this.punchFx(src, dst, m.crit);
+          if (src.weapon) this.weaponSwing(src);
+          else if (this.isPunch(src.id)) this.punchFx(src, dst, m.crit);
           else this.swingFx(src, dst, m.crit);
         }
         // มอนจาก sheet ตีผู้เล่น: เล่นท่า attack จนจบแล้วกลับท่าเดิม
@@ -642,7 +676,7 @@ export class GameScene extends Phaser.Scene {
       : null;
 
     const v: View = {
-      id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
+      id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, tunic: null, weapon: null, swing: { a: 0 }, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
       sprite, look: e.look ?? null, dead: !!e.dead, motion: null, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
@@ -758,7 +792,7 @@ export class GameScene extends Phaser.Scene {
   /** ผู้เล่นมือเปล่า = ต่อย (ผู้เล่นคนอื่นยังไม่รู้ว่าถืออะไร ถือว่ามือเปล่า) */
   private isPunch(id: string): boolean {
     const v = this.views.get(id);
-    return v?.kind === "player" && !(id === this.me && this.myWeapon);
+    return v?.kind === "player" && !v.weapon && !(id === this.me && this.myWeapon);
   }
 
   /** ต่อย (โค้ดล้วน ยังไม่มีภาพท่าตี): ง้าง = ถอยหลัง+เอนไปข้างหลัง → ต่อย = พุ่งไปข้างหน้า มีหมัดพุ่งออกไปหาเป้า + เส้นความเร็ว
@@ -1105,6 +1139,119 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
+  /** ปุ่มทดสอบ: ใส่/ถอดเสื้อ (เฉพาะตัวเรา ฝั่ง client) */
+  toggleTunic(): boolean {
+    this.tunicOn = !this.tunicOn;
+    const v = this.me ? this.views.get(this.me) : undefined;
+    if (v) this.setTunic(v, this.tunicOn);
+    return this.tunicOn;
+  }
+
+  private setTunic(v: View, on: boolean) {
+    if (on && !v.tunic) {
+      v.tunic = this.add.image(0, 0, "tunic_south").setOrigin(0.5, 0);
+      v.inner.addAt(v.tunic, v.inner.getIndex(v.body) + 1); // ทับหน้าตัวละครทุกทิศ
+      this.placeTunic(v);
+    } else if (!on && v.tunic) { v.tunic.destroy(); v.tunic = null; }
+  }
+
+  /** ค่าความทึบของภาพ (อ่านครั้งเดียวต่อ texture) */
+  private alphaOf(key: string) {
+    let c = this.alphaCache.get(key);
+    if (!c) {
+      const src = this.textures.get(key).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
+      const cv = document.createElement("canvas");
+      cv.width = src.width; cv.height = src.height;
+      const ctx = cv.getContext("2d", { willReadFrequently: true })!;
+      ctx.drawImage(src, 0, 0);
+      const d = ctx.getImageData(0, 0, cv.width, cv.height).data;
+      const a = new Uint8ClampedArray(cv.width * cv.height);
+      for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
+      c = { w: cv.width, h: cv.height, a };
+      this.alphaCache.set(key, c);
+    }
+    return c;
+  }
+
+  private topRow(al: { w: number; h: number; a: Uint8ClampedArray }) {
+    for (let y = 0; y < al.h; y++) for (let x = 0; x < al.w; x++) if (al.a[y * al.w + x] > 40) return y;
+    return 0;
+  }
+
+  /** วางเสื้อตามเฟรมที่เล่นอยู่ (พิกัดภาพ 48×48 ของตัวละคร):
+   *  สูง = แถว 18–35 (หลัง 20–35) · กว้างตามสัดส่วนภาพเสื้อ · กึ่งกลางแนวนอน = กึ่งกลางพิกเซลทึบของตัวในแถว 22–30
+   *  เดิน/ท่ายืน: เลื่อนขึ้นลงเท่าที่หัว (พิกเซลทึบบนสุด) ขยับจากภาพนิ่งของทิศนั้น */
+  private placeTunic(v: View) {
+    const t = v.tunic!, b = v.body, dir = v.dir;
+    const fr = b.frame, al = this.alphaOf(fr.texture.key);
+    const fw = fr.width, fh = fr.height, sx = b.scaleX, sy = b.scaleY, flip = b.flipX ? -1 : 1;
+    const delta = this.headDelta(v);
+    const top = 8 + (tunicTop(dir) - 45) + delta;
+    // แถว 22–30 ของภาพ 48 (ขยับตามหัว) → แถวในเฟรมนี้
+    const toFrameY = (wy: number) => Math.round(b.originY * fh + (wy - b.y) / sy);
+    const y0 = Math.max(0, toFrameY(8 + 22 - 45 + delta)), y1 = Math.min(fh - 1, toFrameY(8 + 30 - 45 + delta));
+    let minX = Infinity, maxX = -Infinity;
+    for (let y = y0; y <= y1; y++) for (let x = 0; x < al.w; x++) if (al.a[y * al.w + x] > 40) { if (x < minX) minX = x; if (x > maxX) maxX = x; }
+    const cx = minX <= maxX ? (minX + maxX + 1) / 2 : fw / 2;
+    const k = `tunic_${dir}`;
+    if (t.texture.key !== k) t.setTexture(k);
+    const h = (TUNIC_BOTTOM - tunicTop(dir) + 1) * Math.abs(sy);
+    t.setScale(h / t.frame.height).setPosition(b.x + (cx - b.originX * fw) * sx * flip, top);
+  }
+
+  /** หัวตัวละคร (พิกเซลทึบบนสุดของเฟรมที่เล่นอยู่) ขยับจากภาพนิ่ง 48×48 ของทิศนั้นเท่าไหร่ (พิกัดใน inner, body.y ปกติ = 8 เท้าแถว 45) */
+  private headDelta(v: View): number {
+    const b = v.body;
+    const baseTop = this.topRow(this.alphaOf(`${v.sprite}_${v.dir}`));
+    const headNow = b.y + (this.topRow(this.alphaOf(b.frame.texture.key)) - b.originY * b.frame.height) * b.scaleY;
+    return headNow - (8 + baseTop - 45);
+  }
+
+  /** ปุ่มทดสอบ: สลับอาวุธ มือเปล่า → อาวุธแต่ละชิ้น → มือเปล่า (เฉพาะตัวเรา ฝั่ง client) คืนชื่ออาวุธ */
+  cycleWeapon(): string | null {
+    this.weaponIdx = this.weaponIdx + 1 >= HELD_WEAPONS.length ? -1 : this.weaponIdx + 1;
+    const v = this.me ? this.views.get(this.me) : undefined;
+    if (v) this.setWeapon(v);
+    return this.weaponIdx < 0 ? null : HELD_WEAPONS[this.weaponIdx].name;
+  }
+
+  private setWeapon(v: View) {
+    const w = HELD_WEAPONS[this.weaponIdx];
+    v.weapon?.destroy();
+    v.weapon = null;
+    this.tweens.killTweensOf(v.swing);
+    v.swing.a = 0;
+    if (!w) return;
+    v.weapon = this.add.image(0, 0, `weapon_${w.id}`)
+      .setOrigin(w.grip[0] / w.width, w.grip[1] / w.height)
+      .setScale(1 / WEAPON_HD);
+    v.weapon.setData("back", null);
+    this.placeWeapon(v);
+  }
+
+  /** วาง grip ที่มือตามทิศ เลื่อนขึ้นลงตามหัว · หลัง = ใต้ตัวละคร, หน้า = ทับตัวละคร (และเสื้อ) */
+  private placeWeapon(v: View) {
+    const w = v.weapon!, h = HAND[v.dir] ?? HAND.south;
+    if (w.getData("back") !== h.back) {
+      w.setData("back", h.back);
+      if (w.parentContainer) v.inner.remove(w);
+      v.inner.addAt(w, h.back ? v.inner.getIndex(v.body) : v.inner.length);
+    }
+    w.setFlipX(h.flip)
+      .setPosition(v.body.x + h.x - 24, 8 + h.y - 45 + this.headDelta(v))
+      .setAngle(h.flip ? -v.swing.a : v.swing.a); // ภาพกลับด้าน หมุนทิศตรงข้าม
+  }
+
+  /** ตีปกติด้วยอาวุธ: หมุนรอบ grip ตาม SWING_STEPS */
+  private weaponSwing(v: View) {
+    this.tweens.killTweensOf(v.swing);
+    v.swing.a = 0;
+    this.tweens.chain({
+      targets: v.swing,
+      tweens: SWING_STEPS.map((st) => ({ a: st.a, duration: st.ms, ease: "Sine.easeInOut" })),
+    });
+  }
+
   /** ข้อความลอยขึ้นแล้วจางหาย (+EXP, ฟื้นที่จุดเกิด) */
   private floatText(x: number, y: number, text: string, color: string, ms: number) {
     const t = this.add.text(x, y, text, {
@@ -1320,6 +1467,8 @@ export class GameScene extends Phaser.Scene {
       const lift = this.gm.bridgeLift(v.c.x, v.c.y);
       if (lift !== v.lift) { v.lift = lift; v.inner.y = -lift; }
       v.oc.setPosition(v.c.x, v.c.y - v.lift);
+      if (v.tunic) this.placeTunic(v);
+      if (v.weapon) this.placeWeapon(v);
     }
     const t = this.targetId ? this.views.get(this.targetId) : undefined;
     if (t) this.targetRing.setPosition(t.c.x, t.c.y + 2 - t.lift).setDepth(t.c.y - 1).setVisible(true);
