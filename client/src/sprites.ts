@@ -44,12 +44,19 @@ export const walkFrameUrl = (gender: string, dir: string, i: number) => `sprites
 // ท่าต่อย (มือเปล่า เล่นครั้งเดียวต่อการตี) จาก PixelLab: เฟรม 64×64 วางแบบเดียวกับท่าเดิน (WALK_PAD)
 // hit = เฟรมที่หมัดโดน (นับจาก 1) → เอฟเฟกต์/ตัวเลข/มอนโดนตีขึ้นตอนนี้ · ทิศฝั่งตรงข้ามที่ไม่มีใช้ภาพนี้กลับด้าน
 // ทิศที่ไม่มีเลย (ตอนนี้ south, north) ใช้ท่าต่อยด้วยโค้ด (GameScene.punchFx) · ต้นฉบับ GIF อยู่ art/pixellab/base-<เพศ>-punch/
-export const PUNCH_ANIMS: Record<string, Record<string, { frames: number; hit: number }>> = {
-  male: { east: { frames: 11, hit: 7 }, "south-east": { frames: 13, hit: 8 }, "north-east": { frames: 13, hit: 8 } },
+// south = ท่าถีบ (teep) แทนต่อย: folder ภาพ teep-<ทิศ>, เฟรมละ frameMs, ไม่มีหมัดไฟ (fist: false)
+// ทิศที่ไม่มี south/north ยืมท่าทแยง (GameScene.punchAnim)
+export interface PunchAnim { frames: number; hit: number; frameMs?: number; folder?: string; fist?: boolean }
+export const PUNCH_ANIMS: Record<string, Record<string, PunchAnim>> = {
+  male: {
+    east: { frames: 11, hit: 7 }, "south-east": { frames: 13, hit: 8 }, "north-east": { frames: 13, hit: 8 },
+    south: { frames: 13, hit: 10, frameMs: 70, folder: "teep", fist: false },
+  },
   female: {},
 };
-// ทั้งท่าใช้เวลาเท่าท่าต่อยด้วยโค้ดเดิม (ง้าง 80 + ต่อย 55 + กลับ 120 ms) เวลาต่อเฟรม = PUNCH_MS / จำนวนเฟรม
+// ไม่ระบุ frameMs: ทั้งท่าใช้เวลาเท่าท่าต่อยด้วยโค้ดเดิม (ง้าง 80 + ต่อย 55 + กลับ 120 ms) เวลาต่อเฟรม = PUNCH_MS / จำนวนเฟรม
 export const PUNCH_MS = 255;
-export const punchFrameMs = (frames: number) => PUNCH_MS / frames;
+export const punchFrameMs = (p: PunchAnim) => p.frameMs ?? PUNCH_MS / p.frames;
 export const punchDirs = (gender: string) => Object.keys(PUNCH_ANIMS[gender] ?? {});
-export const punchFrameUrl = (gender: string, dir: string, i: number) => `sprites/base-${gender}/punch-${dir}/${i}.png`;
+export const punchFrameUrl = (gender: string, dir: string, i: number) =>
+  `sprites/base-${gender}/${PUNCH_ANIMS[gender][dir].folder ?? "punch"}-${dir}/${i}.png`;

@@ -856,20 +856,20 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** ท่าต่อย PixelLab ของทิศที่หันอยู่ (ไม่มี = null ใช้ท่าต่อยด้วยโค้ด) + เวลาจากเริ่มท่าถึงเฟรมที่หมัดโดน
-   *  หัน south/north ไม่มีท่าของทิศนั้น: ยืมทิศทแยง มอนอยู่ขวาหรือตรงกลาง (หรือไม่มีเป้า) = -east, อยู่ซ้าย = -west */
-  private punchAnim(v: View, dst?: View): { key: string; dir: string; hitMs: number } | null {
+   *  south มีท่าถีบ (teep) ของตัวเอง · หัน south/north ที่ไม่มีท่าของทิศนั้น: ยืมทิศทแยง มอนอยู่ขวาหรือตรงกลาง (หรือไม่มีเป้า) = -east, อยู่ซ้าย = -west */
+  private punchAnim(v: View, dst?: View): { key: string; dir: string; hitMs: number; fist: boolean } | null {
     if (!v.sprite || !v.look || v.dead) return null;
     let dir = v.dir;
-    if (dir === "south" || dir === "north") dir = `${dir}-${!dst || dst.c.x >= v.c.x ? "east" : "west"}`;
+    if ((dir === "south" || dir === "north") && !punchDirs(v.look.gender).includes(dir)) dir = `${dir}-${!dst || dst.c.x >= v.c.x ? "east" : "west"}`;
     const key = `${v.sprite}_punch_${dir}`;
     const src = animSource(punchDirs(v.look.gender), dir);
     if (!src || !this.anims.exists(key)) return null;
     const p = PUNCH_ANIMS[v.look.gender][src.dir];
-    return { key, dir, hitMs: (p.hit - 1) * punchFrameMs(p.frames) };
+    return { key, dir, hitMs: (p.hit - 1) * punchFrameMs(p), fist: p.fist !== false };
   }
 
   /** เล่นท่าต่อยครั้งเดียว (ตีซ้ำระหว่างท่า = เริ่มใหม่) จบแล้วกลับท่ายืน · โดน = หมัดไฟที่มอนตอนถึงเฟรม hit */
-  private playPunch(v: View, p: { key: string; dir: string; hitMs: number }, dst: View | undefined, crit: boolean, hit: boolean) {
+  private playPunch(v: View, p: { key: string; dir: string; hitMs: number; fist: boolean }, dst: View | undefined, crit: boolean, hit: boolean) {
     v.punching = true;
     v.punchDir = p.dir;
     v.breathing = false;
@@ -882,7 +882,7 @@ export class GameScene extends Phaser.Scene {
       v.pose = "";
       this.updatePose(v);
     });
-    if (hit && dst) this.time.delayedCall(p.hitMs, () => { if (dst.body.active) this.fireFistFx(v, dst, crit); });
+    if (hit && dst && p.fist) this.time.delayedCall(p.hitMs, () => { if (dst.body.active) this.fireFistFx(v, dst, crit); });
   }
 
   /** หมัดไฟ (ภาพ fx flurry) ปลายหมัดชนกลางตัวมอน หันตามทิศต่อย พุ่งเข้าอีกนิดแล้วจางหาย */
@@ -1464,7 +1464,7 @@ export class GameScene extends Phaser.Scene {
           frames.push({ key });
         }
         if (!frames.length) continue;
-        this.anims.create({ key: `${prefix}_punch_${d}`, frames, frameRate: 1000 / punchFrameMs(PUNCH_ANIMS[look.gender][src.dir].frames), repeat: 0 });
+        this.anims.create({ key: `${prefix}_punch_${d}`, frames, frameRate: 1000 / punchFrameMs(PUNCH_ANIMS[look.gender][src.dir]), repeat: 0 });
         if (src.flip) this.walkFlip.add(`${prefix}_punch_${d}`);
       }
     }
