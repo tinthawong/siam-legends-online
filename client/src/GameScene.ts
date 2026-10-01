@@ -14,7 +14,7 @@ import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, QUESTS, emptyLog, isComplete, npcMark, type QuestLog } from "../../shared/quests";
 import { SKILLS } from "../../shared/skills";
-import { MIRROR, WALK_ANIMS, WALK_PAD, animSource, walkDirs, walkFrameUrl } from "./sprites";
+import { MIRROR, PUNCH_ANIMS, PUNCH_FRAME_MS, WALK_ANIMS, WALK_PAD, animSource, punchDirs, punchFrameUrl, walkDirs, walkFrameUrl } from "./sprites";
 import { dyeCanvas, type DyeOutfit } from "./dye";
 import { WALK_FRAME_MS, flipCanvas, makeWalkFrames, walkShift, type Foot } from "./walkgen";
 
@@ -45,6 +45,7 @@ interface View {
   topY: number;          // ขอบบนของตัว (ใช้วางแถบ HP / ตัวเลขดาเมจ)
   dir: Dir;              // ทิศที่หันอยู่
   pose: string;          // texture/animation ที่แสดงอยู่ (กันตั้งซ้ำทุกเฟรม)
+  punching: boolean;     // ผู้เล่นกำลังเล่นท่าต่อย PixelLab (ห้ามท่ายืน/หายใจทับ จนกว่าจะจบหรือเริ่มเดิน)
 }
 
 /** sheet.json ที่ได้จาก tools/slice_sheet.py */
@@ -259,6 +260,9 @@ export class GameScene extends Phaser.Scene {
     for (const [g, dirs] of Object.entries(WALK_ANIMS))
       for (const [d, n] of Object.entries(dirs))
         for (let i = 0; i < n; i++) this.load.image(`base_${g}_walk_${d}_${i}`, walkFrameUrl(g, d, i));
+    for (const [g, dirs] of Object.entries(PUNCH_ANIMS))
+      for (const [d, p] of Object.entries(dirs))
+        for (let i = 0; i < p.frames; i++) this.load.image(`base_${g}_punch_${d}_${i}`, punchFrameUrl(g, d, i));
     for (const { id } of BODY_OUTFITS.filter((o) => o.type === "overlay"))
       for (const d of DIRS) this.load.image(outfitKey(id, d), `sprites/equipment/body/${id}/${id}-${d}.png`);
     // เอฟเฟกต์การโจมตี/สกิล (tools/slice_fx.py): sprites/fx/<ชื่อ>/sheet.json + เฟรม
@@ -536,6 +540,10 @@ export class GameScene extends Phaser.Scene {
       }
       case "hit": {
         const dst = this.views.get(m.dst);
+        const src = this.views.get(m.src);
+        if (src && dst) this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
+        // ผู้เล่นมือเปล่าที่มีท่าต่อย PixelLab ของทิศนี้: หมัดโดนตอนถึงเฟรม hit
+        const punchAnim = src && dst && this.isPunch(src.id) ? this.punchAnim(src) : null;
         if (dst) {
           dst.hp = m.hp;
           this.drawHp(dst);
@@ -548,11 +556,14 @@ export class GameScene extends Phaser.Scene {
             dst.body.setTintFill(0xffffff);
             this.time.delayedCall(70, () => dst.body.clearTint());
           };
-          if (this.isPunch(m.src)) this.time.delayedCall(PUNCH_WINDUP_MS, impact);
+          if (punchAnim) this.time.delayedCall(punchAnim.hitMs, () => { impact(); hitAnim(); });
+          else if (this.isPunch(m.src)) this.time.delayedCall(PUNCH_WINDUP_MS, impact);
           else if (this.views.get(m.src)?.weapon) this.time.delayedCall(SWING_HIT_MS, impact);
           else impact();
           // มอนจาก sheet ที่มีท่าโดนตี: เล่นพร้อมกะพริบขาว แต่ไม่ขัดท่า attack ที่กำลังเล่นอยู่
-          if (dst.sheet && dst.pose !== "attack" && this.anims.exists(`${dst.sheet}_hit`)) {
+          // (ท่าต่อย PixelLab: เล่นตอนหมัดโดน ไม่ใช่ตอนได้ข้อความ)
+          const hitAnim = () => {
+            if (!dst.body.active || !dst.sheet || dst.pose === "attack" || !this.anims.exists(`${dst.sheet}_hit`)) return;
             dst.pose = "hit";
             dst.bob?.pause(); dst.body.y = 8;
             this.playSheet(dst, "hit");
@@ -560,13 +571,13 @@ export class GameScene extends Phaser.Scene {
               dst.pose = "";
               this.updatePose(dst);
             });
-          }
+          };
+          if (!punchAnim) hitAnim();
         }
-        const src = this.views.get(m.src);
-        if (src && dst) this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
         // ผู้เล่นตี: พุ่งตัว + รอยฟัน (ตีพลาดก็เห็นท่าเหวี่ยง)
         if (src?.kind === "player" && dst) {
           if (src.weapon) this.weaponSwing(src);
+          else if (punchAnim) this.playPunch(src, punchAnim, dst, m.crit, !m.miss);
           else if (this.isPunch(src.id)) this.punchFx(src, dst, m.crit);
           else this.swingFx(src, dst, m.crit);
         }
@@ -725,7 +736,7 @@ export class GameScene extends Phaser.Scene {
 
     const v: View = {
       id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, outfit: null, skin: null, weapon: null, swing: { a: 0 }, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
-      sprite, look: e.look ?? null, dead: !!e.dead, breathing: false, breath0: Math.random() * BREATH_MS * 2, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
+      sprite, look: e.look ?? null, dead: !!e.dead, breathing: false, breath0: Math.random() * BREATH_MS * 2, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "", punching: false,
     };
     this.views.set(e.id, v);
     if (e.dead) this.setDead(v, true);
@@ -843,7 +854,51 @@ export class GameScene extends Phaser.Scene {
     return v?.kind === "player" && !v.weapon && !(id === this.me && this.myWeapon);
   }
 
-  /** ต่อย (โค้ดล้วน ยังไม่มีภาพท่าตี): ง้าง = ถอยหลัง+เอนไปข้างหลัง → ต่อย = พุ่งไปข้างหน้า มีหมัดพุ่งออกไปหาเป้า + เส้นความเร็ว
+  /** ท่าต่อย PixelLab ของทิศที่หันอยู่ (ไม่มี = null ใช้ท่าต่อยด้วยโค้ด) + เวลาจากเริ่มท่าถึงเฟรมที่หมัดโดน */
+  private punchAnim(v: View): { key: string; hitMs: number } | null {
+    if (!v.sprite || !v.look || v.dead) return null;
+    const key = `${v.sprite}_punch_${v.dir}`;
+    const src = animSource(punchDirs(v.look.gender), v.dir);
+    if (!src || !this.anims.exists(key)) return null;
+    return { key, hitMs: (PUNCH_ANIMS[v.look.gender][src.dir].hit - 1) * PUNCH_FRAME_MS };
+  }
+
+  /** เล่นท่าต่อยครั้งเดียว (ตีซ้ำระหว่างท่า = เริ่มใหม่) จบแล้วกลับท่ายืน · โดน = หมัดไฟที่มอนตอนถึงเฟรม hit */
+  private playPunch(v: View, p: { key: string; hitMs: number }, dst: View, crit: boolean, hit: boolean) {
+    v.punching = true;
+    v.breathing = false;
+    v.pose = p.key;
+    v.body.setFlipX(this.walkFlip.has(p.key)).setOrigin(0.5, (45 + WALK_PAD) / (48 + WALK_PAD * 2)).setScale(1);
+    v.body.play(p.key);
+    v.body.once(Phaser.Animations.Events.ANIMATION_COMPLETE_KEY + p.key, () => {
+      if (!v.punching || v.pose !== p.key) return;
+      v.punching = false;
+      v.pose = "";
+      this.updatePose(v);
+    });
+    if (hit) this.time.delayedCall(p.hitMs, () => { if (dst.body.active) this.fireFistFx(v, dst, crit); });
+  }
+
+  /** หมัดไฟ (ภาพ fx flurry) ปลายหมัดชนกลางตัวมอน หันตามทิศต่อย พุ่งเข้าอีกนิดแล้วจางหาย */
+  private fireFistFx(src: View, dst: View, crit: boolean) {
+    if (!this.anims.exists("fx_flurry")) return;
+    const meta = this.cache.json.get("fxsheet_flurry") as { scale?: number } | undefined;
+    const sc = (meta?.scale ?? 1) * (crit ? 1.3 : 1);
+    const a = Math.atan2(dst.c.y - src.c.y, dst.c.x - src.c.x);
+    const x = dst.c.x, y = dst.c.y - dst.lift + dst.topY / 2;
+    const parts = [false, true].map((add) => this.add.sprite(x - Math.cos(a) * 6, y - Math.sin(a) * 4, "fx_flurry_0")
+      .setOrigin(0.92, 0.5).setRotation(a).setFlipY(Math.abs(a) > Math.PI / 2)
+      .setScale(add ? sc * 1.12 : sc).setDepth(dst.c.y + 3 + (add ? 0.1 : 0))
+      .setBlendMode(add ? Phaser.BlendModes.ADD : Phaser.BlendModes.NORMAL).setAlpha(add ? 0.5 : 1));
+    for (const p of parts) {
+      p.play("fx_flurry");
+      this.tweens.add({ targets: p, x, y, duration: 90, ease: "Quad.easeOut" });
+    }
+    parts[0].once(Phaser.Animations.Events.ANIMATION_COMPLETE, () =>
+      this.tweens.add({ targets: parts, alpha: 0, duration: 90, onComplete: () => parts.forEach((q) => q.destroy()) }));
+  }
+
+  /** ต่อย (โค้ดล้วน ใช้กับทิศที่ยังไม่มีภาพท่าต่อย): ง้าง = ถอยหลัง+เอนไปข้างหลัง → ต่อย = พุ่งไปข้างหน้า มีหมัดพุ่งออกไปหาเป้า + เส้นความเร็ว
    *  แขนอยู่ในภาพตัวละครภาพเดียว ขยับแยกไม่ได้ จึงใช้หมัดที่วาดด้วยโค้ดแทน */
   private punchFx(src: View, dst: View, crit: boolean) {
     const dx = dst.c.x - src.c.x, dy = dst.c.y - src.c.y;
@@ -1264,7 +1319,7 @@ export class GameScene extends Phaser.Scene {
    *  เดินท่า PixelLab = ภาพนิ่งเลื่อนตาม bodyShift (ทิศกลับด้านใช้ภาพทิศต้นฉบับกลับด้าน ให้ตรงกับตัว)
    *  เดินท่าโค้ด = ภาพนิ่ง (ทิศซ้ายใช้ภาพฝั่งขวากลับด้าน ให้ตรงกับตัว) */
   private placeOverlay(v: View, o: Phaser.GameObjects.Image, b: Phaser.GameObjects.Sprite, id: string, key: string) {
-    const walking = key.startsWith(`${v.sprite}_walk_`) || key.startsWith(`${v.sprite}_pwalk_`);
+    const walking = key.startsWith(`${v.sprite}_walk_`) || this.walkShifts.has(key); // เดินโค้ด / เฟรม PixelLab (เดิน, ต่อย)
     const flip = walking && (b.flipX || (!this.walkShifts.has(key) && v.dir.endsWith("west")));
     const k = outfitKey(id, flip ? MIRROR[v.dir] : v.dir) + (key.endsWith("_in") ? "_in" : "");
     if (o.texture.key !== k && this.textures.exists(k)) o.setTexture(k);
@@ -1382,6 +1437,29 @@ export class GameScene extends Phaser.Scene {
         }
         if (frames.length) this.anims.create({ key: `${prefix}_walk_${d}`, frames, frameRate: 1000 / WALK_FRAME_MS, repeat: -1 });
       }
+      // ท่าต่อย PixelLab: เปลี่ยนสี + ชั้นสีผิว + ค่าเลื่อนตัว (เสื้อภาพทับ) ทุกเฟรม เล่นครั้งเดียว
+      for (const d of DIRS) {
+        const src = animSource(punchDirs(look.gender), d);
+        if (!src) continue;
+        const frames: { key: string }[] = [];
+        for (let i = 0; i < PUNCH_ANIMS[look.gender][src.dir].frames; i++) {
+          const key = `${prefix}_ppunch_${src.dir}_${i}`;
+          if (!this.textures.exists(key)) {
+            const raw = `base_${look.gender}_punch_${src.dir}_${i}`;
+            if (!this.textures.exists(raw)) break;
+            const img = this.textures.get(raw).getSourceImage() as HTMLImageElement;
+            const frame = recolorSprite(img, look);
+            this.textures.addCanvas(key, frame);
+            this.textures.addCanvas(skinKey(key), skinCanvas(frame));
+            const stand = this.textures.get(`base_${look.gender}_${src.dir}`).getSourceImage() as HTMLImageElement;
+            this.walkShifts.set(key, walkShift(img, stand, WALK_PAD));
+          }
+          frames.push({ key });
+        }
+        if (!frames.length) continue;
+        this.anims.create({ key: `${prefix}_punch_${d}`, frames, frameRate: 1000 / PUNCH_FRAME_MS, repeat: 0 });
+        if (src.flip) this.walkFlip.add(`${prefix}_punch_${d}`);
+      }
     }
     return prefix;
   }
@@ -1420,6 +1498,10 @@ export class GameScene extends Phaser.Scene {
     if (!v.sprite) return;
     const walking = v.path.length > 0;
     const alive = v.kind === "player" && !v.dead;
+    if (v.punching) {
+      if (alive && !walking) return; // ต่อยจนจบท่า (ANIMATION_COMPLETE ปลด) เดิน/สลบ = เลิกต่อย
+      v.punching = false;
+    }
     const walk = alive && walking && this.anims.exists(`${v.sprite}_walk_${v.dir}`) ? `${v.sprite}_walk_${v.dir}` : null;
     const pose = walk ?? `${v.sprite}_${v.dir}:${alive ? "breath" : "still"}`;
     if (pose === v.pose) return;
