@@ -16,6 +16,7 @@ import { setWorldMapPin } from "./worldmap";
 import { createHud } from "./hud";
 import { SKILL_LIST } from "../../shared/skills";
 import { bindAttackButton, bindJoystick } from "./controls";
+import { createStatPanel, STATS } from "./statpanel";
 
 interface Character { name: string; level: number; exp: number; look: Look; map?: string }
 
@@ -396,41 +397,6 @@ function bindHud(net: Net, openQuests: () => void) {
     $("bot-potions").textContent = String(inv.filter((i) => ITEMS[i.item]?.heal).reduce((a, i) => a + i.count, 0));
   };
 
-  // หน้าต่างค่าพลัง (docs/stat-system.md): 6 ค่าหลัก + ราคาขั้นถัดไป, กด + ทีละ 1 หรือกดค้างเพิ่มต่อเนื่อง
-  const STATS: { key: StatKey; name: string; desc: string; tip: string }[] = [
-    { key: "str", name: "STR", desc: "พลัง", tip: "เพิ่ม ATK มาก และน้ำหนักที่แบกได้" },
-    { key: "agi", name: "AGI", desc: "ว่องไว", tip: "เพิ่ม FLEE และความเร็วโจมตี (ASPD)" },
-    { key: "vit", name: "VIT", desc: "อึด", tip: "เพิ่ม MAX HP, DEF เสริม และการฟื้น HP" },
-    { key: "int", name: "INT", desc: "ปัญญา", tip: "เพิ่ม MATK, MAX SP, MDEF เสริม และการฟื้น SP" },
-    { key: "dex", name: "DEX", desc: "แม่นยำ", tip: "เพิ่ม HIT, ATK เล็กน้อย, ASPD เล็กน้อย และร่ายเวทเร็วขึ้น" },
-    { key: "luk", name: "LUK", desc: "โชค", tip: "เพิ่ม CRITICAL, หลบสมบูรณ์ และ ATK เล็กน้อย" },
-  ];
-  // แตะหรือชี้ที่ช่องไหน ขึ้นคำอธิบายสั้น ๆ ที่แถบด้านล่าง
-  const tipEl = $("st-tip");
-  const tipDefault = "แตะหรือชี้ที่ค่าเพื่อดูคำอธิบาย";
-  const bindTip = (el: HTMLElement, text: string) => {
-    el.addEventListener("pointerenter", () => { tipEl.textContent = text; });
-    el.addEventListener("click", () => { tipEl.textContent = text; });
-    el.addEventListener("pointerleave", (e) => { if (e.pointerType === "mouse") tipEl.textContent = tipDefault; });
-  };
-  tipEl.textContent = tipDefault;
-  const DV_TIPS: Record<string, string> = {
-    atk: "พลังโจมตีกายภาพ — เพิ่มจาก STR (มาก), DEX, LUK",
-    matk: "พลังเวท ต่ำสุด ~ สูงสุด — เพิ่มจาก INT",
-    hit: "ความแม่นยำ ยิ่งสูงยิ่งตีโดน — เพิ่มจากเลเวลและ DEX",
-    crit: "โอกาสคริติคอล ตีโดนแน่นอน แรงขึ้น 40% ไม่สน DEF — เพิ่มจาก LUK",
-    maxhp: "พลังชีวิตสูงสุด — เพิ่มจากเลเวลและ VIT",
-    def: "DEF เกราะ + DEF เสริม ลดดาเมจกายภาพ — DEF เสริมเพิ่มจาก VIT",
-    mdef: "MDEF เกราะ + MDEF เสริม ลดดาเมจเวท — MDEF เสริมเพิ่มจาก INT",
-    flee: "การหลบ + หลบสมบูรณ์ — FLEE เพิ่มจากเลเวลและ AGI, หลบสมบูรณ์เพิ่มจาก LUK",
-    aspd: "ความเร็วโจมตี ยิ่งสูงยิ่งตีถี่ — เพิ่มจาก AGI (มาก) และ DEX",
-    maxsp: "พลังเวทสูงสุด — เพิ่มจากเลเวลและ INT",
-  };
-  for (const [k, t] of Object.entries(DV_TIPS)) {
-    const dd = $("dv-" + k);
-    bindTip(dd, t);
-    bindTip(dd.previousElementSibling as HTMLElement, t);
-  }
   // หน้าต่างอุปกรณ์: 10 ช่อง แตะช่องที่มีของ = ถอดกลับเข้ากระเป๋า
   const slotEls = new Map<string, HTMLButtonElement>();
   for (const sl of SLOTS) {
@@ -464,36 +430,13 @@ function bindHud(net: Net, openQuests: () => void) {
     $("eq-sum").textContent = `ATK ${dv.atk} · DEF ${dv.defPct}% + ${dv.defBonus} · MDEF ${dv.mdefPct}% + ${dv.mdefBonus}`;
   };
 
-  let last: PlayerStats | null = null;
+  // หน้าต่างค่าพลัง (statpanel.ts)
+  const statPanel = createStatPanel($("stat-panel"), (stat) => net.send({ t: "stat_add", stat, amount: 1 }));
   // เลเวลอัพ: ป็อปอัพ ! ชวนอัพค่าพลัง กดแล้วเปิดหน้าค่าพลัง หายเองเมื่อไม่มีแต้มพอเพิ่มค่าไหนได้แล้ว
   let prevLevel = 0;
   const lvup = $<HTMLButtonElement>("lvup");
   lvup.onclick = () => toggle("stat-panel", true);
   const canSpend = (s: PlayerStats) => STATS.some((st) => s.stats[st.key] < STAT_MAX && s.points >= statCost(s.stats[st.key]));
-  const statRow: Record<string, { v: HTMLElement; bonus: HTMLElement; cost: HTMLElement; btn: HTMLButtonElement }> = {};
-  for (const st of STATS) {
-    const row = document.createElement("div");
-    row.className = "stat-row";
-    row.innerHTML = `<span><b>${st.name}</b><small>${st.desc}</small></span><span class="v">5</span><span class="bonus"></span><span class="cost"></span><button type="button" aria-label="เพิ่ม ${st.desc}">+</button>`;
-    const btn = row.querySelector("button")!;
-    bindTip(row.querySelector("span")!, `${st.name}: ${st.tip}`);
-    statRow[st.key] = { v: row.querySelector(".v")!, bonus: row.querySelector(".bonus")!, cost: row.querySelector(".cost")!, btn };
-    let timer = 0;
-    const stop = () => { clearTimeout(timer); clearInterval(timer); timer = 0; };
-    const add = () => {
-      if (!last || last.stats[st.key] >= STAT_MAX || last.points < statCost(last.stats[st.key])) { stop(); return; }
-      net.send({ t: "stat_add", stat: st.key, amount: 1 });
-      // คาดค่าล่วงหน้าไว้ก่อน server ตอบ กันกดค้างแล้วส่งเกินแต้ม (server ตรวจซ้ำเสมอ)
-      last = { ...last, points: last.points - statCost(last.stats[st.key]), stats: { ...last.stats, [st.key]: last.stats[st.key] + 1 } };
-    };
-    btn.addEventListener("pointerdown", (e) => {
-      e.preventDefault();
-      add();
-      timer = window.setTimeout(() => { timer = window.setInterval(add, 110); }, 400);
-    });
-    for (const ev of ["pointerup", "pointerleave", "pointercancel"]) btn.addEventListener(ev, stop);
-    $("stat-rows").appendChild(row);
-  }
   // Alt+A เปิด/ปิดหน้าต่างค่าพลัง แบบ Ragnarok
   window.addEventListener("keydown", (e) => {
     if (e.altKey && (e.key === "a" || e.key === "A" || e.key === "ฟ")) { e.preventDefault(); toggle("stat-panel"); }
@@ -512,32 +455,7 @@ function bindHud(net: Net, openQuests: () => void) {
       $("gold-amount").textContent = money.toLocaleString("th-TH");
       bag.setMoney(money);
       for (const { btn, cost } of buyButtons) btn.disabled = money < cost;
-      last = s;
-      const dv = s.derived;
-      const put = (id: string, v: string) => { $(id).textContent = v; };
-      put("st-lv", `Lv ${s.level}`);
-      put("st-hp", `${s.hp} / ${s.maxHp}`);
-      put("st-sp", `${s.sp} / ${s.maxSp}`);
-      put("st-money", money.toLocaleString("th-TH"));
-      put("dv-atk", String(dv.atk));
-      put("dv-matk", `${dv.matkMin} ~ ${dv.matkMax}`);
-      put("dv-hit", String(dv.hit));
-      put("dv-flee", `${dv.flee} + ${Math.round(dv.perfectDodge * 10) / 10}`);
-      put("dv-crit", `${dv.crit.toFixed(1)}%`);
-      put("dv-maxhp", String(s.maxHp));
-      put("dv-maxsp", String(s.maxSp));
-      put("dv-def", `${dv.defPct} + ${dv.defBonus}`);
-      put("dv-mdef", `${dv.mdefPct} + ${dv.mdefBonus}`);
-      put("dv-aspd", (200 - dv.aspdMs / 20).toFixed(1)); // แบบ Ragnarok
-      put("st-points", String(s.points));
-      for (const st of STATS) {
-        const r = statRow[st.key], x = s.stats[st.key];
-        const cost = statCost(x);
-        r.v.textContent = String(x);
-        r.bonus.textContent = s.bonus[st.key] ? `${s.bonus[st.key] > 0 ? "+" : ""}${s.bonus[st.key]}` : ""; // โบนัสจากอุปกรณ์
-        r.cost.textContent = x >= STAT_MAX ? "สูงสุด" : String(cost);
-        r.btn.disabled = x >= STAT_MAX || s.points < cost;
-      }
+      statPanel.update(s);
       $("stat-badge").hidden = s.points <= 0; // จุดแดงเตือนเมื่อมีแต้มว่าง
       if (prevLevel && s.level > prevLevel && canSpend(s)) lvup.hidden = false;
       if (!canSpend(s)) lvup.hidden = true;

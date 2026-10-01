@@ -318,26 +318,32 @@
       box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6); color: var(--ink); }
     .gold-panel-theme .bag-head b { color: var(--gold-lite); font-family: var(--font-title); font-weight: 400; font-size: 18px; }
     .gold-panel-theme .bag-head small { font-family: var(--font); font-size: 11px; color: var(--ink-dim); }
-    .st-top { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 13px; color: var(--ink-dim); margin-bottom: 8px; }
-    .st-top b { color: var(--ink); font-weight: 600; }
-    .st-top #st-lv { color: var(--gold-lite); font-weight: 600; }
-    .st-cols { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 14px; }
-    .st-colhead { display: flex; justify-content: space-between; font-size: 11px; color: var(--ink-dim); padding: 0 38px 2px 0; }
-    .gold-panel-theme .stat-row { grid-template-columns: 1fr auto 26px 32px 32px; gap: 6px; padding: 4px 0; border-bottom: 1px dashed rgba(154, 106, 28, 0.35); }
-    .gold-panel-theme .stat-row b { color: var(--gold-lite); }
-    .gold-panel-theme .stat-row small { display: inline; margin-left: 5px; font-size: 11px; }
-    .gold-panel-theme .stat-row .cost { font-size: 12px; color: var(--ink-dim); text-align: center; }
-    .gold-panel-theme .stat-row button { background: linear-gradient(180deg, var(--gold-lite), var(--gold) 55%, #c98f2a); color: #3a1a05; font-size: 18px; line-height: 1; touch-action: none; user-select: none; }
-    .gold-panel-theme .stat-row button:disabled { background: #5b4a3a; color: #9c8a6a; opacity: 1; }
-    .gold-panel-theme .stat-row .bonus { font-size: 12px; font-weight: 700; color: #ffd84a; }
-    .gold-panel-theme .stat-row > span:first-child, .st-derived dt, .st-derived dd { cursor: help; }
-    .st-tip { margin-top: 8px; min-height: 34px; padding: 6px 8px; border-radius: 4px; background: rgba(0, 0, 0, 0.25); font-size: 12px; line-height: 1.4; color: var(--ink-dim); }
-    .st-derived { display: grid; grid-template-columns: auto 1fr; gap: 5px 10px; margin: 0; font-size: 13px; align-content: start; }
-    .st-derived dt { color: var(--ink-dim); }
-    .st-derived dd { margin: 0; text-align: right; font-weight: 600; }
-    .st-points { margin-top: 10px; padding-top: 8px; border-top: 1px solid var(--gold-deep); text-align: center; font-size: 14px; }
-    .st-points b { color: var(--gold-lite); font-size: 18px; }
-    @media (max-width: 420px) { .st-cols { grid-template-columns: minmax(0, 1fr); } }
+    /* หน้าต่างค่าพลัง: ภาพกรอบความละเอียดสูง ย่อแบบเกลี่ยสี (ไม่ pixelated) ตัวอักษรใช้ cqw ตามความกว้างกรอบ
+       คอมกว้าง 720 px มือถือเต็มความกว้างจอ (จอแนวนอนเตี้ย: ย่อให้สูงพอดีจอ) */
+    #stat-panel { position: fixed; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; aspect-ratio: 1440 / 1060;
+      width: min(720px, calc(100vw - 16px), calc((100dvh - 16px) * 1440 / 1060)); container-type: inline-size; font-family: var(--font); }
+    @media (max-width: 900px) and (pointer: coarse), (max-width: 560px) {
+      #stat-panel { width: min(100vw, calc(100dvh * 1440 / 1060)); }
+    }
+    #stat-panel .sp-frame { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+    #stat-panel .sp-box { position: absolute; display: flex; align-items: center; box-sizing: border-box; min-width: 0; }
+    #stat-panel .sp-title { justify-content: center; font-family: var(--font-title); font-size: 3.4cqw; color: #f6e4b0; text-shadow: 0 0.2cqw 0.4cqw #000; }
+    #stat-panel .sp-head { justify-content: center; font-size: 1.9cqw; font-weight: 600; color: #f1dfae; }
+    #stat-panel .sp-icon img { width: 100%; height: 100%; }
+    #stat-panel .sp-value { justify-content: space-between; gap: 0.6cqw; padding: 0 1.3cqw; font-size: 1.95cqw; font-weight: 600; color: #3b2412; white-space: nowrap; cursor: help; }
+    #stat-panel .sp-value b { font-weight: 700; }
+    #stat-panel .sp-dv { padding: 0 0.9cqw 0 1cqw; font-size: 1.75cqw; } /* ช่องขวาค่ายาว (20 ~ 24, 21 + 1.1) ตัวเล็กลงนิดให้ไม่ชิดชื่อ */
+    #stat-panel .sp-icon { cursor: help; }
+    #stat-panel .sp-bonus { justify-content: center; font-size: 1.95cqw; font-weight: 700; color: #c8870e; }
+    #stat-panel .sp-plus { padding: 0; border: 0; background: none; touch-action: none; user-select: none; cursor: pointer; }
+    #stat-panel .sp-plus img { width: 100%; height: 100%; pointer-events: none; }
+    #stat-panel .sp-plus:disabled { opacity: 0.5; cursor: default; }
+    #stat-panel .sp-points { justify-content: center; gap: 0.8cqw; font-size: 2.3cqw; font-weight: 600; color: #f6e4b0; }
+    #stat-panel .sp-points b { color: var(--gold-lite); }
+    #stat-panel .sp-close { position: absolute; padding: 0; border: 0; border-radius: 50%; background: transparent; cursor: pointer; }
+    #stat-panel .sp-close:hover, #stat-panel .sp-close:focus-visible { box-shadow: 0 0 1.2cqw 0.3cqw rgba(255, 200, 120, 0.75); outline: none; }
+    #stat-panel .st-tip { position: absolute; z-index: 1; max-width: 44cqw; padding: 0.8cqw 1.2cqw; border: 1px solid var(--gold); border-radius: 0.6cqw;
+      background: rgba(28, 16, 8, 0.94); color: #f6e4b0; font-size: 1.8cqw; line-height: 1.4; pointer-events: none; box-shadow: 0 0.6cqw 1.6cqw rgba(0, 0, 0, 0.5); }
     .stat-head { display: flex; justify-content: space-between; align-items: baseline; margin: 12px 0 6px; padding-top: 10px;
       border-top: 1px solid rgba(159, 192, 236, 0.25); font-size: 14px; }
     .stat-head b#st-points { color: var(--exp); font-size: 16px; }
@@ -749,29 +755,11 @@
       <button type="button" data-panel="settings-panel" aria-expanded="false" aria-label="ตั้งค่า (Esc)" title="ตั้งค่า (Esc)"><img src="/ui/hud/btn-settings.webp" alt="" draggable="false" /></button>
     </nav>
 
-    <section id="stat-panel" class="panel-pop gold-panel-theme" hidden aria-label="ค่าพลัง">
-      <div class="bag-head"><b>ค่าพลัง <small>(Alt+A)</small></b><button class="panel-close" aria-label="ปิด">✕</button></div>
-      <div class="st-top"><span id="st-lv"></span><span>HP <b id="st-hp"></b></span><span>SP <b id="st-sp"></b></span><span>เบี้ย <b id="st-money"></b></span></div>
-      <div class="st-cols">
-        <div>
-          <div class="st-colhead"><span>ค่าหลัก</span><span>ราคา</span></div>
-          <div id="stat-rows"></div>
-        </div>
-        <dl class="st-derived">
-          <dt>ATK</dt><dd id="dv-atk"></dd>
-          <dt>MATK</dt><dd id="dv-matk"></dd>
-          <dt>HIT</dt><dd id="dv-hit"></dd>
-          <dt>CRITICAL</dt><dd id="dv-crit"></dd>
-          <dt>MAX HP</dt><dd id="dv-maxhp"></dd>
-          <dt>DEF</dt><dd id="dv-def"></dd>
-          <dt>MDEF</dt><dd id="dv-mdef"></dd>
-          <dt>FLEE</dt><dd id="dv-flee"></dd>
-          <dt>ASPD</dt><dd id="dv-aspd"></dd>
-          <dt>MAX SP</dt><dd id="dv-maxsp"></dd>
-        </dl>
-      </div>
-      <div class="st-tip" id="st-tip"></div>
-      <div class="st-points">แต้มว่าง <b id="st-points">0</b></div>
+    <!-- หน้าต่างค่าพลัง (docs/stat-system.md): ภาพกรอบ ui/stats/stat-panel.webp ทุกช่องวางตาม shared/data/stat-panel-layout.json (main.ts) -->
+    <section id="stat-panel" hidden aria-label="ค่าพลัง">
+      <img class="sp-frame" src="/ui/stats/stat-panel.webp" alt="" draggable="false" />
+      <button type="button" class="panel-close sp-close" aria-label="ปิด"></button>
+      <div class="st-tip" id="st-tip" role="status" hidden></div>
     </section>
 
     <!-- แผนที่โลก (worldmap.ts) -->
