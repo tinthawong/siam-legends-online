@@ -24,7 +24,7 @@ interface View {
   body: Phaser.GameObjects.Sprite;
   hpBar: Phaser.GameObjects.Graphics | null;
   inner: Phaser.GameObjects.Container; // ตัว + เงา (ยกขึ้นตอนอยู่บนสะพานโค้ง)
-  tunic: Phaser.GameObjects.Image | null; // เสื้อทับตัว (ทดสอบ)
+  outfit: Phaser.GameObjects.Image | null; // เสื้อ: ภาพทับขนาดเท่าตัวละคร ทิศละไฟล์ (ทดสอบ)
   weapon: Phaser.GameObjects.Image | null; // อาวุธในมือ (ทดสอบ)
   swing: { a: number };                    // มุมเหวี่ยงอาวุธตอนตี (องศา ก่อนกลับด้าน)
   lift: number;                         // ยกขึ้นกี่ px (สะพานโค้ง) — ข้อความ/เอฟเฟกต์เหนือตัวต้องยกตาม
@@ -81,10 +81,21 @@ const PUNCH_WINDUP_MS = 80;
 // ท่ายืนผู้เล่น (โค้ดล้วน): สลับภาพนิ่ง ↔ หายใจเข้า ทุก 660 ms
 // หายใจเข้า = แถว y 0–32 เลื่อนขึ้น 1 px (แถว y ใช้ค่าจากแถว y+1) แถว 33 คงเดิม แถว 34 ลงไป (ขา) ไม่ขยับ
 const BREATH_MS = 660, BREATH_ROW = 33;
-// เสื้อทับตัว (ทดสอบ) ภาพ sprites/equipment/tunic/<ทิศ>.png ตาม tunic.json: เสื้ออยู่แถว TOP–BOTTOM ของภาพตัวละคร 48×48
-const TUNIC_DIRS = ["south", "south-east", "east", "north-east", "north", "north-west", "west", "south-west"];
-const TUNIC_BOTTOM = 35, TUNIC_HD = 2;
-const tunicTop = (dir: string) => (dir.startsWith("north") ? 20 : 18);
+/** เฟรมหายใจเข้า (ตัวละครและเสื้อ): แถว 0..32 ← แถว 1..33 ของภาพนิ่ง ที่เหลือคงเดิม */
+function inhaleCanvas(still: HTMLImageElement | HTMLCanvasElement): HTMLCanvasElement {
+  const cv = document.createElement("canvas");
+  cv.width = still.width; cv.height = still.height;
+  const ctx = cv.getContext("2d")!;
+  ctx.drawImage(still, 0, 0);
+  ctx.clearRect(0, 0, still.width, BREATH_ROW);
+  ctx.drawImage(still, 0, 1, still.width, BREATH_ROW, 0, 0, still.width, BREATH_ROW);
+  return cv;
+}
+// เสื้อ (แบบหลัก): ภาพทับขนาด 48×48 เท่าตัวละคร ทิศละไฟล์ sprites/equipment/body/<id>/<id>-<ทิศ>.png
+// วาดซ้อนตำแหน่งเดียวกับตัวละคร ไม่ย่อ · หายใจเข้าใช้เฟรมเลื่อนแบบเดียวกับตัว · เดินไม่ขยับ (ขยับแค่ขา)
+// เสื้อชุดใหม่ = วางไฟล์ 8 ทิศ แล้วเพิ่ม id ในรายการนี้ (ไฟล์ไม่ครบ 8 ทิศ = ไม่ขึ้นในปุ่มทดสอบ)
+const BODY_OUTFITS = ["muay-shirt"];
+const outfitKey = (id: string, dir: string) => `outfit_${id}_${dir}`;
 // อาวุธในมือ (ทดสอบ) ภาพ sprites/weapons/<file> ตาม shared/data/weapons2.json (ต้นฉบับ art/equipment/weapon-angle-guide.png)
 // ภาพแนวตั้ง ปลายชี้ขึ้น ขนาดจริง 1 พิกเซล = 1 พิกเซลตัวละคร จุดหมุน = grip
 // ไฟล์ภาพที่ยังไม่มีจะโหลดไม่ขึ้น → ไม่อยู่ในรายการปุ่มทดสอบ
@@ -159,7 +170,7 @@ export class GameScene extends Phaser.Scene {
   private invCount = new Map<string, number>();
   private myWeapon = false; // เราถืออาวุธอยู่ไหม (มือเปล่า = ต่อย)
   private weaponId: string | null = null; // ปุ่มทดสอบอาวุธ: id ใน weapons2.json (null = มือเปล่า)
-  private tunicOn = false;  // ปุ่มทดสอบใส่เสื้อ (เห็นเฉพาะตัวเอง ยังไม่มีระบบอุปกรณ์)
+  private outfitId: string | null = null; // ปุ่มทดสอบเสื้อ (เห็นเฉพาะตัวเอง ยังไม่มีระบบอุปกรณ์)
   /** ตำแหน่งเท้าซ้าย/ขวาของแต่ละเฟรมท่าเดิน (key = ชื่อ texture) ไว้วางรองเท้าในอนาคต */
   readonly walkFeet = new Map<string, { left: Foot; right: Foot }>();
   private alphaCache = new Map<string, { w: number; h: number; a: Uint8ClampedArray }>();
@@ -215,7 +226,8 @@ export class GameScene extends Phaser.Scene {
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
     for (const w of WEAPONS) this.load.image(`weapon_${w.id}`, `sprites/weapons/${w.file}`);
-    for (const d of TUNIC_DIRS) this.load.image(`tunic_${d}`, `sprites/equipment/tunic/${d}.png`);
+    for (const id of BODY_OUTFITS)
+      for (const d of DIRS) this.load.image(outfitKey(id, d), `sprites/equipment/body/${id}/${id}-${d}.png`);
     // เอฟเฟกต์การโจมตี/สกิล (tools/slice_fx.py): sprites/fx/<ชื่อ>/sheet.json + เฟรม
     for (const name of FX_NAMES) {
       const key = `fxsheet_${name}`;
@@ -421,7 +433,7 @@ export class GameScene extends Phaser.Scene {
       case "welcome":
         this.me = m.you;
         for (const e of m.entities) this.addView(e);
-        { const mv = this.views.get(m.you); if (mv) { if (this.tunicOn) this.setTunic(mv, true); this.setWeapon(mv); } }
+        { const mv = this.views.get(m.you); if (mv) { this.setOutfit(mv); this.setWeapon(mv); } }
         for (const g of m.ground) this.addGround(g, false);
         this.cameras.main.startFollow(this.views.get(m.you)!.c, true, 0.2, 0.2);
         this.updateStats(m.self);
@@ -678,7 +690,7 @@ export class GameScene extends Phaser.Scene {
       : null;
 
     const v: View = {
-      id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, tunic: null, weapon: null, swing: { a: 0 }, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
+      id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, outfit: null, weapon: null, swing: { a: 0 }, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
       sprite, look: e.look ?? null, dead: !!e.dead, breathing: false, breath0: Math.random() * BREATH_MS * 2, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
@@ -1141,20 +1153,42 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** ปุ่มทดสอบ: ใส่/ถอดเสื้อ (เฉพาะตัวเรา ฝั่ง client) */
-  toggleTunic(): boolean {
-    this.tunicOn = !this.tunicOn;
+  /** ปุ่มทดสอบ: สลับเสื้อ ไม่ใส่ → เสื้อแต่ละชุดที่มีไฟล์ครบ 8 ทิศ → ไม่ใส่ (เฉพาะตัวเรา ฝั่ง client) คืน id */
+  cycleOutfit(): string | null {
+    const list = BODY_OUTFITS.filter((id) => DIRS.every((d) => this.textures.exists(outfitKey(id, d))));
+    const i = this.outfitId ? list.indexOf(this.outfitId) : -1;
+    this.outfitId = list[i + 1] ?? null;
     const v = this.me ? this.views.get(this.me) : undefined;
-    if (v) this.setTunic(v, this.tunicOn);
-    return this.tunicOn;
+    if (v) this.setOutfit(v);
+    return this.outfitId;
   }
 
-  private setTunic(v: View, on: boolean) {
-    if (on && !v.tunic) {
-      v.tunic = this.add.image(0, 0, "tunic_south").setOrigin(0.5, 0);
-      v.inner.addAt(v.tunic, v.inner.getIndex(v.body) + 1); // ทับหน้าตัวละครทุกทิศ
-      this.placeTunic(v);
-    } else if (!on && v.tunic) { v.tunic.destroy(); v.tunic = null; }
+  private setOutfit(v: View) {
+    v.outfit?.destroy();
+    v.outfit = null;
+    const id = this.outfitId;
+    if (!id || !this.textures.exists(outfitKey(id, "south"))) return;
+    // เฟรมหายใจเข้าของเสื้อ สร้างครั้งแรกครั้งเดียว
+    for (const d of DIRS) {
+      const k = outfitKey(id, d);
+      if (this.textures.exists(k) && !this.textures.exists(`${k}_in`))
+        this.textures.addCanvas(`${k}_in`, inhaleCanvas(this.textures.get(k).getSourceImage() as HTMLImageElement));
+    }
+    // ลำดับวาด: ตัวละคร → เสื้อ → อาวุธ (อาวุธด้านหน้าอยู่บนสุดของ inner, ด้านหลังอยู่ใต้ตัว)
+    v.outfit = this.add.image(0, 0, outfitKey(id, v.dir));
+    v.inner.addAt(v.outfit, v.inner.getIndex(v.body) + 1);
+    this.placeOutfit(v);
+  }
+
+  /** เสื้อซ้อนตรงตัวละครทุกเฟรม: ยืน = ภาพนิ่ง/หายใจเข้าตามตัว, เดิน = ภาพนิ่ง (ทิศซ้ายเดินใช้ภาพฝั่งขวากลับด้าน ให้ตรงกับตัว) */
+  private placeOutfit(v: View) {
+    const o = v.outfit!, b = v.body, id = this.outfitId!;
+    const key = b.texture.key;
+    const walking = key.startsWith(`${v.sprite}_walk_`);
+    const flip = walking && v.dir.endsWith("west");
+    const k = outfitKey(id, flip ? MIRROR[v.dir] : v.dir) + (key.endsWith("_in") ? "_in" : "");
+    if (o.texture.key !== k && this.textures.exists(k)) o.setTexture(k);
+    o.setFlipX(flip).setOrigin(b.originX, b.originY).setPosition(b.x, b.y).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
   }
 
   /** ค่าความทึบของภาพ (อ่านครั้งเดียวต่อ texture) */
@@ -1178,27 +1212,6 @@ export class GameScene extends Phaser.Scene {
   private topRow(al: { w: number; h: number; a: Uint8ClampedArray }) {
     for (let y = 0; y < al.h; y++) for (let x = 0; x < al.w; x++) if (al.a[y * al.w + x] > 40) return y;
     return 0;
-  }
-
-  /** วางเสื้อตามเฟรมที่เล่นอยู่ (พิกัดภาพ 48×48 ของตัวละคร):
-   *  สูง = แถว 18–35 (หลัง 20–35) · กว้างตามสัดส่วนภาพเสื้อ · กึ่งกลางแนวนอน = กึ่งกลางพิกเซลทึบของตัวในแถว 22–30
-   *  เดิน/ท่ายืน: เลื่อนขึ้นลงเท่าที่หัว (พิกเซลทึบบนสุด) ขยับจากภาพนิ่งของทิศนั้น */
-  private placeTunic(v: View) {
-    const t = v.tunic!, b = v.body, dir = v.dir;
-    const fr = b.frame, al = this.alphaOf(fr.texture.key);
-    const fw = fr.width, fh = fr.height, sx = b.scaleX, sy = b.scaleY, flip = b.flipX ? -1 : 1;
-    const delta = this.headDelta(v);
-    const top = 8 + (tunicTop(dir) - 45) + delta;
-    // แถว 22–30 ของภาพ 48 (ขยับตามหัว) → แถวในเฟรมนี้
-    const toFrameY = (wy: number) => Math.round(b.originY * fh + (wy - b.y) / sy);
-    const y0 = Math.max(0, toFrameY(8 + 22 - 45 + delta)), y1 = Math.min(fh - 1, toFrameY(8 + 30 - 45 + delta));
-    let minX = Infinity, maxX = -Infinity;
-    for (let y = y0; y <= y1; y++) for (let x = 0; x < al.w; x++) if (al.a[y * al.w + x] > 40) { if (x < minX) minX = x; if (x > maxX) maxX = x; }
-    const cx = minX <= maxX ? (minX + maxX + 1) / 2 : fw / 2;
-    const k = `tunic_${dir}`;
-    if (t.texture.key !== k) t.setTexture(k);
-    const h = (TUNIC_BOTTOM - tunicTop(dir) + 1) * Math.abs(sy);
-    t.setScale(h / t.frame.height).setPosition(b.x + (cx - b.originX * fw) * sx * flip, top);
   }
 
   /** หัวตัวละคร (พิกเซลทึบบนสุดของเฟรมที่เล่นอยู่) ขยับจากภาพนิ่ง 48×48 ของทิศนั้นเท่าไหร่ (พิกัดใน inner, body.y ปกติ = 8 เท้าแถว 45) */
@@ -1275,14 +1288,7 @@ export class GameScene extends Phaser.Scene {
         const still = recolorSprite(src, look);
         stills[d] = still;
         this.textures.addCanvas(`${prefix}_${d}`, still);
-        // เฟรมหายใจเข้า สร้างครั้งเดียว: แถว 0..32 ← แถว 1..33 ของภาพนิ่ง ที่เหลือคงเดิม
-        const inhale = document.createElement("canvas");
-        inhale.width = still.width; inhale.height = still.height;
-        const ctx = inhale.getContext("2d")!;
-        ctx.drawImage(still, 0, 0);
-        ctx.clearRect(0, 0, still.width, BREATH_ROW);
-        ctx.drawImage(still, 0, 1, still.width, BREATH_ROW, 0, 0, still.width, BREATH_ROW);
-        this.textures.addCanvas(`${prefix}_${d}_in`, inhale);
+        this.textures.addCanvas(`${prefix}_${d}_in`, inhaleCanvas(still));
       }
       // ท่าเดิน (โค้ดล้วน walkgen.ts): 4 เฟรมจากภาพยืนนิ่ง ทิศซ้าย 3 ทิศใช้ภาพฝั่งขวาที่กลับด้านแล้วค่อยแบ่งขา
       for (const d of DIRS) {
@@ -1433,7 +1439,7 @@ export class GameScene extends Phaser.Scene {
       t.setVisible(Math.abs(meV.c.x - cx) < TILE * 7 && Math.abs(meV.c.y - cy) < TILE * 7);
     }
     for (const v of this.views.values()) {
-      // หายใจ: สลับภาพนิ่ง/หายใจเข้าตามจังหวะของแต่ละคน (เสื้อ/อาวุธตามด้วย headDelta ใน placeTunic/placeWeapon)
+      // หายใจ: สลับภาพนิ่ง/หายใจเข้าตามจังหวะของแต่ละคน (เสื้อตามภาพตัว placeOutfit, อาวุธตามหัว headDelta)
       if (v.breathing) {
         const key = `${v.sprite}_${v.dir}${Math.floor((time + v.breath0) / BREATH_MS) % 2 ? "_in" : ""}`;
         if (v.body.texture.key !== key) v.body.setTexture(key);
@@ -1453,7 +1459,7 @@ export class GameScene extends Phaser.Scene {
       const lift = this.gm.bridgeLift(v.c.x, v.c.y);
       if (lift !== v.lift) { v.lift = lift; v.inner.y = -lift; }
       v.oc.setPosition(v.c.x, v.c.y - v.lift);
-      if (v.tunic) this.placeTunic(v);
+      if (v.outfit) this.placeOutfit(v);
       if (v.weapon) this.placeWeapon(v);
     }
     const t = this.targetId ? this.views.get(this.targetId) : undefined;

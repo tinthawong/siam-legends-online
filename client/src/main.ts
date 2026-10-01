@@ -149,7 +149,11 @@ function startGame(ch: Character, session: Session) {
     $("weapon-test").textContent = `อาวุธ: ${name ?? "มือเปล่า"}`; // ยังไม่มีชื่อไทยใน weapons2.json ใช้ id
     $("weapon-test").setAttribute("aria-pressed", String(!!name));
   };
-  $("tunic-test").onclick = () => { $("tunic-test").setAttribute("aria-pressed", String(scene.toggleTunic())); };
+  $("tunic-test").onclick = () => {
+    const id = scene.cycleOutfit();
+    $("tunic-test").textContent = `เสื้อ: ${id ?? "ไม่ใส่"}`;
+    $("tunic-test").setAttribute("aria-pressed", String(!!id));
+  };
   scene.onMapReady = (id, name) => {
     $("minimap-name").textContent = name;
     setWorldMapPin(id);
