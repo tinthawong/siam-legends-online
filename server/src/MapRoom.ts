@@ -174,7 +174,8 @@ export class MapRoom extends DurableObject<Env> {
       case "move": {
         const x = Math.floor(Number(msg.x)), y = Math.floor(Number(msg.y));
         if (!this.map.isWalkable(x, y)) return;
-        const path = pathTo(this.map, p.x, p.y, x, y);
+        const s = this.stepCell(p);
+        const path = pathTo(this.map, s.x, s.y, x, y);
         if (!path) return;
         // เดินเองแปลว่ายกเลิกการตีและ auto
         if (p.auto) { p.auto = false; this.send(p, { t: "auto", on: false }); }
@@ -183,7 +184,7 @@ export class MapRoom extends DurableObject<Env> {
         p.pickup = null;
         p.talk = null;
         p.skill = null;
-        this.setPath(p, path, now);
+        this.repath(p, path, now);
         break;
       }
       case "pickup": {
@@ -433,6 +434,20 @@ export class MapRoom extends DurableObject<Env> {
     this.broadcast({ t: "move", id: e.id, from: { x: e.x, y: e.y }, path, moveMs: e.moveMs });
   }
 
+  /** ช่องที่กำลังก้าวไปอยู่ (ก้าวที่เริ่มแล้วต้องเดินให้จบ) ไม่ได้เดิน = ช่องปัจจุบัน — ใช้เป็นจุดเริ่มหาเส้นทางใหม่ */
+  private stepCell(e: Entity): Cell {
+    return e.path[0] ?? { x: e.x, y: e.y };
+  }
+
+  /** เปลี่ยนเส้นทางระหว่างเดิน: path หาจาก stepCell → เดินก้าวที่ค้างอยู่ให้จบก่อน (เวลาเดิม) แล้วต่อเส้นทางใหม่
+   *  ไม่อย่างนั้นภาพบน client ที่เดินไปครึ่งช่องแล้วจะถูกดึงย้อนกลับ (กระตุก) และ server ช้ากว่าภาพสะสมจนวาป */
+  private repath(e: Entity, path: Cell[], now: number) {
+    const c = e.path[0];
+    if (!c) { this.setPath(e, path, now); return; }
+    e.path = [c, ...path];
+    this.broadcast({ t: "move", id: e.id, from: { x: e.x, y: e.y }, path: e.path, moveMs: e.moveMs });
+  }
+
   // ---------- ผู้เล่น: ตีเป้าหมาย / auto ----------
 
   private updatePlayer(p: Player, now: number) {
@@ -464,9 +479,10 @@ export class MapRoom extends DurableObject<Env> {
     const key = `${m.x},${m.y}`;
     if (p.chaseKey !== key || p.path.length === 0) {
       p.chaseKey = key;
-      const path = pathNear(this.map, p.x, p.y, m.x, m.y, PLAYER_RANGE);
+      const s = this.stepCell(p);
+      const path = pathNear(this.map, s.x, s.y, m.x, m.y, PLAYER_RANGE);
       if (!path) { p.target = null; this.send(p, { t: "target", id: null }); return; }
-      this.setPath(p, path, now);
+      this.repath(p, path, now);
     }
   }
 
@@ -616,9 +632,10 @@ export class MapRoom extends DurableObject<Env> {
     const key = `${p.x},${p.y}`;
     if (m.chaseKey !== key || m.path.length === 0) {
       m.chaseKey = key;
-      const path = pathNear(this.map, m.x, m.y, p.x, p.y, MOB_RANGE);
+      const s = this.stepCell(m);
+      const path = pathNear(this.map, s.x, s.y, p.x, p.y, MOB_RANGE);
       if (!path) { this.dropAggro(m, now); return; }
-      this.setPath(m, path, now);
+      this.repath(m, path, now);
     }
   }
 
