@@ -14,7 +14,8 @@ import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, QUESTS, emptyLog, isComplete, npcMark, type QuestLog } from "../../shared/quests";
 import { SKILLS } from "../../shared/skills";
-import { WALK_FRAMES, WALK_FPS, WALK_OFFSET, WALK_SCALE, animSource, walkDirs, walkFrameUrl } from "./sprites";
+import { MIRROR } from "./sprites";
+import { WALK_FRAME_MS, flipCanvas, makeWalkFrames, type Foot } from "./walkgen";
 
 interface View {
   id: string;
@@ -35,7 +36,6 @@ interface View {
   sprite: string | null; // มี = ภาพ 8 ทิศ (ผู้เล่น หรือมอนที่มีภาพ)
   look: Look | null;     // ผู้เล่น: เพศใช้เลือกทิศที่มีท่ายืน
   dead: boolean;         // ผู้เล่นสลบ (นิ่ง ไม่ขยับ)
-  motion: { mode: "step"; tween: Phaser.Tweens.Tween } | null; // เดินในทิศที่ไม่มีภาพท่าเดิน: เด้งด้วยโค้ด
   breathing: boolean; // ผู้เล่นยืนนิ่ง: สลับภาพนิ่ง/ภาพหายใจเข้า (update)
   breath0: number;    // จุดเริ่มจังหวะหายใจ (สุ่ม ทุกคนไม่พร้อมกัน)
   sheet: string | null;  // มี = มอนจาก sheet (ทิศเดียว มีท่า walk/attack/death)
@@ -160,6 +160,8 @@ export class GameScene extends Phaser.Scene {
   private myWeapon = false; // เราถืออาวุธอยู่ไหม (มือเปล่า = ต่อย)
   private weaponId: string | null = null; // ปุ่มทดสอบอาวุธ: id ใน weapons2.json (null = มือเปล่า)
   private tunicOn = false;  // ปุ่มทดสอบใส่เสื้อ (เห็นเฉพาะตัวเอง ยังไม่มีระบบอุปกรณ์)
+  /** ตำแหน่งเท้าซ้าย/ขวาของแต่ละเฟรมท่าเดิน (key = ชื่อ texture) ไว้วางรองเท้าในอนาคต */
+  readonly walkFeet = new Map<string, { left: Foot; right: Foot }>();
   private alphaCache = new Map<string, { w: number; h: number; a: Uint8ClampedArray }>();
   /** เราใช้สกิลโดน → main.ts เริ่มนับคูลดาวน์ที่ปุ่ม */
   onSkillCast: ((id: string) => void) | null = null;
@@ -201,9 +203,6 @@ export class GameScene extends Phaser.Scene {
     // ตัว base ของแต่ละเพศ (client/public/sprites/base-<เพศ>/<ทิศ>.png)
     for (const g of Object.keys(GENDERS))
       for (const d of DIRS) this.load.image(`base_${g}_${d}`, `sprites/base-${g}/${d}.png`);
-    for (const g of Object.keys(GENDERS))
-      for (const d of walkDirs(g))
-        for (let i = 0; i < WALK_FRAMES; i++) this.load.image(`base_${g}_walk_${d}_${i}`, walkFrameUrl(g, d, i));
     // พื้นหญ้า 64×64 ปูซ้ำทั้งแมพ (ขนาดเดิม ไม่ย่อ/ขยาย)
     TILE_URLS.forEach((url, i) => this.load.image(`tile_${TERRAIN_NAMES[i]}`, url));
     // พื้นที่ bake แล้ว (npm run bake / npm run map) ถ้ามี ใช้แทนพื้นที่วาดด้วยโค้ด ไม่มี = วาดเอง (renderGround)
@@ -680,7 +679,7 @@ export class GameScene extends Phaser.Scene {
 
     const v: View = {
       id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, tunic: null, weapon: null, swing: { a: 0 }, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
-      sprite, look: e.look ?? null, dead: !!e.dead, motion: null, breathing: false, breath0: Math.random() * BREATH_MS * 2, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
+      sprite, look: e.look ?? null, dead: !!e.dead, breathing: false, breath0: Math.random() * BREATH_MS * 2, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "",
     };
     this.views.set(e.id, v);
     if (e.dead) this.setDead(v, true);
@@ -1270,9 +1269,11 @@ export class GameScene extends Phaser.Scene {
   private lookSprite(look: Look): string {
     const prefix = `p_${lookKey(look)}`;
     if (!this.textures.exists(`${prefix}_south`)) {
+      const stills: Record<string, HTMLCanvasElement> = {};
       for (const d of DIRS) {
         const src = this.textures.get(`base_${look.gender}_${d}`).getSourceImage() as HTMLImageElement;
         const still = recolorSprite(src, look);
+        stills[d] = still;
         this.textures.addCanvas(`${prefix}_${d}`, still);
         // เฟรมหายใจเข้า สร้างครั้งเดียว: แถว 0..32 ← แถว 1..33 ของภาพนิ่ง ที่เหลือคงเดิม
         const inhale = document.createElement("canvas");
@@ -1283,17 +1284,17 @@ export class GameScene extends Phaser.Scene {
         ctx.drawImage(still, 0, 1, still.width, BREATH_ROW, 0, 0, still.width, BREATH_ROW);
         this.textures.addCanvas(`${prefix}_${d}_in`, inhale);
       }
-      // ท่าเดิน: เปลี่ยนสีทุกเฟรม แล้วสร้าง animation (ทิศที่ไม่มีใช้ของฝั่งตรงข้ามกลับภาพ ดู updatePose)
-      for (const d of walkDirs(look.gender)) {
-        const frames: Phaser.Types.Animations.AnimationFrame[] = [];
-        for (let i = 0; i < WALK_FRAMES; i++) {
-          const key = `base_${look.gender}_walk_${d}_${i}`;
-          if (!this.textures.exists(key)) break;
-          const src = this.textures.get(key).getSourceImage() as HTMLImageElement;
-          this.textures.addCanvas(`${prefix}_walk_${d}_${i}`, recolorSprite(src, look));
-          frames.push({ key: `${prefix}_walk_${d}_${i}` });
-        }
-        if (frames.length === WALK_FRAMES) this.anims.create({ key: `${prefix}_walk_${d}`, frames, frameRate: WALK_FPS, repeat: -1 });
+      // ท่าเดิน (โค้ดล้วน walkgen.ts): 4 เฟรมจากภาพยืนนิ่ง ทิศซ้าย 3 ทิศใช้ภาพฝั่งขวาที่กลับด้านแล้วค่อยแบ่งขา
+      for (const d of DIRS) {
+        const left = d.endsWith("west");
+        const base = left ? flipCanvas(stills[MIRROR[d]]) : stills[d];
+        const frames = makeWalkFrames(base).map((f, i) => {
+          const key = `${prefix}_walk_${d}_${i}`;
+          this.textures.addCanvas(key, f.canvas);
+          this.walkFeet.set(key, { left: f.left, right: f.right });
+          return { key };
+        });
+        this.anims.create({ key: `${prefix}_walk_${d}`, frames, frameRate: 1000 / WALK_FRAME_MS, repeat: -1 });
       }
     }
     return prefix;
@@ -1307,7 +1308,7 @@ export class GameScene extends Phaser.Scene {
     else if (!v.sheet && Math.abs(dx) > 0.5) v.body.setFlipX(dx < 0);
   }
 
-  /** ผู้เล่น: ยืน = ภาพนิ่งของทิศ + หายใจ (update), เดิน = ท่าเดินของทิศนั้น (หรือทิศกระจก) ไม่มี = ภาพนิ่งเด้งด้วยโค้ด
+  /** ผู้เล่น: ยืน = ภาพนิ่งของทิศ + หายใจ (update), เดิน = ท่าเดิน 4 เฟรมของทิศนั้น (walkgen.ts), สลบ = ภาพนิ่ง
    *  มอนจาก sheet: เดิน = ท่า walk, ยืน = เฟรมแรกของ walk + ขยับขึ้นลง */
   private updatePose(v: View) {
     if (v.sheet) {
@@ -1331,38 +1332,16 @@ export class GameScene extends Phaser.Scene {
       return;
     }
     if (!v.sprite) return;
-    // ผู้เล่น: ยืน = ภาพนิ่ง + หายใจ, เดิน = ท่าเดิน (ทิศที่ไม่มีใช้ของฝั่งตรงข้ามกลับภาพ)
     const walking = v.path.length > 0;
     const alive = v.kind === "player" && !v.dead;
-    const src = alive && walking && v.look ? animSource(walkDirs(v.look.gender), v.dir) : null;
-    const walk = src && this.anims.exists(`${v.sprite}_walk_${src.dir}`) ? `${v.sprite}_walk_${src.dir}` : null;
-    // ไม่มีภาพท่าเดินของทิศนี้: ภาพนิ่ง + เด้งตามก้าวด้วยโค้ด · สลบ = ภาพนิ่ง ไม่หายใจ
-    const mode = !alive ? "still" : walking ? "step" : "breath";
-    const pose = walk ? `${walk}${src!.flip ? ":flip" : ""}` : `${v.sprite}_${v.dir}:${mode}`;
+    const walk = alive && walking && this.anims.exists(`${v.sprite}_walk_${v.dir}`) ? `${v.sprite}_walk_${v.dir}` : null;
+    const pose = walk ?? `${v.sprite}_${v.dir}:${alive ? "breath" : "still"}`;
     if (pose === v.pose) return;
     v.pose = pose;
-    v.breathing = !walk && mode === "breath" && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (walk) {
-      this.setMotion(v, null);
-      v.body.setFlipX(src!.flip).setOrigin(0.5, (45 + WALK_OFFSET) / 64).play(walk, true);
-      v.body.setScale(WALK_SCALE); // ยึดเท้า ขยายแล้วเท้ายังติดพื้น
-    } else {
-      v.body.stop();
-      v.body.setFlipX(false).setTexture(`${v.sprite}_${v.dir}`).setOrigin(0.5, 45 / 48);
-      this.setMotion(v, mode === "step" ? "step" : null);
-    }
-  }
-
-  /** เดินในทิศที่ยังไม่มีภาพท่าเดินจาก PixelLab: ภาพนิ่งเด้งตามก้าว */
-  private setMotion(v: View, mode: "step" | null) {
-    if ((v.motion?.mode ?? null) === mode) return;
-    v.motion?.tween.remove();
-    v.motion = null;
-    v.body.setScale(1);
-    v.body.y = 8; // ตำแหน่งเท้าผู้เล่น (addView)
-    if (!mode || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
-    const tween = this.tweens.add({ targets: v.body, y: 6, yoyo: true, repeat: -1, duration: v.moveMs / 2, ease: "Sine.easeOut" });
-    v.motion = { mode, tween };
+    v.breathing = !walk && alive && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    v.body.setFlipX(false).setOrigin(0.5, 45 / 48).setScale(1);
+    if (walk) v.body.play(walk, true); // เดินต่อทิศใหม่: เฟรมเดินต่อจากเดิม
+    else v.body.stop().setTexture(`${v.sprite}_${v.dir}`);
   }
 
   private setTarget(id: string | null) {
