@@ -136,10 +136,11 @@ export function createInventory(root: HTMLElement, onUse: (item: string) => void
       if (!it) return;
       const def = ITEMS[it.item];
       const eq = EQUIP[it.item];
-      s.title = `${def.name} ×${it.count}${def.heal ? ` · กดเพื่อกิน (เติมเลือด ${def.heal})` : eq ? " · กดเพื่อใส่" : ""}`;
+      s.title = `${def.name} ×${it.count}${def.heal ? ` · กดเพื่อกิน (เติมเลือด ${def.heal})` : def.sp ? ` · กดเพื่อกิน (เติม SP ${def.sp})` : eq ? " · กดเพื่อใส่" : ""}`;
       if (def.icon) {
         const icon = document.createElement("img");
         icon.src = `/sprites/items/${def.icon}-64.png`;
+        if (def.pixel) icon.style.imageRendering = "pixelated"; // ภาพพิกเซลจริง ขยายไม่เกลี่ยสี
         icon.alt = def.name;
         icon.draggable = false;
         s.appendChild(icon);
@@ -155,7 +156,7 @@ export function createInventory(root: HTMLElement, onUse: (item: string) => void
         c.textContent = String(it.count);
         s.appendChild(c);
       }
-      if (def.heal) {
+      if (def.heal || def.sp) {
         s.classList.add("usable");
         s.onclick = () => onUse(it.item);
       } else if (eq) {

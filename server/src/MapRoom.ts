@@ -85,6 +85,9 @@ type Entity = Player | Mob;
  * 1 instance = 1 แมพ
  * server เป็นผู้ตัดสินทุกอย่าง: client ส่งแค่ความตั้งใจ (เดินไปช่องนี้ / ตีตัวนี้ / เปิด auto)
  */
+/** ยาที่มอนทุกตัวดรอปตอนตาย (สุ่มแยกกัน) */
+const POTION_DROPS = [{ item: "potion_red", chance: 0.3 }, { item: "potion_sky", chance: 0.3 }];
+
 export class MapRoom extends DurableObject<Env> {
   private players = new Map<string, Player>();
   private mobs = new Map<string, Mob>();
@@ -697,14 +700,18 @@ export class MapRoom extends DurableObject<Env> {
   }
 
   /** ใช้ยาในกระเป๋า: เติมเลือด (มีคูลดาวน์ POTION_COOLDOWN_MS) คืน true ถ้าได้กินจริง */
+  /** กินยา: heal = เติม HP (เต็มแล้วกินไม่ได้), sp = เติม SP (เต็มแล้วกินไม่ได้) */
   private usePotion(p: Player, item: string, now: number): boolean {
-    const heal = ITEMS[item]?.heal;
-    if (!heal || p.dead || (p.inv.get(item) ?? 0) < 1 || now < p.nextPotionAt || p.hp >= p.maxHp) return false;
+    const def = ITEMS[item];
+    if (!def || !(def.heal || def.sp) || p.dead || (p.inv.get(item) ?? 0) < 1 || now < p.nextPotionAt) return false;
+    if (def.heal ? p.hp >= p.maxHp : p.sp >= p.maxSp) return false;
     p.nextPotionAt = now + POTION_COOLDOWN_MS;
     p.inv.set(item, (p.inv.get(item) ?? 0) - 1);
-    const amount = Math.min(heal, p.maxHp - p.hp);
-    p.hp += amount;
-    this.broadcast({ t: "heal", id: p.id, amount });
+    if (def.heal) {
+      const amount = Math.min(def.heal, p.maxHp - p.hp);
+      p.hp += amount;
+      this.broadcast({ t: "heal", id: p.id, amount });
+    } else p.sp += Math.min(def.sp!, p.maxSp - p.sp);
     this.send(p, { t: "inv", items: invList(p.inv) });
     this.send(p, { t: "stats", self: this.stats(p) });
     return true;
@@ -752,10 +759,11 @@ export class MapRoom extends DurableObject<Env> {
     m.respawnAt = now + MOB_RESPAWN_MS;
     this.broadcast({ t: "die", id: m.id });
 
-    // ของดรอป: หล่นที่ช่องที่มอนตาย
+    // ของดรอป: หล่นที่ช่องที่มอนตาย · ของประจำตัวมอน + ยาที่มอนทุกตัวดรอป (สุ่มแยกกันทีละอย่าง)
     const drop = MOBS[m.type].drop;
-    if (drop && ITEMS[drop.item] && Math.random() < drop.chance) {
-      const g: GroundItem = { id: "g" + ++this.groundSeq, item: drop.item, x: m.x, y: m.y };
+    for (const d of drop ? [drop, ...POTION_DROPS] : POTION_DROPS) {
+      if (!ITEMS[d.item] || Math.random() >= d.chance) continue;
+      const g: GroundItem = { id: "g" + ++this.groundSeq, item: d.item, x: m.x, y: m.y };
       this.ground.set(g.id, g);
       this.groundExpire.set(g.id, now + GROUND_ITEM_MS);
       this.broadcast({ t: "drop", g });

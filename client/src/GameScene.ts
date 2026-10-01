@@ -256,7 +256,8 @@ export class GameScene extends Phaser.Scene {
     const kinds = new Set([...this.gm.props.flatMap((p) => ARCH_BRIDGES.has(p.kind) ? [`${p.kind}-back`, `${p.kind}-front`] : [p.kind]), ...FOREST_KINDS]);
     for (const kind of kinds) if (PROP_SET_OF[kind]) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
-    for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
+    // ของบนพื้น: ภาพพิกเซล 32×32 ใช้ขนาดจริง นอกนั้นใช้ภาพ 16
+    for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-${it.pixel ? 32 : 16}.png`);
     for (const w of WEAPONS) this.load.image(`weapon_${w.id}`, `sprites/weapons/${w.file}`);
     // ท่าเดินจาก PixelLab (sprites.ts WALK_ANIMS) ทิศที่ไม่มีใช้ท่าเดินที่สร้างด้วยโค้ด
     for (const [g, dirs] of Object.entries(WALK_ANIMS))
@@ -776,6 +777,8 @@ export class GameScene extends Phaser.Scene {
       .setDepth(center(g.y) - 2)
       // พื้นที่กดใหญ่เท่า 1 ช่อง (32px) แม้รูปจะเล็ก เพื่อให้กดบนมือถือง่าย
       .setInteractive({ hitArea: new Phaser.Geom.Rectangle(-8, -8, 32, 32), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
+    // พื้นที่กด 32×32 ตรงกลางภาพ (ภาพ 16 หรือ 32)
+    (img.input!.hitArea as Phaser.Geom.Rectangle).setPosition(img.width / 2 - 16, img.height / 2 - 16);
     img.setData("groundId", g.id).setData("item", g.item);
     this.groundViews.set(g.id, img);
 

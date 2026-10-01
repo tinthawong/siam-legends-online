@@ -362,7 +362,7 @@ function bindHud(net: Net, openQuests: () => void) {
   for (const [key, d] of shopItems) {
     const row = document.createElement("div");
     row.className = "shop-item";
-    row.innerHTML = `<img src="/sprites/items/${d.icon}-64.png" alt="" /><div class="info">${d.name}<small>${d.heal ? `เติมเลือด ${d.heal} · ` : ""}${d.price} เบี้ย</small></div>`;
+    row.innerHTML = `<img src="/sprites/items/${d.icon}-64.png" alt=""${d.pixel ? ' style="image-rendering:pixelated"' : ""} /><div class="info">${d.name}<small>${d.heal ? `เติมเลือด ${d.heal} · ` : d.sp ? `เติม SP ${d.sp} · ` : ""}${d.price} เบี้ย</small></div>`;
     for (const n of [1, 10]) {
       const btn = document.createElement("button");
       btn.type = "button";
@@ -414,7 +414,7 @@ function bindHud(net: Net, openQuests: () => void) {
       b.dataset.item = item ?? "";
       const icon = document.createElement("span");
       icon.className = "eq-icon";
-      if (def?.icon) { const img = document.createElement("img"); img.src = `/sprites/items/${def.icon}-64.png`; img.alt = ""; icon.appendChild(img); }
+      if (def?.icon) { const img = document.createElement("img"); img.src = `/sprites/items/${def.icon}-64.png`; img.alt = ""; if (def.pixel) img.style.imageRendering = "pixelated"; icon.appendChild(img); }
       const txt = document.createElement("span");
       txt.className = "eq-text";
       txt.innerHTML = `<small>${sl.name}</small>`;
