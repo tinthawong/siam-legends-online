@@ -94,7 +94,7 @@ function inhaleCanvas(still: HTMLImageElement | HTMLCanvasElement): HTMLCanvasEl
 // เสื้อ (แบบหลัก): ภาพทับขนาด 48×48 เท่าตัวละคร ทิศละไฟล์ sprites/equipment/body/<id>/<id>-<ทิศ>.png
 // วาดซ้อนตำแหน่งเดียวกับตัวละคร ไม่ย่อ · หายใจเข้าใช้เฟรมเลื่อนแบบเดียวกับตัว · เดินไม่ขยับ (ขยับแค่ขา)
 // เสื้อชุดใหม่ = วางไฟล์ 8 ทิศ แล้วเพิ่ม id ในรายการนี้ (ไฟล์ไม่ครบ 8 ทิศ = ไม่ขึ้นในปุ่มทดสอบ)
-const BODY_OUTFITS = ["muay-shirt"];
+const BODY_OUTFITS = ["muay-shirt", "red-vest", "black-armor"];
 const outfitKey = (id: string, dir: string) => `outfit_${id}_${dir}`;
 // อาวุธในมือ (ทดสอบ) ภาพ sprites/weapons/<file> ตาม shared/data/weapons2.json (ต้นฉบับ art/equipment/weapon-angle-guide.png)
 // ภาพแนวตั้ง ปลายชี้ขึ้น ขนาดจริง 1 พิกเซล = 1 พิกเซลตัวละคร จุดหมุน = grip
