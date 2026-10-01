@@ -14,7 +14,7 @@ import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, QUESTS, emptyLog, isComplete, npcMark, type QuestLog } from "../../shared/quests";
 import { SKILLS } from "../../shared/skills";
-import { MIRROR, PUNCH_ANIMS, PUNCH_FRAME_MS, WALK_ANIMS, WALK_PAD, animSource, punchDirs, punchFrameUrl, walkDirs, walkFrameUrl } from "./sprites";
+import { MIRROR, PUNCH_ANIMS, WALK_ANIMS, WALK_PAD, animSource, punchDirs, punchFrameMs, punchFrameUrl, walkDirs, walkFrameUrl } from "./sprites";
 import { dyeCanvas, type DyeOutfit } from "./dye";
 import { WALK_FRAME_MS, flipCanvas, makeWalkFrames, walkShift, type Foot } from "./walkgen";
 
@@ -860,7 +860,8 @@ export class GameScene extends Phaser.Scene {
     const key = `${v.sprite}_punch_${v.dir}`;
     const src = animSource(punchDirs(v.look.gender), v.dir);
     if (!src || !this.anims.exists(key)) return null;
-    return { key, hitMs: (PUNCH_ANIMS[v.look.gender][src.dir].hit - 1) * PUNCH_FRAME_MS };
+    const p = PUNCH_ANIMS[v.look.gender][src.dir];
+    return { key, hitMs: (p.hit - 1) * punchFrameMs(p.frames) };
   }
 
   /** เล่นท่าต่อยครั้งเดียว (ตีซ้ำระหว่างท่า = เริ่มใหม่) จบแล้วกลับท่ายืน · โดน = หมัดไฟที่มอนตอนถึงเฟรม hit */
@@ -1457,7 +1458,7 @@ export class GameScene extends Phaser.Scene {
           frames.push({ key });
         }
         if (!frames.length) continue;
-        this.anims.create({ key: `${prefix}_punch_${d}`, frames, frameRate: 1000 / PUNCH_FRAME_MS, repeat: 0 });
+        this.anims.create({ key: `${prefix}_punch_${d}`, frames, frameRate: 1000 / punchFrameMs(PUNCH_ANIMS[look.gender][src.dir].frames), repeat: 0 });
         if (src.flip) this.walkFlip.add(`${prefix}_punch_${d}`);
       }
     }

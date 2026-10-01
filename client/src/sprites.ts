@@ -48,6 +48,8 @@ export const PUNCH_ANIMS: Record<string, Record<string, { frames: number; hit: n
   male: { east: { frames: 11, hit: 7 }, "south-east": { frames: 13, hit: 8 }, "north-east": { frames: 13, hit: 8 } },
   female: {},
 };
-export const PUNCH_FRAME_MS = 70; // ช้าไปตอนเล่น ลด 55
+// ทั้งท่าใช้เวลาเท่าท่าต่อยด้วยโค้ดเดิม (ง้าง 80 + ต่อย 55 + กลับ 120 ms) เวลาต่อเฟรม = PUNCH_MS / จำนวนเฟรม
+export const PUNCH_MS = 255;
+export const punchFrameMs = (frames: number) => PUNCH_MS / frames;
 export const punchDirs = (gender: string) => Object.keys(PUNCH_ANIMS[gender] ?? {});
 export const punchFrameUrl = (gender: string, dir: string, i: number) => `sprites/base-${gender}/punch-${dir}/${i}.png`;
