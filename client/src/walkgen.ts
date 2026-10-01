@@ -66,3 +66,34 @@ export function flipCanvas(src: HTMLCanvasElement): HTMLCanvasElement {
   ctx.drawImage(src, 0, 0);
   return cv;
 }
+
+/** ท่าเดินจาก PixelLab: หาว่าตัวในเฟรม 64×64 เลื่อนจากภาพยืน 48×48 (วางกลางด้วยระยะ pad) เท่าไหร่
+ *  ลองเลื่อนแนวนอน -2..+2 แนวตั้ง -3..+3 เลือกค่าที่พิกเซลช่วงบน (แถว 0–33 ของภาพยืน) ต่างกันน้อยที่สุด */
+export function walkShift(frame: CanvasImageSource & { width: number; height: number },
+                          stand: CanvasImageSource & { width: number; height: number }, pad: number): { dx: number; dy: number } {
+  const read = (img: CanvasImageSource & { width: number; height: number }) => {
+    const cv = document.createElement("canvas");
+    cv.width = img.width; cv.height = img.height;
+    const ctx = cv.getContext("2d", { willReadFrequently: true })!;
+    ctx.drawImage(img, 0, 0);
+    return ctx.getImageData(0, 0, img.width, img.height);
+  };
+  const f = read(frame), s = read(stand);
+  const TOP = 34;
+  let best = { dx: 0, dy: 0 }, bestDiff = Infinity;
+  for (let dy = -3; dy <= 3; dy++) for (let dx = -2; dx <= 2; dx++) {
+    let diff = 0;
+    for (let y = 0; y < TOP; y++) for (let x = 0; x < s.width; x++) {
+      const fx = x + pad + dx, fy = y + pad + dy;
+      const si = (y * s.width + x) * 4;
+      const inside = fx >= 0 && fy >= 0 && fx < f.width && fy < f.height;
+      const fi = (fy * f.width + fx) * 4;
+      for (let c = 0; c < 4; c++) diff += Math.abs((inside ? f.data[fi + c] : 0) - s.data[si + c]);
+    }
+    // เท่ากัน: เลือกค่าที่เลื่อนน้อยกว่า
+    if (diff < bestDiff || (diff === bestDiff && Math.abs(dx) + Math.abs(dy) < Math.abs(best.dx) + Math.abs(best.dy))) {
+      bestDiff = diff; best = { dx, dy };
+    }
+  }
+  return best;
+}

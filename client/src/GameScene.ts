@@ -14,8 +14,8 @@ import { ITEMS } from "../../shared/items";
 import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, QUESTS, emptyLog, isComplete, npcMark, type QuestLog } from "../../shared/quests";
 import { SKILLS } from "../../shared/skills";
-import { MIRROR } from "./sprites";
-import { WALK_FRAME_MS, flipCanvas, makeWalkFrames, type Foot } from "./walkgen";
+import { MIRROR, WALK_ANIMS, WALK_PAD, animSource, walkDirs, walkFrameUrl } from "./sprites";
+import { WALK_FRAME_MS, flipCanvas, makeWalkFrames, walkShift, type Foot } from "./walkgen";
 
 interface View {
   id: string;
@@ -173,7 +173,10 @@ export class GameScene extends Phaser.Scene {
   private outfitId: string | null = null; // ปุ่มทดสอบเสื้อ (เห็นเฉพาะตัวเอง ยังไม่มีระบบอุปกรณ์)
   /** ตำแหน่งเท้าซ้าย/ขวาของแต่ละเฟรมท่าเดิน (key = ชื่อ texture) ไว้วางรองเท้าในอนาคต */
   readonly walkFeet = new Map<string, { left: Foot; right: Foot }>();
-  private alphaCache = new Map<string, { w: number; h: number; a: Uint8ClampedArray }>();
+  /** ท่าเดินจาก PixelLab: ตัวในเฟรมเลื่อนจากภาพยืนเท่าไหร่ (key = ชื่อ texture เฟรม) ใช้เลื่อนเสื้อ/จุดมือ — หาเองตอนโหลด */
+  private walkShifts = new Map<string, { dx: number; dy: number }>();
+  /** animation ท่าเดินที่เล่นแบบกลับด้าน (ทิศฝั่งตรงข้ามของภาพ PixelLab) */
+  private walkFlip = new Set<string>();
   /** เราใช้สกิลโดน → main.ts เริ่มนับคูลดาวน์ที่ปุ่ม */
   onSkillCast: ((id: string) => void) | null = null;
 
@@ -226,6 +229,10 @@ export class GameScene extends Phaser.Scene {
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
     for (const w of WEAPONS) this.load.image(`weapon_${w.id}`, `sprites/weapons/${w.file}`);
+    // ท่าเดินจาก PixelLab (sprites.ts WALK_ANIMS) ทิศที่ไม่มีใช้ท่าเดินที่สร้างด้วยโค้ด
+    for (const [g, dirs] of Object.entries(WALK_ANIMS))
+      for (const [d, n] of Object.entries(dirs))
+        for (let i = 0; i < n; i++) this.load.image(`base_${g}_walk_${d}_${i}`, walkFrameUrl(g, d, i));
     for (const id of BODY_OUTFITS)
       for (const d of DIRS) this.load.image(outfitKey(id, d), `sprites/equipment/body/${id}/${id}-${d}.png`);
     // เอฟเฟกต์การโจมตี/สกิล (tools/slice_fx.py): sprites/fx/<ชื่อ>/sheet.json + เฟรม
@@ -1180,47 +1187,30 @@ export class GameScene extends Phaser.Scene {
     this.placeOutfit(v);
   }
 
-  /** เสื้อซ้อนตรงตัวละครทุกเฟรม: ยืน = ภาพนิ่ง/หายใจเข้าตามตัว, เดิน = ภาพนิ่ง (ทิศซ้ายเดินใช้ภาพฝั่งขวากลับด้าน ให้ตรงกับตัว) */
+  /** ตัวในเฟรมที่เล่นอยู่เลื่อนจากภาพยืนของทิศนั้นเท่าไหร่ (พิกัด inner):
+   *  หายใจเข้า = ขึ้น 1 px · ท่าเดิน PixelLab = ค่าที่หาตอนโหลด (กลับด้าน = กลับเครื่องหมายแนวนอน) · ท่าเดินโค้ด = 0 */
+  private bodyShift(v: View): { dx: number; dy: number } {
+    const key = v.body.texture.key;
+    if (key.endsWith("_in")) return { dx: 0, dy: -1 };
+    const w = this.walkShifts.get(key);
+    return w ? { dx: v.body.flipX ? -w.dx : w.dx, dy: w.dy } : { dx: 0, dy: 0 };
+  }
+
+  /** เสื้อซ้อนตรงตัวละครทุกเฟรม: ยืน = ภาพนิ่ง/หายใจเข้าตามตัว
+   *  เดินท่า PixelLab = ภาพนิ่งเลื่อนตาม bodyShift (ทิศกลับด้านใช้ภาพทิศต้นฉบับกลับด้าน ให้ตรงกับตัว)
+   *  เดินท่าโค้ด = ภาพนิ่ง (ทิศซ้ายใช้ภาพฝั่งขวากลับด้าน ให้ตรงกับตัว) */
   private placeOutfit(v: View) {
     const o = v.outfit!, b = v.body, id = this.outfitId!;
     const key = b.texture.key;
-    const walking = key.startsWith(`${v.sprite}_walk_`);
-    const flip = walking && v.dir.endsWith("west");
+    const walking = key.startsWith(`${v.sprite}_walk_`) || key.startsWith(`${v.sprite}_pwalk_`);
+    const flip = walking && (b.flipX || (!this.walkShifts.has(key) && v.dir.endsWith("west")));
     const k = outfitKey(id, flip ? MIRROR[v.dir] : v.dir) + (key.endsWith("_in") ? "_in" : "");
     if (o.texture.key !== k && this.textures.exists(k)) o.setTexture(k);
-    o.setFlipX(flip).setOrigin(b.originX, b.originY).setPosition(b.x, b.y).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
+    const sh = this.walkShifts.has(key) ? this.bodyShift(v) : { dx: 0, dy: 0 };
+    o.setFlipX(flip).setOrigin(0.5, 45 / 48).setPosition(b.x + sh.dx, b.y + sh.dy).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
   }
 
-  /** ค่าความทึบของภาพ (อ่านครั้งเดียวต่อ texture) */
-  private alphaOf(key: string) {
-    let c = this.alphaCache.get(key);
-    if (!c) {
-      const src = this.textures.get(key).getSourceImage() as HTMLImageElement | HTMLCanvasElement;
-      const cv = document.createElement("canvas");
-      cv.width = src.width; cv.height = src.height;
-      const ctx = cv.getContext("2d", { willReadFrequently: true })!;
-      ctx.drawImage(src, 0, 0);
-      const d = ctx.getImageData(0, 0, cv.width, cv.height).data;
-      const a = new Uint8ClampedArray(cv.width * cv.height);
-      for (let i = 0; i < a.length; i++) a[i] = d[i * 4 + 3];
-      c = { w: cv.width, h: cv.height, a };
-      this.alphaCache.set(key, c);
-    }
-    return c;
-  }
 
-  private topRow(al: { w: number; h: number; a: Uint8ClampedArray }) {
-    for (let y = 0; y < al.h; y++) for (let x = 0; x < al.w; x++) if (al.a[y * al.w + x] > 40) return y;
-    return 0;
-  }
-
-  /** หัวตัวละคร (พิกเซลทึบบนสุดของเฟรมที่เล่นอยู่) ขยับจากภาพนิ่ง 48×48 ของทิศนั้นเท่าไหร่ (พิกัดใน inner, body.y ปกติ = 8 เท้าแถว 45) */
-  private headDelta(v: View): number {
-    const b = v.body;
-    const baseTop = this.topRow(this.alphaOf(`${v.sprite}_${v.dir}`));
-    const headNow = b.y + (this.topRow(this.alphaOf(b.frame.texture.key)) - b.originY * b.frame.height) * b.scaleY;
-    return headNow - (8 + baseTop - 45);
-  }
 
   /** ปุ่มทดสอบ: สลับอาวุธ มือเปล่า → อาวุธที่มีภาพแต่ละชิ้น → มือเปล่า (เฉพาะตัวเรา ฝั่ง client) คืน id อาวุธ */
   cycleWeapon(): string | null {
@@ -1256,7 +1246,7 @@ export class GameScene extends Phaser.Scene {
     // ภาพปลายชี้ขึ้น (90°) → หมุนตามเข็มใน Phaser = 90 - deg · ท่าตี: ปลายชี้ซ้ายหมุนทิศตรงข้าม
     const side = Math.cos((h.deg * Math.PI) / 180) < 0 ? -1 : 1;
     w.setScale(1, h.len)
-      .setPosition(v.body.x + h.x - 24, 8 + h.y - 45 + this.headDelta(v))
+      .setPosition(v.body.x + h.x - 24 + this.bodyShift(v).dx, 8 + h.y - 45 + this.bodyShift(v).dy)
       .setAngle(90 - h.deg + side * v.swing.a);
   }
 
@@ -1290,17 +1280,39 @@ export class GameScene extends Phaser.Scene {
         this.textures.addCanvas(`${prefix}_${d}`, still);
         this.textures.addCanvas(`${prefix}_${d}_in`, inhaleCanvas(still));
       }
-      // ท่าเดิน (โค้ดล้วน walkgen.ts): 4 เฟรมจากภาพยืนนิ่ง ทิศซ้าย 3 ทิศใช้ภาพฝั่งขวาที่กลับด้านแล้วค่อยแบ่งขา
+      // ท่าเดิน: มีภาพ PixelLab ของทิศนี้ (หรือทิศฝั่งตรงข้าม → กลับด้าน) ใช้ภาพนั้น
+      // ไม่มี = โค้ดล้วน (walkgen.ts) 4 เฟรมจากภาพยืนนิ่ง ทิศซ้าย 3 ทิศใช้ภาพฝั่งขวาที่กลับด้านแล้วค่อยแบ่งขา
+      const pl = walkDirs(look.gender);
       for (const d of DIRS) {
-        const left = d.endsWith("west");
-        const base = left ? flipCanvas(stills[MIRROR[d]]) : stills[d];
-        const frames = makeWalkFrames(base).map((f, i) => {
-          const key = `${prefix}_walk_${d}_${i}`;
-          this.textures.addCanvas(key, f.canvas);
-          this.walkFeet.set(key, { left: f.left, right: f.right });
-          return { key };
-        });
-        this.anims.create({ key: `${prefix}_walk_${d}`, frames, frameRate: 1000 / WALK_FRAME_MS, repeat: -1 });
+        const src = animSource(pl, d);
+        let frames: { key: string }[];
+        if (src) {
+          const n = WALK_ANIMS[look.gender][src.dir];
+          frames = [];
+          for (let i = 0; i < n; i++) {
+            const key = `${prefix}_pwalk_${src.dir}_${i}`;
+            if (!this.textures.exists(key)) {
+              const raw = `base_${look.gender}_walk_${src.dir}_${i}`;
+              if (!this.textures.exists(raw)) break;
+              const img = this.textures.get(raw).getSourceImage() as HTMLImageElement;
+              this.textures.addCanvas(key, recolorSprite(img, look));
+              const stand = this.textures.get(`base_${look.gender}_${src.dir}`).getSourceImage() as HTMLImageElement;
+              this.walkShifts.set(key, walkShift(img, stand, WALK_PAD));
+            }
+            frames.push({ key });
+          }
+          if (src.flip) this.walkFlip.add(`${prefix}_walk_${d}`);
+        } else {
+          const left = d.endsWith("west");
+          const base = left ? flipCanvas(stills[MIRROR[d]]) : stills[d];
+          frames = makeWalkFrames(base).map((f, i) => {
+            const key = `${prefix}_walk_${d}_${i}`;
+            this.textures.addCanvas(key, f.canvas);
+            this.walkFeet.set(key, { left: f.left, right: f.right });
+            return { key };
+          });
+        }
+        if (frames.length) this.anims.create({ key: `${prefix}_walk_${d}`, frames, frameRate: 1000 / WALK_FRAME_MS, repeat: -1 });
       }
     }
     return prefix;
@@ -1345,9 +1357,13 @@ export class GameScene extends Phaser.Scene {
     if (pose === v.pose) return;
     v.pose = pose;
     v.breathing = !walk && alive && !window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    v.body.setFlipX(false).setOrigin(0.5, 45 / 48).setScale(1);
-    if (walk) v.body.play(walk, true); // เดินต่อทิศใหม่: เฟรมเดินต่อจากเดิม
-    else v.body.stop().setTexture(`${v.sprite}_${v.dir}`);
+    v.body.setScale(1);
+    if (walk) {
+      // ภาพ PixelLab 64×64: ภาพยืนอยู่กลางด้วยระยะ WALK_PAD → เท้า (แถว 45 ของภาพยืน) อยู่แถว 45 + WALK_PAD
+      const pixellab = this.walkShifts.has(this.anims.get(walk).frames[0].textureKey);
+      v.body.setFlipX(this.walkFlip.has(walk)).setOrigin(0.5, pixellab ? (45 + WALK_PAD) / (48 + WALK_PAD * 2) : 45 / 48);
+      v.body.play(walk, true);
+    } else v.body.stop().setFlipX(false).setOrigin(0.5, 45 / 48).setTexture(`${v.sprite}_${v.dir}`);
   }
 
   private setTarget(id: string | null) {
@@ -1439,7 +1455,7 @@ export class GameScene extends Phaser.Scene {
       t.setVisible(Math.abs(meV.c.x - cx) < TILE * 7 && Math.abs(meV.c.y - cy) < TILE * 7);
     }
     for (const v of this.views.values()) {
-      // หายใจ: สลับภาพนิ่ง/หายใจเข้าตามจังหวะของแต่ละคน (เสื้อตามภาพตัว placeOutfit, อาวุธตามหัว headDelta)
+      // หายใจ: สลับภาพนิ่ง/หายใจเข้าตามจังหวะของแต่ละคน (เสื้อ/จุดมืออาวุธตาม bodyShift)
       if (v.breathing) {
         const key = `${v.sprite}_${v.dir}${Math.floor((time + v.breath0) / BREATH_MS) % 2 ? "_in" : ""}`;
         if (v.body.texture.key !== key) v.body.setTexture(key);
