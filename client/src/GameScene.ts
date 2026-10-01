@@ -15,6 +15,7 @@ import type { GroundItem, InvItem } from "../../shared/protocol";
 import { NPCS, QUESTS, emptyLog, isComplete, npcMark, type QuestLog } from "../../shared/quests";
 import { SKILLS } from "../../shared/skills";
 import { MIRROR, WALK_ANIMS, WALK_PAD, animSource, walkDirs, walkFrameUrl } from "./sprites";
+import { dyeCanvas, type DyeOutfit } from "./dye";
 import { WALK_FRAME_MS, flipCanvas, makeWalkFrames, walkShift, type Foot } from "./walkgen";
 
 interface View {
@@ -108,11 +109,19 @@ function skinCanvas(src: HTMLImageElement | HTMLCanvasElement): HTMLCanvasElemen
   return cv;
 }
 const skinKey = (bodyKey: string) => `${bodyKey}_skin`;
-// เสื้อ (แบบหลัก): ภาพทับขนาด 48×48 เท่าตัวละคร ทิศละไฟล์ sprites/equipment/body/<id>/<id>-<ทิศ>.png
-// วาดซ้อนตำแหน่งเดียวกับตัวละคร ไม่ย่อ · หายใจเข้าใช้เฟรมเลื่อนแบบเดียวกับตัว · เดินไม่ขยับ (ขยับแค่ขา)
-// เสื้อชุดใหม่ = วางไฟล์ 8 ทิศ แล้วเพิ่ม id ในรายการนี้ (ไฟล์ไม่ครบ 8 ทิศ = ไม่ขึ้นในปุ่มทดสอบ)
-const BODY_OUTFITS = ["muay-shirt", "red-vest", "black-armor"];
+// เสื้อมี 2 แบบ
+// - "dye" ย้อมสี (dye.ts): ย้อมเสื้อกล้ามของตัวละครในทุกเฟรม ใช้ได้ทุกท่า texture ย้อมแล้วสร้างครั้งเดียวต่อเฟรมตอนใส่เสื้อ
+//   shades = สีเข้ม → สว่าง 4 ระดับตามความสว่างของเสื้อเดิม, trim = ขอบล่างชายเสื้อ
+// - "overlay" ภาพทับ (เสื้อทรงอื่น): ภาพ 48×48 ทิศละไฟล์ sprites/equipment/body/<id>/<id>-<ทิศ>.png
+//   วาดซ้อนตำแหน่งเดียวกับตัวละคร ไม่ย่อ · หายใจเข้าใช้เฟรมเลื่อนแบบเดียวกับตัว (ไฟล์ไม่ครบ 8 ทิศ = ไม่ขึ้นในปุ่มทดสอบ)
+type Outfit = DyeOutfit | { id: string; type: "overlay" };
+const BODY_OUTFITS: Outfit[] = [
+  { id: "muay-shirt", type: "dye", shades: ["#70060A", "#9E0E10", "#C41E1E", "#E23A32"], trim: "#E8B43C" },
+  { id: "red-vest", type: "overlay" },
+  { id: "black-armor", type: "overlay" },
+];
 const outfitKey = (id: string, dir: string) => `outfit_${id}_${dir}`;
+const dyeKey = (bodyKey: string, id: string) => `${bodyKey}_dye_${id}`;
 // อาวุธในมือ (ทดสอบ) ภาพ sprites/weapons/<file> ตาม shared/data/weapons2.json (ต้นฉบับ art/equipment/weapon-angle-guide.png)
 // ภาพแนวตั้ง ปลายชี้ขึ้น ขนาดจริง 1 พิกเซล = 1 พิกเซลตัวละคร จุดหมุน = grip
 // ไฟล์ภาพที่ยังไม่มีจะโหลดไม่ขึ้น → ไม่อยู่ในรายการปุ่มทดสอบ
@@ -250,7 +259,7 @@ export class GameScene extends Phaser.Scene {
     for (const [g, dirs] of Object.entries(WALK_ANIMS))
       for (const [d, n] of Object.entries(dirs))
         for (let i = 0; i < n; i++) this.load.image(`base_${g}_walk_${d}_${i}`, walkFrameUrl(g, d, i));
-    for (const id of BODY_OUTFITS)
+    for (const { id } of BODY_OUTFITS.filter((o) => o.type === "overlay"))
       for (const d of DIRS) this.load.image(outfitKey(id, d), `sprites/equipment/body/${id}/${id}-${d}.png`);
     // เอฟเฟกต์การโจมตี/สกิล (tools/slice_fx.py): sprites/fx/<ชื่อ>/sheet.json + เฟรม
     for (const name of FX_NAMES) {
@@ -1178,9 +1187,11 @@ export class GameScene extends Phaser.Scene {
     });
   }
 
-  /** ปุ่มทดสอบ: สลับเสื้อ ไม่ใส่ → เสื้อแต่ละชุดที่มีไฟล์ครบ 8 ทิศ → ไม่ใส่ (เฉพาะตัวเรา ฝั่ง client) คืน id */
+  /** ปุ่มทดสอบ: สลับเสื้อ ไม่ใส่ → เสื้อแต่ละชุด (ภาพทับต้องมีไฟล์ครบ 8 ทิศ) → ไม่ใส่ (เฉพาะตัวเรา ฝั่ง client) คืน id */
   cycleOutfit(): string | null {
-    const list = BODY_OUTFITS.filter((id) => DIRS.every((d) => this.textures.exists(outfitKey(id, d))));
+    const list = BODY_OUTFITS
+      .filter((o) => o.type === "dye" || DIRS.every((d) => this.textures.exists(outfitKey(o.id, d))))
+      .map((o) => o.id);
     const i = this.outfitId ? list.indexOf(this.outfitId) : -1;
     this.outfitId = list[i + 1] ?? null;
     const v = this.me ? this.views.get(this.me) : undefined;
@@ -1193,15 +1204,21 @@ export class GameScene extends Phaser.Scene {
     v.skin?.destroy();
     v.outfit = v.skin = null;
     const id = this.outfitId;
-    if (!id || !this.textures.exists(outfitKey(id, "south"))) return;
-    // เฟรมหายใจเข้าของเสื้อ สร้างครั้งแรกครั้งเดียว
-    for (const d of DIRS) {
+    const def = BODY_OUTFITS.find((o) => o.id === id);
+    if (!id || !def || !v.sprite) return;
+    if (def.type === "dye") {
+      // ย้อมทุกเฟรมของตัวนี้ที่มีอยู่ (ยืน หายใจ เดิน) ครั้งเดียว เก็บไว้ · เฟรมท่าใหม่ที่ยังไม่มีย้อมตอนเจอครั้งแรก (placeOutfit)
+      for (const k of this.textures.getTextureKeys())
+        if (k.startsWith(`${v.sprite}_`) && !k.endsWith("_skin") && !k.includes("_dye_")) this.dyeFrame(k, def);
+    } else if (!this.textures.exists(outfitKey(id, "south"))) return;
+    // เฟรมหายใจเข้าของเสื้อภาพทับ สร้างครั้งแรกครั้งเดียว
+    if (def.type === "overlay") for (const d of DIRS) {
       const k = outfitKey(id, d);
       if (this.textures.exists(k) && !this.textures.exists(`${k}_in`))
         this.textures.addCanvas(`${k}_in`, inhaleCanvas(this.textures.get(k).getSourceImage() as HTMLImageElement));
     }
     // ลำดับวาด: ตัวละคร → เสื้อ → สีผิวของตัว → อาวุธ (อาวุธด้านหน้าอยู่บนสุดของ inner, ด้านหลังอยู่ใต้ตัว)
-    v.outfit = this.add.image(0, 0, outfitKey(id, v.dir));
+    v.outfit = this.add.image(0, 0, def.type === "dye" ? "__MISSING" : outfitKey(id, v.dir));
     v.inner.addAt(v.outfit, v.inner.getIndex(v.body) + 1);
     v.skin = this.add.image(0, 0, "__MISSING");
     v.inner.addAt(v.skin, v.inner.getIndex(v.outfit) + 1);
@@ -1217,23 +1234,42 @@ export class GameScene extends Phaser.Scene {
     return w ? { dx: v.body.flipX ? -w.dx : w.dx, dy: w.dy } : { dx: 0, dy: 0 };
   }
 
-  /** เสื้อซ้อนตรงตัวละครทุกเฟรม: ยืน = ภาพนิ่ง/หายใจเข้าตามตัว
-   *  เดินท่า PixelLab = ภาพนิ่งเลื่อนตาม bodyShift (ทิศกลับด้านใช้ภาพทิศต้นฉบับกลับด้าน ให้ตรงกับตัว)
-   *  เดินท่าโค้ด = ภาพนิ่ง (ทิศซ้ายใช้ภาพฝั่งขวากลับด้าน ให้ตรงกับตัว) */
+  /** เสื้อซ้อนตรงตัวละครทุกเฟรม (ย้อมสี = ภาพย้อมของเฟรมนั้น, ภาพทับ = placeOverlay) แล้ววางชั้นสีผิวทับ */
   private placeOutfit(v: View) {
     const o = v.outfit!, b = v.body, id = this.outfitId!;
     const key = b.texture.key;
+    const def = BODY_OUTFITS.find((x) => x.id === id);
+    if (def?.type === "dye") {
+      // ย้อมสี: ภาพย้อมของเฟรมที่ตัวเล่นอยู่ ตรงกับตัวทุกอย่าง (ต่อย/ท่าอื่นที่ขยับตัวด้วย tween ก็ตามไปด้วย)
+      const dk = this.dyeFrame(key, def);
+      if (o.texture.key !== dk) o.setTexture(dk);
+      o.setFlipX(b.flipX).setOrigin(b.originX, b.originY).setPosition(b.x, b.y).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
+    } else this.placeOverlay(v, o, b, id, key);
+    // ชั้นสีผิว: ตรงกับตัวทุกอย่าง (ภาพเฟรมเดียวกัน กลับด้าน/จุดยึดเดียวกัน)
+    const sk = v.skin!, sKey = skinKey(key);
+    sk.setVisible(this.textures.exists(sKey));
+    if (sk.visible && sk.texture.key !== sKey) sk.setTexture(sKey);
+    sk.setFlipX(b.flipX).setOrigin(b.originX, b.originY).setPosition(b.x, b.y).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
+  }
+
+  /** texture ย้อมสีของเฟรมตัวละคร (สร้างครั้งแรกครั้งเดียว) คืนชื่อ texture */
+  private dyeFrame(bodyKey: string, def: DyeOutfit): string {
+    const k = dyeKey(bodyKey, def.id);
+    if (!this.textures.exists(k))
+      this.textures.addCanvas(k, dyeCanvas(this.textures.get(bodyKey).getSourceImage() as HTMLImageElement | HTMLCanvasElement, def));
+    return k;
+  }
+
+  /** ภาพทับ: ยืน = ภาพนิ่ง/หายใจเข้าตามตัว
+   *  เดินท่า PixelLab = ภาพนิ่งเลื่อนตาม bodyShift (ทิศกลับด้านใช้ภาพทิศต้นฉบับกลับด้าน ให้ตรงกับตัว)
+   *  เดินท่าโค้ด = ภาพนิ่ง (ทิศซ้ายใช้ภาพฝั่งขวากลับด้าน ให้ตรงกับตัว) */
+  private placeOverlay(v: View, o: Phaser.GameObjects.Image, b: Phaser.GameObjects.Sprite, id: string, key: string) {
     const walking = key.startsWith(`${v.sprite}_walk_`) || key.startsWith(`${v.sprite}_pwalk_`);
     const flip = walking && (b.flipX || (!this.walkShifts.has(key) && v.dir.endsWith("west")));
     const k = outfitKey(id, flip ? MIRROR[v.dir] : v.dir) + (key.endsWith("_in") ? "_in" : "");
     if (o.texture.key !== k && this.textures.exists(k)) o.setTexture(k);
     const sh = this.walkShifts.has(key) ? this.bodyShift(v) : { dx: 0, dy: 0 };
     o.setFlipX(flip).setOrigin(0.5, 45 / 48).setPosition(b.x + sh.dx, b.y + sh.dy).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
-    // ชั้นสีผิว: ตรงกับตัวทุกอย่าง (ภาพเฟรมเดียวกัน กลับด้าน/จุดยึดเดียวกัน)
-    const sk = v.skin!, sKey = skinKey(key);
-    sk.setVisible(this.textures.exists(sKey));
-    if (sk.visible && sk.texture.key !== sKey) sk.setTexture(sKey);
-    sk.setFlipX(b.flipX).setOrigin(b.originX, b.originY).setPosition(b.x, b.y).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
   }
 
 
