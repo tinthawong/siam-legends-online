@@ -146,7 +146,7 @@ function startGame(ch: Character, session: Session) {
   };
   $("weapon-test").onclick = () => {
     const name = scene.cycleWeapon();
-    $("weapon-test").textContent = `อาวุธ: ${name ?? "มือเปล่า"}`;
+    $("weapon-test").textContent = `อาวุธ: ${name ?? "มือเปล่า"}`; // ยังไม่มีชื่อไทยใน weapons2.json ใช้ id
     $("weapon-test").setAttribute("aria-pressed", String(!!name));
   };
   $("tunic-test").onclick = () => { $("tunic-test").setAttribute("aria-pressed", String(scene.toggleTunic())); };

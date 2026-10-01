@@ -1,4 +1,4 @@
-import WEAPON_DATA from "../../shared/data/weapons.json";
+import WEAPON_DATA from "../../shared/data/weapons2.json";
 import Phaser from "phaser";
 import type { Net } from "./net";
 import type { EntityState, PlayerStats, ServerMsg } from "../../shared/protocol";
@@ -80,20 +80,21 @@ const PUNCH_WINDUP_MS = 80;
 const TUNIC_DIRS = ["south", "south-east", "east", "north-east", "north", "north-west", "west", "south-west"];
 const TUNIC_BOTTOM = 35, TUNIC_HD = 2;
 const tunicTop = (dir: string) => (dir.startsWith("north") ? 20 : 18);
-// อาวุธในมือ (ทดสอบ) ภาพ sprites/equipment/weapons/<id>.png (tools/make_weapons.py ย่อไว้ HD เท่าของ gameScale)
-// ภาพเอียง 45° ปลายชี้ขึ้นขวา จุดหมุน = grip (พิกเซลของภาพเต็ม) · hand = false ใช้เป็นไอคอนอย่างเดียว
-const WEAPON_HD = 2;
-const HELD_WEAPONS = WEAPON_DATA.filter((w) => w.hand);
-// จุดมือในภาพตัวละคร 48×48 ต่อทิศ: back = วาดก่อนตัวละคร, flip = กลับด้านภาพอาวุธ
-const HAND: Record<string, { x: number; y: number; back: boolean; flip: boolean }> = {
-  south: { x: 15, y: 33, back: false, flip: true },
-  "south-east": { x: 18, y: 34, back: false, flip: true },
-  east: { x: 24, y: 33, back: false, flip: false },
-  "north-east": { x: 31, y: 34, back: false, flip: false },
-  north: { x: 32, y: 33, back: true, flip: false },
-  "north-west": { x: 30, y: 32, back: true, flip: false },
-  west: { x: 23, y: 33, back: true, flip: true },
-  "south-west": { x: 15, y: 33, back: true, flip: true },
+// อาวุธในมือ (ทดสอบ) ภาพ sprites/weapons/<file> ตาม shared/data/weapons2.json (ต้นฉบับ art/equipment/weapon-angle-guide.png)
+// ภาพแนวตั้ง ปลายชี้ขึ้น ขนาดจริง 1 พิกเซล = 1 พิกเซลตัวละคร จุดหมุน = grip
+// ไฟล์ภาพที่ยังไม่มีจะโหลดไม่ขึ้น → ไม่อยู่ในรายการปุ่มทดสอบ
+const WEAPONS = Object.entries(WEAPON_DATA).map(([id, w]) => ({ id, ...w }));
+// ต่อทิศ: จุดมือในภาพ 48×48, deg = ทิศปลายอาวุธ (ทวนเข็ม 0° = ขวา 90° = ขึ้น), len = ความยาวที่เหลือตามความลึก,
+// back = วาดก่อนตัวละคร (อยู่หลังตัว)
+const HAND: Record<string, { x: number; y: number; deg: number; len: number; back: boolean }> = {
+  south: { x: 15, y: 33, deg: -100, len: 0.62, back: false },
+  "south-east": { x: 18, y: 34, deg: -55, len: 0.82, back: false },
+  east: { x: 24, y: 33, deg: -25, len: 1, back: false },
+  "north-east": { x: 31, y: 34, deg: 55, len: 0.82, back: false },
+  north: { x: 32, y: 33, deg: 95, len: 0.62, back: true },
+  "north-west": { x: 30, y: 32, deg: 130, len: 0.82, back: true },
+  west: { x: 23, y: 33, deg: -155, len: 1, back: true },
+  "south-west": { x: 15, y: 33, deg: -125, len: 0.82, back: true },
 };
 // ตีปกติ: หมุนรอบ grip -10° → -60° → +85° → 0° รวม 0.3 วินาที (โดนเป้าตอนฟันลงสุด)
 const SWING_STEPS = [{ a: -10, ms: 30 }, { a: -60, ms: 90 }, { a: 85, ms: 90 }, { a: 0, ms: 90 }];
@@ -152,7 +153,7 @@ export class GameScene extends Phaser.Scene {
   private level = 1;
   private invCount = new Map<string, number>();
   private myWeapon = false; // เราถืออาวุธอยู่ไหม (มือเปล่า = ต่อย)
-  private weaponIdx = -1;   // ปุ่มทดสอบอาวุธ: ลำดับใน HELD_WEAPONS (-1 = มือเปล่า)
+  private weaponId: string | null = null; // ปุ่มทดสอบอาวุธ: id ใน weapons2.json (null = มือเปล่า)
   private tunicOn = false;  // ปุ่มทดสอบใส่เสื้อ (เห็นเฉพาะตัวเอง ยังไม่มีระบบอุปกรณ์)
   private alphaCache = new Map<string, { w: number; h: number; a: Uint8ClampedArray }>();
   /** เราใช้สกิลโดน → main.ts เริ่มนับคูลดาวน์ที่ปุ่ม */
@@ -212,7 +213,7 @@ export class GameScene extends Phaser.Scene {
     for (const kind of kinds) if (PROP_SET_OF[kind]) this.load.image(`prop_${kind}`, `sprites/props/${PROP_SET_OF[kind]}/${kind}.png`);
     // รูปไอเท็ม 16px ใช้ตอนหล่นบนพื้น (64px ใช้ในหน้ากระเป๋าซึ่งเป็น HTML)
     for (const it of Object.values(ITEMS)) if (it.icon) this.load.image(`item_${it.icon}`, `sprites/items/${it.icon}-16.png`);
-    for (const w of HELD_WEAPONS) this.load.image(`weapon_${w.id}`, `sprites/equipment/weapons/${w.file}`);
+    for (const w of WEAPONS) this.load.image(`weapon_${w.id}`, `sprites/weapons/${w.file}`);
     for (const d of TUNIC_DIRS) this.load.image(`tunic_${d}`, `sprites/equipment/tunic/${d}.png`);
     // เอฟเฟกต์การโจมตี/สกิล (tools/slice_fx.py): sprites/fx/<ชื่อ>/sheet.json + เฟรม
     for (const name of FX_NAMES) {
@@ -1207,29 +1208,30 @@ export class GameScene extends Phaser.Scene {
     return headNow - (8 + baseTop - 45);
   }
 
-  /** ปุ่มทดสอบ: สลับอาวุธ มือเปล่า → อาวุธแต่ละชิ้น → มือเปล่า (เฉพาะตัวเรา ฝั่ง client) คืนชื่ออาวุธ */
+  /** ปุ่มทดสอบ: สลับอาวุธ มือเปล่า → อาวุธที่มีภาพแต่ละชิ้น → มือเปล่า (เฉพาะตัวเรา ฝั่ง client) คืน id อาวุธ */
   cycleWeapon(): string | null {
-    this.weaponIdx = this.weaponIdx + 1 >= HELD_WEAPONS.length ? -1 : this.weaponIdx + 1;
+    const list = WEAPONS.filter((w) => this.textures.exists(`weapon_${w.id}`)).map((w) => w.id);
+    const i = this.weaponId ? list.indexOf(this.weaponId) : -1;
+    this.weaponId = list[i + 1] ?? null;
     const v = this.me ? this.views.get(this.me) : undefined;
     if (v) this.setWeapon(v);
-    return this.weaponIdx < 0 ? null : HELD_WEAPONS[this.weaponIdx].name;
+    return this.weaponId;
   }
 
   private setWeapon(v: View) {
-    const w = HELD_WEAPONS[this.weaponIdx];
+    const w = WEAPONS.find((x) => x.id === this.weaponId);
     v.weapon?.destroy();
     v.weapon = null;
     this.tweens.killTweensOf(v.swing);
     v.swing.a = 0;
-    if (!w) return;
-    v.weapon = this.add.image(0, 0, `weapon_${w.id}`)
-      .setOrigin(w.grip[0] / w.width, w.grip[1] / w.height)
-      .setScale(1 / WEAPON_HD);
+    if (!w || !this.textures.exists(`weapon_${w.id}`)) return;
+    v.weapon = this.add.image(0, 0, `weapon_${w.id}`).setOrigin(w.grip[0] / w.size[0], w.grip[1] / w.size[1]);
     v.weapon.setData("back", null);
     this.placeWeapon(v);
   }
 
-  /** วาง grip ที่มือตามทิศ เลื่อนขึ้นลงตามหัว · หลัง = ใต้ตัวละคร, หน้า = ทับตัวละคร (และเสื้อ) */
+  /** วาง grip ที่มือตามทิศ เลื่อนขึ้นลงตามหัว · หมุนให้ปลายชี้ไปทาง deg · หดความยาวตาม len
+   *  หลัง = ใต้ตัวละคร, หน้า = ทับตัวละคร (และเสื้อ) */
   private placeWeapon(v: View) {
     const w = v.weapon!, h = HAND[v.dir] ?? HAND.south;
     if (w.getData("back") !== h.back) {
@@ -1237,9 +1239,11 @@ export class GameScene extends Phaser.Scene {
       if (w.parentContainer) v.inner.remove(w);
       v.inner.addAt(w, h.back ? v.inner.getIndex(v.body) : v.inner.length);
     }
-    w.setFlipX(h.flip)
+    // ภาพปลายชี้ขึ้น (90°) → หมุนตามเข็มใน Phaser = 90 - deg · ท่าตี: ปลายชี้ซ้ายหมุนทิศตรงข้าม
+    const side = Math.cos((h.deg * Math.PI) / 180) < 0 ? -1 : 1;
+    w.setScale(1, h.len)
       .setPosition(v.body.x + h.x - 24, 8 + h.y - 45 + this.headDelta(v))
-      .setAngle(h.flip ? -v.swing.a : v.swing.a); // ภาพกลับด้าน หมุนทิศตรงข้าม
+      .setAngle(90 - h.deg + side * v.swing.a);
   }
 
   /** ตีปกติด้วยอาวุธ: หมุนรอบ grip ตาม SWING_STEPS */
