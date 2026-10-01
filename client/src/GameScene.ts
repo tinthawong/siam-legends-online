@@ -46,6 +46,7 @@ interface View {
   dir: Dir;              // ทิศที่หันอยู่
   pose: string;          // texture/animation ที่แสดงอยู่ (กันตั้งซ้ำทุกเฟรม)
   punching: boolean;     // ผู้เล่นกำลังเล่นท่าต่อย PixelLab (ห้ามท่ายืน/หายใจทับ จนกว่าจะจบหรือเริ่มเดิน)
+  punchDir: string;      // ทิศของท่าต่อยที่เล่นอยู่ (หัน south/north ยืมทิศทแยง) จบท่ากลับไปใช้ dir เดิม
 }
 
 /** sheet.json ที่ได้จาก tools/slice_sheet.py */
@@ -543,7 +544,7 @@ export class GameScene extends Phaser.Scene {
         const src = this.views.get(m.src);
         if (src && dst) this.face(src, dst.c.x - src.c.x, dst.c.y - src.c.y);
         // ผู้เล่นมือเปล่าที่มีท่าต่อย PixelLab ของทิศนี้: หมัดโดนตอนถึงเฟรม hit
-        const punchAnim = src && dst && this.isPunch(src.id) ? this.punchAnim(src) : null;
+        const punchAnim = src && this.isPunch(src.id) ? this.punchAnim(src, dst) : null;
         if (dst) {
           dst.hp = m.hp;
           this.drawHp(dst);
@@ -575,9 +576,9 @@ export class GameScene extends Phaser.Scene {
           if (!punchAnim) hitAnim();
         }
         // ผู้เล่นตี: พุ่งตัว + รอยฟัน (ตีพลาดก็เห็นท่าเหวี่ยง)
-        if (src?.kind === "player" && dst) {
+        if (src && punchAnim) this.playPunch(src, punchAnim, dst, m.crit, !m.miss);
+        else if (src?.kind === "player" && dst) {
           if (src.weapon) this.weaponSwing(src);
-          else if (punchAnim) this.playPunch(src, punchAnim, dst, m.crit, !m.miss);
           else if (this.isPunch(src.id)) this.punchFx(src, dst, m.crit);
           else this.swingFx(src, dst, m.crit);
         }
@@ -736,7 +737,7 @@ export class GameScene extends Phaser.Scene {
 
     const v: View = {
       id: e.id, kind: e.kind, c, oc, body, hpBar, inner, lift: 0, outfit: null, skin: null, weapon: null, swing: { a: 0 }, hp: e.hp, maxHp: e.maxHp, path: e.path.slice(), moveMs: e.moveMs,
-      sprite, look: e.look ?? null, dead: !!e.dead, breathing: false, breath0: Math.random() * BREATH_MS * 2, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "", punching: false,
+      sprite, look: e.look ?? null, dead: !!e.dead, breathing: false, breath0: Math.random() * BREATH_MS * 2, sheet: sheet?.name ?? null, bob, topY, dir: "south", pose: "", punching: false, punchDir: "",
     };
     this.views.set(e.id, v);
     if (e.dead) this.setDead(v, true);
@@ -854,19 +855,23 @@ export class GameScene extends Phaser.Scene {
     return v?.kind === "player" && !v.weapon && !(id === this.me && this.myWeapon);
   }
 
-  /** ท่าต่อย PixelLab ของทิศที่หันอยู่ (ไม่มี = null ใช้ท่าต่อยด้วยโค้ด) + เวลาจากเริ่มท่าถึงเฟรมที่หมัดโดน */
-  private punchAnim(v: View): { key: string; hitMs: number } | null {
+  /** ท่าต่อย PixelLab ของทิศที่หันอยู่ (ไม่มี = null ใช้ท่าต่อยด้วยโค้ด) + เวลาจากเริ่มท่าถึงเฟรมที่หมัดโดน
+   *  หัน south/north ไม่มีท่าของทิศนั้น: ยืมทิศทแยง มอนอยู่ขวาหรือตรงกลาง (หรือไม่มีเป้า) = -east, อยู่ซ้าย = -west */
+  private punchAnim(v: View, dst?: View): { key: string; dir: string; hitMs: number } | null {
     if (!v.sprite || !v.look || v.dead) return null;
-    const key = `${v.sprite}_punch_${v.dir}`;
-    const src = animSource(punchDirs(v.look.gender), v.dir);
+    let dir = v.dir;
+    if (dir === "south" || dir === "north") dir = `${dir}-${!dst || dst.c.x >= v.c.x ? "east" : "west"}`;
+    const key = `${v.sprite}_punch_${dir}`;
+    const src = animSource(punchDirs(v.look.gender), dir);
     if (!src || !this.anims.exists(key)) return null;
     const p = PUNCH_ANIMS[v.look.gender][src.dir];
-    return { key, hitMs: (p.hit - 1) * punchFrameMs(p.frames) };
+    return { key, dir, hitMs: (p.hit - 1) * punchFrameMs(p.frames) };
   }
 
   /** เล่นท่าต่อยครั้งเดียว (ตีซ้ำระหว่างท่า = เริ่มใหม่) จบแล้วกลับท่ายืน · โดน = หมัดไฟที่มอนตอนถึงเฟรม hit */
-  private playPunch(v: View, p: { key: string; hitMs: number }, dst: View, crit: boolean, hit: boolean) {
+  private playPunch(v: View, p: { key: string; dir: string; hitMs: number }, dst: View | undefined, crit: boolean, hit: boolean) {
     v.punching = true;
+    v.punchDir = p.dir;
     v.breathing = false;
     v.pose = p.key;
     v.body.setFlipX(this.walkFlip.has(p.key)).setOrigin(0.5, (45 + WALK_PAD) / (48 + WALK_PAD * 2)).setScale(1);
@@ -877,7 +882,7 @@ export class GameScene extends Phaser.Scene {
       v.pose = "";
       this.updatePose(v);
     });
-    if (hit) this.time.delayedCall(p.hitMs, () => { if (dst.body.active) this.fireFistFx(v, dst, crit); });
+    if (hit && dst) this.time.delayedCall(p.hitMs, () => { if (dst.body.active) this.fireFistFx(v, dst, crit); });
   }
 
   /** หมัดไฟ (ภาพ fx flurry) ปลายหมัดชนกลางตัวมอน หันตามทิศต่อย พุ่งเข้าอีกนิดแล้วจางหาย */
@@ -1322,7 +1327,8 @@ export class GameScene extends Phaser.Scene {
   private placeOverlay(v: View, o: Phaser.GameObjects.Image, b: Phaser.GameObjects.Sprite, id: string, key: string) {
     const walking = key.startsWith(`${v.sprite}_walk_`) || this.walkShifts.has(key); // เดินโค้ด / เฟรม PixelLab (เดิน, ต่อย)
     const flip = walking && (b.flipX || (!this.walkShifts.has(key) && v.dir.endsWith("west")));
-    const k = outfitKey(id, flip ? MIRROR[v.dir] : v.dir) + (key.endsWith("_in") ? "_in" : "");
+    const dir = v.punching ? v.punchDir : v.dir; // ต่อยทิศทแยงที่ยืมมา: เสื้อตามทิศของท่า
+    const k = outfitKey(id, flip ? MIRROR[dir] : dir) + (key.endsWith("_in") ? "_in" : "");
     if (o.texture.key !== k && this.textures.exists(k)) o.setTexture(k);
     const sh = this.walkShifts.has(key) ? this.bodyShift(v) : { dx: 0, dy: 0 };
     o.setFlipX(flip).setOrigin(0.5, 45 / 48).setPosition(b.x + sh.dx, b.y + sh.dy).setScale(b.scaleX, b.scaleY).setAngle(b.angle);
