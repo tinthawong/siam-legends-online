@@ -83,6 +83,7 @@ const STEPS = [[1, 0], [1, 1], [0, 1], [-1, 1], [-1, 0], [-1, -1], [0, -1], [1, 
 const JOY_AHEAD = 4;     // จอยสติ๊ก: สั่งเดินไปช่องข้างหน้ากี่ช่อง
 const JOY_RESEND_MS = 150;
 const PUNCH_WINDUP_MS = 80;
+const GROUND_PIXEL_SCALE = 0.75; // ของบนพื้นที่เป็นภาพพิกเซล 32×32 (ยา) แสดงที่ 24 px
 // ท่ายืนผู้เล่น (โค้ดล้วน): สลับภาพนิ่ง ↔ หายใจเข้า ทุก 660 ms
 // หายใจเข้า = แถว y 0–32 เลื่อนขึ้น 1 px (แถว y ใช้ค่าจากแถว y+1) แถว 33 คงเดิม แถว 34 ลงไป (ขา) ไม่ขยับ
 const BREATH_MS = 660, BREATH_ROW = 33;
@@ -519,7 +520,7 @@ export class GameScene extends Phaser.Scene {
         // ท่าก้มเก็บ (เฟรมที่ 5): ของบนพื้นหาย ไอคอนโผล่ที่มือ ลอยขึ้นหาหัวแล้วจางหาย 0.4 วินาที
         const hand = by ? this.pickupHand(by) : null;
         if (by && hand) {
-          const icon = this.add.image(hand.x, hand.y, img.texture.key).setDepth(by.c.y + 5);
+          const icon = this.add.image(hand.x, hand.y, img.texture.key).setScale(img.scaleX).setDepth(by.c.y + 5);
           img.destroy();
           this.tweens.add({ targets: icon, x: by.c.x, y: by.c.y - by.lift + by.topY, alpha: 0, duration: 400, ease: "Quad.easeOut",
             onComplete: () => icon.destroy() });
@@ -777,8 +778,10 @@ export class GameScene extends Phaser.Scene {
       .setDepth(center(g.y) - 2)
       // พื้นที่กดใหญ่เท่า 1 ช่อง (32px) แม้รูปจะเล็ก เพื่อให้กดบนมือถือง่าย
       .setInteractive({ hitArea: new Phaser.Geom.Rectangle(-8, -8, 32, 32), hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true });
-    // พื้นที่กด 32×32 ตรงกลางภาพ (ภาพ 16 หรือ 32)
-    (img.input!.hitArea as Phaser.Geom.Rectangle).setPosition(img.width / 2 - 16, img.height / 2 - 16);
+    // ภาพพิกเซล 32×32 (ยา) บนพื้นย่อเหลือ 24 px · พื้นที่กดยังเป็น 32×32 บนจอ ตรงกลางภาพ (พิกัดก่อนย่อ)
+    const scale = def.pixel ? GROUND_PIXEL_SCALE : 1;
+    img.setScale(scale);
+    (img.input!.hitArea as Phaser.Geom.Rectangle).setTo(img.width / 2 - 16 / scale, img.height / 2 - 16 / scale, 32 / scale, 32 / scale);
     img.setData("groundId", g.id).setData("item", g.item);
     this.groundViews.set(g.id, img);
 
@@ -804,7 +807,7 @@ export class GameScene extends Phaser.Scene {
     });
     const first = (t: number) => {
       const p = arc({ x: x0, y: y0 }, 22, t);
-      img.setPosition(p.x, p.y).setScale(0.4 + 0.6 * t).setRotation((1 - t) * -0.9);
+      img.setPosition(p.x, p.y).setScale((0.4 + 0.6 * t) * scale).setRotation((1 - t) * -0.9);
       shadow.setScale(0.3 + 0.7 * t).setAlpha(0.35 * t);
     };
     first(0);

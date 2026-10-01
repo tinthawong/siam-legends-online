@@ -85,8 +85,13 @@ type Entity = Player | Mob;
  * 1 instance = 1 แมพ
  * server เป็นผู้ตัดสินทุกอย่าง: client ส่งแค่ความตั้งใจ (เดินไปช่องนี้ / ตีตัวนี้ / เปิด auto)
  */
-/** ยาที่มอนทุกตัวดรอปตอนตาย (สุ่มแยกกัน) */
+/** ยาที่มอนทุกตัวดรอปตอนตาย: สุ่มครั้งเดียว ได้อย่างใดอย่างหนึ่งหรือไม่ได้เลย (ยาแดง 30% · ยาฟ้า 30% · ไม่ได้ 40%) */
 const POTION_DROPS = [{ item: "potion_red", chance: 0.3 }, { item: "potion_sky", chance: 0.3 }];
+function rollPotion(): string | null {
+  let r = Math.random();
+  for (const d of POTION_DROPS) { if (r < d.chance) return d.item; r -= d.chance; }
+  return null;
+}
 
 export class MapRoom extends DurableObject<Env> {
   private players = new Map<string, Player>();
@@ -759,11 +764,13 @@ export class MapRoom extends DurableObject<Env> {
     m.respawnAt = now + MOB_RESPAWN_MS;
     this.broadcast({ t: "die", id: m.id });
 
-    // ของดรอป: หล่นที่ช่องที่มอนตาย · ของประจำตัวมอน + ยาที่มอนทุกตัวดรอป (สุ่มแยกกันทีละอย่าง)
+    // ของดรอป: หล่นที่ช่องที่มอนตาย · ของประจำตัวมอน + ยา 1 อย่าง (ยาแดงหรือยาฟ้า ไม่ได้ทั้งคู่)
     const drop = MOBS[m.type].drop;
-    for (const d of drop ? [drop, ...POTION_DROPS] : POTION_DROPS) {
-      if (!ITEMS[d.item] || Math.random() >= d.chance) continue;
-      const g: GroundItem = { id: "g" + ++this.groundSeq, item: d.item, x: m.x, y: m.y };
+    const potion = rollPotion();
+    const items = [drop && Math.random() < drop.chance ? drop.item : null, potion];
+    for (const item of items) {
+      if (!item || !ITEMS[item]) continue;
+      const g: GroundItem = { id: "g" + ++this.groundSeq, item, x: m.x, y: m.y };
       this.ground.set(g.id, g);
       this.groundExpire.set(g.id, now + GROUND_ITEM_MS);
       this.broadcast({ t: "drop", g });

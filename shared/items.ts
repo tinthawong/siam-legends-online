@@ -22,7 +22,7 @@ export const ITEMS: Record<string, ItemDef> = {
   sickle: { name: "เคียว", kind: "equip", icon: "sickle" },              // ดรอปตั๊กแตนเคียว
   iron_helmet: { name: "หมวกเหล็ก", kind: "equip", icon: "iron-helmet" }, // ดรอปหมึกหมวกเหล็ก
   sai_sin: { name: "สายสิญจน์", kind: "equip" },                          // รางวัลเควส q001 ยังไม่มีภาพ/ค่าพลัง
-  // ยา: มอนทุกตัวตอนตายสุ่มดรอปยาแดง 30% และยาฟ้า 30% แยกกัน (POTION_DROPS ใน server) · ยาแดงแทนยาสมุนไพรเดิม (migration 0013)
+  // ยา: มอนทุกตัวตอนตายสุ่มดรอปยาแดง 30% หรือยาฟ้า 30% อย่างใดอย่างหนึ่ง (POTION_DROPS ใน server) · ยาแดงแทนยาสมุนไพรเดิม (migration 0013)
   potion_red: { name: "ยาแดง", kind: "use", icon: "potion-red", heal: 60, price: 10, pixel: true },
   potion_sky: { name: "ยาฟ้า", kind: "use", icon: "potion-sky", sp: 30, pixel: true },
 };
